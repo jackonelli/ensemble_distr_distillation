@@ -1,12 +1,18 @@
 """"Main entry point"""
 import argparse
 from pathlib import Path
+import numpy as np
+from dataloaders import gaussian
 
 
 def main():
     """Main"""
     args = parse_args()
-    print(args)
+    gaussian.SyntheticGaussianData(mean_0=[0, 0],
+                                   mean_1=[1, 0],
+                                   cov_0=np.eye(2),
+                                   cov_1=np.eye(2),
+                                   store_file=Path("data/2d_gaussian_1000"))
 
 
 def parse_args():
@@ -17,8 +23,7 @@ def parse_args():
                         default=10,
                         help="Number of epochs")
     parser.add_argument("--retrain",
-                        action="store_const",
-                        default=True,
+                        action="store_true",
                         help="Retrain ensemble from scratch")
     parser.add_argument("--model_dir",
                         type=Path,
