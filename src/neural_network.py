@@ -10,20 +10,12 @@ class NeuralNet(nn.Module):
         self.hidden_size_1 = hidden_size_1  # Or make a list or something
         self.hidden_size_2 = hidden_size_2
         self.output_size = output_size
-        self.layers = self.initialize_network()
 
-    def initialize_network(self):
-        layers = []
+        self.fc1 = nn.Linear(self.input_size, self.hidden_size_1)
+        self.fc2 = nn.Linear(self.hidden_size_1, self.hidden_size_2)
+        self.fc3 = nn.Linear(self.hidden_size_2, self.output_size)
 
-        fc1 = nn.Linear(self.input_size, self.hidden_size_1)
-        fc2 = nn.Linear(self.hidden_size_1, self.hidden_size_2)
-        fc3 = nn.Linear(self.hidden_size_2, self.output_size)
-
-        layers.append(fc1)
-        layers.append(fc2)
-        layers.append(fc3)
-
-        return layers
+        self.layers = [self.fc1, self.fc2, self.fc3]
 
     def forward(self, x):
 
@@ -36,3 +28,12 @@ class NeuralNet(nn.Module):
                 x = nn.functional.softmax(x)
 
         return x
+
+
+def main():
+    net = NeuralNet(20, 10, 5, 2)
+    print(net)
+
+
+if __name__ == "__main__":
+    main()
