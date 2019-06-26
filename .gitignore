@@ -4,5 +4,6 @@ venv
 tags
 tags.temp
 tags.lock
+data
 
 models
