@@ -30,9 +30,3 @@ class Ensemble():
             pred_mean += (1 / len(self.members)) * p
 
         return pred_mean
-
-    def eval_mode(self):  # Är verkligen inte säker på detta...
-
-        for member in self.members:
-            member.eval()
-

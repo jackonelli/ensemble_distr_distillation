@@ -20,9 +20,9 @@ def main():
     train_loader = torch.utils.data.DataLoader(data,
                                                batch_size=4,
                                                shuffle=True,
-                                               num_workers=2)
+                                               num_workers=0)
     model = neural_network.NeuralNet(2, 10, 5, 2)
-    train(model, train_loader, args.num_epochs)
+    train(model, train_loader, 20)
 
 
 def train(model, train_loader, num_epochs):

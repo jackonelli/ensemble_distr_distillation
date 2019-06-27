@@ -3,13 +3,11 @@ import matplotlib.pyplot as plt
 
 
 def accuracy_comparison(model, ensemble, data):
-    ensemble.eval_mode()
-    ensemble_output = ensemble.prediction()
+    ensemble_output = ensemble.prediction().data.numpy()
     ensemble_prediction = np.argmax(ensemble_output, axis=-1)
     ensemble_accuracy = (1 / data.x.shape[0]) * np.sum(ensemble_prediction == data.y)
 
-    model.eval()  # Räcker detta för att jag ska få ut en nd_array? Eller måste jag ha en extra eval-funktion i nätverket?
-    model_output = model.forward(data.x)
+    model_output = model.forward(data.x).data.numpy()
     model_prediction = np.argmax(model_output)
     model_accuracy = (1 / data.x.shape[0]) * np.sum(model_prediction == data.y)
 
@@ -18,6 +16,7 @@ def accuracy_comparison(model, ensemble, data):
 
 def brier_score_comparison(model, ensemble, data):  # Eventuellt
     pass
+
 
 def effect_of_ensemble_size():
     pass
@@ -33,14 +32,17 @@ def entropy(p):
 
 def entropy_comparison(model, ensemble, data):
     # Comparing predictions vs entropy of ensemble and distilled model
-
-    ensemble.eval_mode()
-    ensemble_output = ensemble.prediction()
+    ensemble_output = ensemble.prediction().data.numpy()
     ensemble_entropy = (1 / data.x.shape[0]) * np.sum(entropy(ensemble_output), axis=-1)
 
-    model.eval()
-    model_output = model.forward(data.x)
+    model_output = model.forward(data.x).data.numpy()
     model_entropy = (1 / data.x.shape[0]) * np.sum(entropy(model_output), axis=-1)  # Logiskt att kolla på detta värde?
+
+    return ensemble_entropy, model_entropy
+
+
+def entropy_comparison_plot(model, ensemble, data):
+    ensemble_entropy, model_entropy = entropy_comparison(model, ensemble, data)
 
     num_bins = 100
     plt.hist(ensemble_entropy, bins=num_bins, density=True)
@@ -57,12 +59,10 @@ def to_one_hot(y):
 
 
 def nll_comparison(model, ensemble, data):
-    ensemble.eval_mode()
-    ensemble_output = ensemble.prediction()
+    ensemble_output = ensemble.prediction().data.numpy()
     ensemble_nll = np.sum(-to_one_hot(data.y) * np.log(ensemble_output))
 
-    model.eval()
-    model_output = model.forward(data.x)
+    model_output = model.forward(data.x).data.numpy()
     model_nll = np.sum(-to_one_hot(data.y) * np.log(model_output))
 
     return ensemble_nll, model_nll

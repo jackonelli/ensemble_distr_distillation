@@ -23,16 +23,15 @@ class NeuralNet(nn.Module):
 
     def forward(self, x, t=1):
 
-        for i, layer in enumerate(self.layers):
-            x = nn.functional.relu(layer(x))
+        x = nn.functional.relu(self.fc1(x))
+        x = nn.functional.relu(self.fc2(x))
+        x = self.fc3(x) / t
 
-            if i == (len(self.layers) - 1):
-                x = self.temperature_softmax(x, t)
         return x
 
     @staticmethod
     def temperature_softmax(x, t=1):
-        return nn.functional.softmax(x / t)
+        return nn.functional.softmax(x / t, dim=-1)
 
     def train_epoch(self, train_loader):
         """Train single epoch"""
@@ -50,7 +49,7 @@ class NeuralNet(nn.Module):
         output = self.forward(x)
         loss = nn.CrossEntropyLoss()
 
-        return loss(output, target)
+        return loss(output, target.type(torch.LongTensor))
 
 
 def main():
