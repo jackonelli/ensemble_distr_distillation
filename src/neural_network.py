@@ -16,7 +16,6 @@ class NeuralNet(nn.Module):
         self.fc3 = nn.Linear(self.hidden_size_2, self.output_size)
 
         self.layers = [self.fc1, self.fc2, self.fc3]
-        self.loss = nn.CrossEntropyLoss()
         self.optimizer = torch_optim.SGD(self.parameters(),
                                          lr=0.001,
                                          momentum=0.9)
@@ -40,12 +39,17 @@ class NeuralNet(nn.Module):
         for batch in train_loader:
             inputs, labels = batch
             self.optimizer.zero_grad()
-            outputs = self.forward(inputs)
-            loss = self.loss(outputs, labels)
+            loss = self.loss(inputs, labels)
             loss.backward()
             self.optimizer.step()
             running_loss += loss.item()
         return running_loss
+
+    def loss(self, x, target):
+        output = self.forward(x)
+        loss = nn.CrossEntropyLoss()
+
+        return loss(output, target)
 
 
 def main():
