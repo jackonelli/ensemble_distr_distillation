@@ -4,8 +4,8 @@ import cross_entropy_loss_one_hot
 
 
 class NeuralNet(nn.Module):
-
-    def __init__(self, input_size, hidden_size_1, hidden_size_2, output_size, teacher):
+    def __init__(self, input_size, hidden_size_1, hidden_size_2, output_size,
+                 teacher):
         super(NeuralNet, self).__init__()
 
         self.input_size = input_size
@@ -38,7 +38,8 @@ class NeuralNet(nn.Module):
         output = self.forward(x)
         target = self.teacher.prediction(x, t)
 
-        loss = cross_entropy_loss_one_hot.CrossEntropyLossOneHot.apply(output, target)
+        loss = cross_entropy_loss_one_hot.CrossEntropyLossOneHot.apply(
+            output, target)
 
         return loss
 

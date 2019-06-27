@@ -5,7 +5,8 @@ import matplotlib.pyplot as plt
 def accuracy_comparison(model, ensemble, data):
     ensemble_output = ensemble.prediction().data.numpy()
     ensemble_prediction = np.argmax(ensemble_output, axis=-1)
-    ensemble_accuracy = (1 / data.x.shape[0]) * np.sum(ensemble_prediction == data.y)
+    ensemble_accuracy = (1 / data.x.shape[0]) * np.sum(
+        ensemble_prediction == data.y)
 
     model_output = model.forward(data.x).data.numpy()
     model_prediction = np.argmax(model_output)
@@ -27,16 +28,18 @@ def effect_of_model_capacity():
 
 
 def entropy(p):
-    return - p * np.log(p)
+    return -p * np.log(p)
 
 
 def entropy_comparison(model, ensemble, data):
     # Comparing predictions vs entropy of ensemble and distilled model
     ensemble_output = ensemble.prediction().data.numpy()
-    ensemble_entropy = (1 / data.x.shape[0]) * np.sum(entropy(ensemble_output), axis=-1)
+    ensemble_entropy = (1 / data.x.shape[0]) * np.sum(entropy(ensemble_output),
+                                                      axis=-1)
 
     model_output = model.forward(data.x).data.numpy()
-    model_entropy = (1 / data.x.shape[0]) * np.sum(entropy(model_output), axis=-1)  # Logiskt att kolla på detta värde?
+    model_entropy = (1 / data.x.shape[0]) * np.sum(
+        entropy(model_output), axis=-1)  # Logiskt att kolla på detta värde?
 
     return ensemble_entropy, model_entropy
 
@@ -71,16 +74,23 @@ def nll_comparison(model, ensemble, data):
 # Sen lite andra allmänna osäkerhetstest?
 # Typ i Sensoy et al. så kollar de på entropi + accuracy när de lägger på brus på
 
+
 def noise_effect_on_entropy(model, ensemble, data):
     # Oklart om det här såhär de gör, men
     epsilon = np.linspace(0.0001, 1, 10)
 
-    ensemble_entropy = np.zeros([len(epsilon), ])
-    model_entropy = np.zeros([len(epsilon), ])
+    ensemble_entropy = np.zeros([
+        len(epsilon),
+    ])
+    model_entropy = np.zeros([
+        len(epsilon),
+    ])
     for i, e in enumerate(epsilon):
         data_perturbed = data.copy()
-        data_perturbed.x = data_perturbed.x + np.random.normal(loc=0, scale=epsilon, size=data.shape)
-        ensemble_entropy[i], model_entropy[i] = entropy_comparison(model, ensemble, data_perturbed)
+        data_perturbed.x = data_perturbed.x + np.random.normal(
+            loc=0, scale=epsilon, size=data.shape)
+        ensemble_entropy[i], model_entropy[i] = entropy_comparison(
+            model, ensemble, data_perturbed)
 
     plt.plot(epsilon, ensemble_entropy)
     plt.plot(epsilon, model_entropy)

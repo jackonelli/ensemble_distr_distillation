@@ -46,6 +46,7 @@ def main_dump():
     net = neural_network.DumpNet()
     net.train_full(trainloader)
 
+
 def train(model, train_loader, num_epochs):
     for epoch in range(1, num_epochs + 1):
         loss = model.train_epoch(train_loader)
