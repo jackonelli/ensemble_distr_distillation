@@ -1,4 +1,5 @@
 """Ensemble class"""
+import torch
 import torch.nn as nn
 
 
@@ -19,12 +20,15 @@ class Ensemble():
     def train(self, num_epochs):
         pass
 
-    def ensemble_prediction(self, x, t=1):
+    def prediction(self, x, t=1):
 
-        y = []
-
+        pred = list()
         for member in self.members:
-            y.append(member.forward(x, t))
+            pred.append(member.forward(x, t))  # For future use rather
 
-        return y
+        pred_mean = torch.zeros([x.size[0], self.members[0].output_size], dtype=torch.float32)
+        for p in pred:
+            pred_mean += (1 / len(self.members)) * p
+
+        return pred_mean
 

@@ -32,6 +32,12 @@ class NeuralNet(nn.Module):
     def temperature_softmax(x, t=1):
         return nn.functional.softmax(x / t)
 
+    def loss(self, x, target):
+        output = self.forward(x)
+        loss = nn.CrossEntropyLoss()
+
+        return loss(output, target)
+
 
 def main():
     net = NeuralNet(20, 10, 5, 2)
