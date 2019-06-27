@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as torch_optim
-
+import cross_entropy_loss_one_hot
 
 class DumpNet(nn.Module):
     """Sanity check CIFAR model from here:
@@ -176,6 +176,7 @@ class NeuralNet(nn.Module):
         x = self.temperature_softmax(x, t)
 
         return x
+
 
 def main():
     net = NeuralNet(20, 10, 5, 2)

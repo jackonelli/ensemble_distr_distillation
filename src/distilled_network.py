@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import cross_entropy_loss_one_hot
 
 
 class NeuralNet(nn.Module):
@@ -27,19 +28,19 @@ class NeuralNet(nn.Module):
 
         return x
 
-    def loss(self, x, target):  # ALTERNATIVT SÅ SKITER VI I LOSSEN NEDAN OCH SKICKAR IN TARGETS UTIFRÅN ÄVEN DÄR
+    def loss(self, x, target):
         output = self.forward(x)
         loss = nn.CrossEntropyLoss()
 
         return loss(output, target)
 
-    def loss_cross_entropy_soft_targets(self, x, t=1):  # Tror inte att vi själva ska behöva definiera gradienten osv., får se
+    def loss_cross_entropy_soft_targets(self, x, t=1):
         output = self.forward(x)
         target = self.teacher.prediction(x, t)
 
-        loss = nn.CrossEntropyLoss()
+        loss = cross_entropy_loss_one_hot.CrossEntropyLossOneHot.apply(output, target)
 
-        return loss(output, target)
+        return loss
 
     def predict(self, x, t=1):
         x = self.forward(x)

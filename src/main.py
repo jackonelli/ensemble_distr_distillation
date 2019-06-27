@@ -22,7 +22,7 @@ def main():
     train_loader = torch.utils.data.DataLoader(data,
                                                batch_size=4,
                                                shuffle=True,
-                                               num_workers=2)
+                                               num_workers=0)
     # model = neural_network.NeuralNet(2, 3, 3, 2, lr=args.lr)
     model = neural_network.LinearNet(lr=args.lr)
     train(model, train_loader, args.num_epochs)
