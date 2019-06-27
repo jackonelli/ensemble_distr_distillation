@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 
 
@@ -32,11 +33,11 @@ class NeuralNet(nn.Module):
     def temperature_softmax(x, t=1):
         return nn.functional.softmax(x / t)
 
-    def loss(self, x, target):
-        output = self.forward(x)
+    def loss(self, data):
+        output = self.forward(data.x)
         loss = nn.CrossEntropyLoss()
 
-        return loss(output, target)
+        return loss(output, data.y)
 
 
 def main():

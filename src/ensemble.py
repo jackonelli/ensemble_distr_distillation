@@ -21,7 +21,6 @@ class Ensemble():
         pass
 
     def prediction(self, x, t=1):
-
         pred = list()
         for member in self.members:
             pred.append(member.forward(x, t))  # For future use rather
