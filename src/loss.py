@@ -11,5 +11,5 @@ class CrossEntropyLossOneHot(torch.autograd.Function):
         x = torch.sum(target * nn.functional.softmax(x, dim=-1))
         return x
 
-    #def backward(self, grad_output):
+    # def backward(self, grad_output):
     # Eventuellt att vi behöver denna, ska kolla på det

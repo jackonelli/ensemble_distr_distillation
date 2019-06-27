@@ -2,11 +2,12 @@
 from pathlib import Path
 import numpy as np
 import torch
+import torchvision.transforms as torch_transforms
 from dataloaders import gaussian
 import utils
-import neural_network
+import models
+import extra_models
 import torchvision
-import torchvision.transforms as transforms
 
 
 def main():
@@ -23,17 +24,17 @@ def main():
                                                batch_size=4,
                                                shuffle=True,
                                                num_workers=0)
-    # model = neural_network.NeuralNet(2, 3, 3, 2, lr=args.lr)
-    model = neural_network.LinearNet(lr=args.lr)
-    train(model, train_loader, args.num_epochs)
+    # model = models.NeuralNet(2, 3, 3, 2, lr=args.lr)
+    model = models.LinearNet(lr=args.lr)
+    model.train(train_loader, args.num_epochs)
     for p in model.parameters():
         print("grad", p)
 
 
 def main_dump():
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    transform = torch_transforms.Compose([
+        torch_transforms.ToTensor(),
+        torch_transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
     trainset = torchvision.datasets.CIFAR10(root='./data',
                                             train=True,
@@ -43,14 +44,8 @@ def main_dump():
                                               batch_size=4,
                                               shuffle=True,
                                               num_workers=2)
-    net = neural_network.DumpNet()
+    net = extra_models.DumpNet()
     net.train_full(trainloader)
-
-
-def train(model, train_loader, num_epochs):
-    for epoch in range(1, num_epochs + 1):
-        loss = model.train_epoch(train_loader)
-        print("Epoch {}: Loss: {}".format(epoch, loss))
 
 
 if __name__ == "__main__":

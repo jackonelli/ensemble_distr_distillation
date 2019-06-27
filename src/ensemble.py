@@ -1,6 +1,44 @@
 """Ensemble class"""
+from abc import ABC, abstractmethod
 import torch
 import torch.nn as nn
+
+
+class EnsembleMember(nn.Module, ABC):
+    """Parent class for keeping common logic in one place"""
+
+    def __init__(self, loss_function):
+        super().__init__()
+        self.loss = loss_function
+        self.optimizer = None
+
+    def train(self, train_loader, num_epochs):
+        # if self.loss is None or not issubclass(self.loss,
+        #                                        nn.modules.loss._Loss):
+        #     raise ValueError
+        for epoch in range(1, num_epochs + 1):
+            loss = self.train_epoch(train_loader)
+            print("Epoch {}: Loss: {}".format(epoch, loss))
+
+    def train_epoch(self, train_loader):
+        """Train single epoch"""
+        running_loss = 0
+        for batch in train_loader:
+            self.optimizer.zero_grad()
+            inputs, labels = batch
+            loss = self.calculate_loss(inputs, labels)
+            loss.backward()
+            self.optimizer.step()
+            running_loss += loss.item()
+        return running_loss
+
+    @abstractmethod
+    def forward(self, inputs):
+        pass
+
+    @abstractmethod
+    def calculate_loss(self, inputs, labels):
+        pass
 
 
 class Ensemble():
@@ -8,7 +46,8 @@ class Ensemble():
         self.members = list()
 
     def add_member(self, new_member):
-        if issubclass(new_member, nn.Module):
+        if issubclass(new_member, nn.Module) and issubclass(
+                new_member, EnsembleMember):
             self.members.append(new_member)
         else:
             raise ValueError("Ensemble member must be nn.Module subclass")

@@ -1,7 +1,5 @@
-import torch
 import torch.nn as nn
 import torch.optim as torch_optim
-import cross_entropy_loss_one_hot
 
 
 class DumpNet(nn.Module):
@@ -99,90 +97,3 @@ class LinearNet(nn.Module):
             running_loss += loss.item()
             #print_batch(batch, loss)
         return running_loss
-
-
-def print_batch(batch, loss):
-    inputs, labels = batch
-    for ind, input_ in enumerate(inputs):
-        print("{}: {}\nloss: {}".format(input_.data.numpy(), labels[ind],
-                                        loss))
-
-
-class NeuralNet(nn.Module):
-    def __init__(self,
-                 input_size,
-                 hidden_size_1,
-                 hidden_size_2,
-                 output_size,
-                 lr=0.001):
-        super().__init__()
-
-        self.input_size = input_size
-        self.hidden_size_1 = hidden_size_1  # Or make a list or something
-        self.hidden_size_2 = hidden_size_2
-        self.output_size = output_size
-        self.lr = lr
-
-        self.fc1 = nn.Linear(self.input_size, self.hidden_size_1)
-        self.fc2 = nn.Linear(self.hidden_size_1, self.hidden_size_2)
-        self.fc3 = nn.Linear(self.hidden_size_2, self.output_size)
-
-        self.layers = [self.fc1, self.fc2, self.fc3]
-        self.optimizer = torch_optim.SGD(self.parameters(),
-                                         lr=self.lr,
-                                         momentum=0.9)
-
-    def forward(self, x):
-        x = nn.functional.relu(self.fc1(x))
-        x = nn.functional.relu(self.fc2(x))
-        x = self.fc3(x)
-
-        # for i, layer in enumerate(self.layers):
-        #     x = nn.functional.relu(layer(x))
-
-        #     if i == (len(self.layers) - 1):
-        #         x = self.temperature_softmax(x, t)
-        # return x
-        return x
-
-    @staticmethod
-    def temperature_softmax(x, t=1):
-        return nn.functional.softmax(x / t, dim=-1)
-
-    def train_epoch(self, train_loader):
-        """Train single epoch"""
-        running_loss = 0
-        #print("parameters before", list(self.parameters())[0])
-        for batch in train_loader:
-            self.optimizer.zero_grad()
-            inputs, labels = batch
-            loss = self.loss(inputs, labels)
-            loss.backward()
-            # for p in self.parameters():
-            #     if p.grad is not None:
-            #         print("grad", p.grad.data)
-            self.optimizer.step()
-            running_loss += loss.item()
-        #print("parameters after", list(self.parameters())[0])
-        return running_loss
-
-    def loss(self, x, target):
-        output = self.forward(x)
-        loss = nn.CrossEntropyLoss()
-
-        return loss(output, target.type(torch.LongTensor))
-
-    def predict(self, x, t=1):
-        x = self.forward(x)
-        x = self.temperature_softmax(x, t)
-
-        return x
-
-
-def main():
-    net = NeuralNet(20, 10, 5, 2)
-    print(net)
-
-
-if __name__ == "__main__":
-    main()
