@@ -24,6 +24,7 @@ def parse_args():
                         type=int,
                         default=10,
                         help="Number of epochs")
+    parser.add_argument("--lr", type=float, default=0.01, help="Learning rate")
     parser.add_argument("--retrain",
                         action="store_true",
                         help="Retrain ensemble from scratch")
@@ -31,7 +32,6 @@ def parse_args():
                         type=Path,
                         default="../models",
                         help="Model directory")
-
     parser.add_argument("--seed",
                         type=int,
                         default=1,

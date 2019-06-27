@@ -2,6 +2,7 @@ from pathlib import Path
 import csv
 import numpy as np
 import torch.utils.data
+import matplotlib.pyplot as plt
 
 
 class SyntheticGaussianData(torch.utils.data.Dataset):
@@ -60,6 +61,7 @@ class SyntheticGaussianData(torch.utils.data.Dataset):
         all_x = np.row_stack((sampled_x_0, sampled_x_1))
         all_y = np.row_stack((y_0, y_1))
         combined_data = np.column_stack((all_x, all_y))
+        np.random.shuffle(combined_data)
         np.savetxt(self.file, combined_data, delimiter=",")
 
     def validate_dataset(self):
@@ -74,3 +76,28 @@ class SyntheticGaussianData(torch.utils.data.Dataset):
             csv_reader = csv.reader(csv_file, delimiter=",", quotechar="|")
             tmp_raw_data = [data for data in csv_reader]
         return np.array(tmp_raw_data, dtype=float)
+
+
+def plot_2d_data(data, ax):
+    inputs = data[:, :-1]
+    print(inputs)
+    labels = data[:, -1]
+    label_1_inds = labels == 0
+    label_2_inds = labels == 1
+    ax.scatter(inputs[label_1_inds, 0], inputs[label_1_inds, 1], label="blue")
+    ax.scatter(inputs[label_2_inds, 0], inputs[label_2_inds, 1], label="red")
+    plt.show()
+
+
+def main():
+    _, ax = plt.subplots()
+    dataset = SyntheticGaussianData(mean_0=[0, 0],
+                                    mean_1=[10, 0],
+                                    cov_0=np.eye(2),
+                                    cov_1=np.eye(2),
+                                    store_file=Path("data/2d_gaussian_1000"))
+    plot_2d_data(dataset.get_full_data(), ax)
+
+
+if __name__ == "__main__":
+    main()
