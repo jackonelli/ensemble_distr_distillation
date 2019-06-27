@@ -23,7 +23,7 @@ class Ensemble():
     def prediction(self, x, t=1):
         pred = list()
         for member in self.members:
-            pred.append(member.forward(x, t))  # For future use rather
+            pred.append(member.predict(x, t))  # For future use rather
 
         pred_mean = torch.zeros([x.size[0], self.members[0].output_size], dtype=torch.float32)
         for p in pred:

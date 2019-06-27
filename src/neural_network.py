@@ -131,10 +131,10 @@ class NeuralNet(nn.Module):
                                          lr=self.lr,
                                          momentum=0.9)
 
-    def forward(self, x, t=1):
+    def forward(self, x):
         x = nn.functional.relu(self.fc1(x))
         x = nn.functional.relu(self.fc2(x))
-        x = self.fc3(x) / t
+        x = self.fc3(x)
 
         # for i, layer in enumerate(self.layers):
         #     x = nn.functional.relu(layer(x))
@@ -171,6 +171,11 @@ class NeuralNet(nn.Module):
 
         return loss(output, target.type(torch.LongTensor))
 
+    def predict(self, x, t=1):
+        x = self.forward(x)
+        x = self.temperature_softmax(x, t)
+
+        return x
 
 def main():
     net = NeuralNet(20, 10, 5, 2)

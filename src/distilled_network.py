@@ -20,15 +20,11 @@ class NeuralNet(nn.Module):
 
         self.teacher = teacher
 
-    def forward(self, x, t=1):
+    def forward(self, x):
+        x = nn.functional.relu(self.fc1(x))
+        x = nn.functional.relu(self.fc2(x))
+        x = self.fc3(x)
 
-        assert x.size[1] == self.input_size
-
-        for i, layer in enumerate(self.layers):
-            x = nn.functional.relu(layer(x))
-
-            if i == (len(self.layers) - 1):
-                x = nn.functional.softmax(x, t)
         return x
 
     def loss(self, x, target):  # ALTERNATIVT SÅ SKITER VI I LOSSEN NEDAN OCH SKICKAR IN TARGETS UTIFRÅN ÄVEN DÄR
@@ -44,6 +40,13 @@ class NeuralNet(nn.Module):
         loss = nn.CrossEntropyLoss()
 
         return loss(output, target)
+
+    def predict(self, x, t=1):
+        x = self.forward(x)
+        x = self.temperature_softmax(x, t)
+
+        return x
+
 
 def main():
     net = NeuralNet(20, 10, 5, 2)
