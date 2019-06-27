@@ -46,7 +46,7 @@ class Ensemble():
         self.members = list()
 
     def add_member(self, new_member):
-        if issubclass(new_member, nn.Module) and issubclass(
+        if issubclass(new_member, EnsembleMember):
                 new_member, EnsembleMember):
             self.members.append(new_member)
         else:
