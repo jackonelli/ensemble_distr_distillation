@@ -23,8 +23,6 @@ class NeuralNet(nn.Module):
 
     def forward(self, x, t=1):
 
-        assert x.size[1] == self.input_size
-
         for i, layer in enumerate(self.layers):
             x = nn.functional.relu(layer(x))
 
@@ -35,6 +33,19 @@ class NeuralNet(nn.Module):
     @staticmethod
     def temperature_softmax(x, t=1):
         return nn.functional.softmax(x / t)
+
+    def train_epoch(self, train_loader):
+        """Train single epoch"""
+        running_loss = 0
+        for batch in train_loader:
+            inputs, labels = batch
+            self.optimizer.zero_grad()
+            outputs = self.forward(inputs)
+            loss = self.loss(outputs, labels)
+            loss.backward()
+            self.optimizer.step()
+            running_loss += loss.item()
+        return running_loss
 
 
 def main():
