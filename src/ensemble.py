@@ -31,3 +31,8 @@ class Ensemble():
 
         return pred_mean
 
+    def eval_mode(self):  # Är verkligen inte säker på detta...
+
+        for member in self.members:
+            member.eval()
+

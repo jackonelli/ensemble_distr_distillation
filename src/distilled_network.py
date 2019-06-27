@@ -31,11 +31,11 @@ class NeuralNet(nn.Module):
                 x = nn.functional.softmax(x, t)
         return x
 
-    def loss(self, data):  # ALTERNATIVT SÅ SKITER VI I LOSSEN NEDAN OCH SKICKAR IN TARGETS UTIFRÅN ÄVEN DÄR
-        output = self.forward(data.x)
+    def loss(self, x, target):  # ALTERNATIVT SÅ SKITER VI I LOSSEN NEDAN OCH SKICKAR IN TARGETS UTIFRÅN ÄVEN DÄR
+        output = self.forward(x)
         loss = nn.CrossEntropyLoss()
 
-        return loss(output, data.y)
+        return loss(output, target)
 
     def loss_cross_entropy_soft_targets(self, x, t=1):  # Tror inte att vi själva ska behöva definiera gradienten osv., får se
         output = self.forward(x)
