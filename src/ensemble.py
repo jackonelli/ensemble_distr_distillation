@@ -19,3 +19,12 @@ class Ensemble():
     def train(self, num_epochs):
         pass
 
+    def ensemble_prediction(self, x, t=1):
+
+        y = []
+
+        for member in self.members:
+            y.append(member.forward(x, t))
+
+        return y
+

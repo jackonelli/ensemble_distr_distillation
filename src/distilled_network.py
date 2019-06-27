@@ -1,8 +1,8 @@
 import torch.nn as nn
-import torch.optim as torch_optim
 
 
 class NeuralNet(nn.Module):
+
     def __init__(self, input_size, hidden_size_1, hidden_size_2, output_size):
         super(NeuralNet, self).__init__()
 
@@ -16,10 +16,6 @@ class NeuralNet(nn.Module):
         self.fc3 = nn.Linear(self.hidden_size_2, self.output_size)
 
         self.layers = [self.fc1, self.fc2, self.fc3]
-        self.loss = nn.CrossEntropyLoss()
-        self.optimizer = torch_optim.SGD(self.parameters(),
-                                         lr=0.001,
-                                         momentum=0.9)
 
     def forward(self, x, t=1):
 
@@ -29,12 +25,8 @@ class NeuralNet(nn.Module):
             x = nn.functional.relu(layer(x))
 
             if i == (len(self.layers) - 1):
-                x = self.temperature_softmax(x, t)
+                x = nn.functional.softmax(x, t)
         return x
-
-    @staticmethod
-    def temperature_softmax(x, t=1):
-        return nn.functional.softmax(x / t)
 
 
 def main():
