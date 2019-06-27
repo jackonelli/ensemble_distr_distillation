@@ -39,8 +39,10 @@ class SyntheticGaussianData(torch.utils.data.Dataset):
                 if count == index:
                     sample = row
                     break
-
-        return np.array(sample, dtype=float)
+        inputs = sample[:-1]
+        labels = int(float(sample[-1]))
+        return (np.array(inputs,
+                         dtype=np.float32), np.array(labels, dtype=np.long))
 
     def sample_new_data(self):
         self.file.parent.mkdir(parents=True, exist_ok=True)
