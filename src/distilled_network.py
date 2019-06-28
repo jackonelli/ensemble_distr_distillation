@@ -1,17 +1,20 @@
+import numpy as np
 import torch
 import torch.nn as nn
-import cross_entropy_loss_one_hot
+import torch.optim as torch_optim
+import loss as custom_loss
 
 
 class NeuralNet(nn.Module):
     def __init__(self, input_size, hidden_size_1, hidden_size_2, output_size,
-                 teacher):
+                 teacher, lr=0.001):
         super(NeuralNet, self).__init__()
 
         self.input_size = input_size
         self.hidden_size_1 = hidden_size_1  # Or make a list or something
         self.hidden_size_2 = hidden_size_2
         self.output_size = output_size
+        self.lr = lr
 
         self.fc1 = nn.Linear(self.input_size, self.hidden_size_1)
         self.fc2 = nn.Linear(self.hidden_size_1, self.hidden_size_2)
@@ -19,7 +22,12 @@ class NeuralNet(nn.Module):
 
         self.layers = [self.fc1, self.fc2, self.fc3]
 
+        self.loss = nn.CrossEntropyLoss()
         self.teacher = teacher
+
+        self.optimizer = torch_optim.SGD(self.parameters(),
+                                         lr=self.lr,
+                                         momentum=0.9)
 
     def forward(self, x):
         x = nn.functional.relu(self.fc1(x))
@@ -28,20 +36,45 @@ class NeuralNet(nn.Module):
 
         return x
 
-    def loss(self, x, target):
-        output = self.forward(x)
-        loss = nn.CrossEntropyLoss()
+    def calculate_loss(self, inputs, labels, t):
+        outputs = self.forward(inputs)
+        soft_targets = self.teacher.predict(inputs, t)
 
-        return loss(output, target)
+        loss = custom_loss.CrossEntropyLossOneHot.apply(outputs, soft_targets)
 
-    def loss_cross_entropy_soft_targets(self, x, t=1):
-        output = self.forward(x)
-        target = self.teacher.prediction(x, t)
-
-        loss = cross_entropy_loss_one_hot.CrossEntropyLossOneHot.apply(
-            output, target)
+        if labels is not None:
+            loss += self.loss(outputs, labels.type(torch.LongTensor))
 
         return loss
+
+    def train_epoch(self, train_loader, t=1, hard_targets=False):
+        """Train single epoch"""
+        running_loss = 0
+        for batch in train_loader:
+            self.optimizer.zero_grad()
+            inputs, labels = batch
+
+            if hard_targets:
+                loss = self.calculate_loss(inputs=inputs, t=t)
+            else:
+                loss = self.calculate_loss(inputs=inputs, labels=labels, t=t)
+
+            loss.sum().backward()
+            self.optimizer.step()
+            running_loss += loss.item()
+        return running_loss
+
+    def train(self, train_loader, num_epochs):
+
+        epoch_half = np.floor(num_epochs / 2).astype(np.int)
+
+        for epoch in range(1, epoch_half):
+            loss = self.train_epoch(train_loader)
+            print("Epoch {}: Loss: {}".format(epoch, loss))
+
+        for epoch in range(epoch_half, num_epochs + 1):
+            loss = self.train_epoch(train_loader, hard_targets=True)
+            print("Epoch {}: Loss: {}".format(epoch, loss))
 
     def predict(self, x, t=1):
         x = self.forward(x)

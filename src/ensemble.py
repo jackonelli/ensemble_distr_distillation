@@ -47,7 +47,6 @@ class Ensemble():
 
     def add_member(self, new_member):
         if issubclass(new_member, EnsembleMember):
-                new_member, EnsembleMember):
             self.members.append(new_member)
         else:
             raise ValueError("Ensemble member must be nn.Module subclass")
@@ -59,7 +58,7 @@ class Ensemble():
     def train(self, num_epochs):
         pass
 
-    def prediction(self, x, t=1):
+    def predict(self, x, t=1):
         pred = list()
         for member in self.members:
             pred.append(member.predict(x, t))  # For future use rather

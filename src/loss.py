@@ -3,13 +3,16 @@ import torch.nn as nn
 
 
 class CrossEntropyLossOneHot(torch.autograd.Function):
-    def __init__(self):
-        super(CrossEntropyLossOneHot, self).__init__()
 
-    def forward(self, x, target):
-        # Target should have the same dimension as x
-        x = torch.sum(target * nn.functional.softmax(x, dim=-1))
+    @staticmethod
+    def forward(ctx, inputs, soft_targets):
+        ctx.save_for_backward(inputs, soft_targets)
+        x = - soft_targets * nn.functional.log_softmax(inputs, dim=-1)
         return x
 
-    # def backward(self, grad_output):
-    # Eventuellt att vi behöver denna, ska kolla på det
+    @staticmethod
+    def backward(ctx, grad_output):
+        inputs, soft_targets = ctx.saved_tensors
+        grad_input = grad_output * soft_targets
+
+        return grad_input
