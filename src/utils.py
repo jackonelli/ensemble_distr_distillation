@@ -2,6 +2,12 @@
 import argparse
 from pathlib import Path
 import torch
+import torch.nn as nn
+
+
+def to_one_hot(labels, number_of_classes):
+    """Labels is a tensor of class indices"""
+    return nn.functional.one_hot(labels, number_of_classes)
 
 
 def torch_settings(seed=1):

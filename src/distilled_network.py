@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import cross_entropy_loss_one_hot
+import loss as custom_loss
 
 
 class NeuralNet(nn.Module):
@@ -38,8 +38,7 @@ class NeuralNet(nn.Module):
         output = self.forward(x)
         target = self.teacher.prediction(x, t)
 
-        loss = cross_entropy_loss_one_hot.CrossEntropyLossOneHot.apply(
-            output, target)
+        loss = custom_loss.CrossEntropyLossOneHot.apply(output, target)
 
         return loss
 
