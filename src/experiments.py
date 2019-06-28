@@ -24,10 +24,6 @@ def accuracy_comparison(model, ensemble, data):
     return ensemble_accuracy, model_accuracy
 
 
-def brier_score_comparison(model, ensemble, data):  # Eventuellt
-    pass
-
-
 def effect_of_ensemble_size():
     pass
 
