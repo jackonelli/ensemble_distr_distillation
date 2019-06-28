@@ -47,7 +47,6 @@ class Ensemble():
 
     def add_member(self, new_member):
         if issubclass(new_member, EnsembleMember):
-                new_member, EnsembleMember):
             self.members.append(new_member)
         else:
             raise ValueError("Ensemble member must be nn.Module subclass")
