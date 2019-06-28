@@ -28,7 +28,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Ensemble")
     parser.add_argument("--num_epochs",
                         type=int,
-                        default=10,
+                        default=5,
                         help="Number of epochs")
     parser.add_argument("--lr", type=float, default=0.01, help="Learning rate")
     parser.add_argument("--retrain",

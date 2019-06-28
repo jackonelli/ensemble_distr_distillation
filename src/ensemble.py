@@ -58,7 +58,7 @@ class Ensemble():
     def train(self, num_epochs):
         pass
 
-    def prediction(self, x, t=1):
+    def predict(self, x, t=1):
         pred = list()
         for member in self.members:
             pred.append(member.predict(x, t))  # For future use rather

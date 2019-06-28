@@ -38,12 +38,12 @@ def entropy(p):
 
 def entropy_comparison(model, ensemble, data):
     # Comparing predictions vs entropy of ensemble and distilled model
-    ensemble_output = ensemble.prediction().data.numpy()
-    ensemble_entropy = (1 / data.x.shape[0]) * np.sum(entropy(ensemble_output),
-                                                      axis=-1)
+    ensemble_output = ensemble.prediction()
+    ensemble_entropy = (1 / data.x.shape[0]) * torch.sum(entropy(ensemble_output),
+                                                        axis=-1)
 
-    model_output = model.forward(data.x).data.numpy()
-    model_entropy = (1 / data.x.shape[0]) * np.sum(
+    model_output = model.forward(data.x)
+    model_entropy = (1 / data.x.shape[0]) * torch.sum(
         entropy(model_output), axis=-1)  # Logiskt att kolla på detta värde?
 
     return ensemble_entropy, model_entropy

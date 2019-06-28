@@ -41,7 +41,7 @@ class NeuralNet(ensemble.EnsembleMember):
     def calculate_loss(self, inputs, labels):
         outputs = self.forward(inputs)
 
-        return self.loss(outputs, labels)
+        return self.loss(outputs, labels.type(torch.LongTensor))
 
     def predict(self, x, t=1):
         x = self.forward(x)
@@ -64,16 +64,14 @@ class LinearNet(ensemble.EnsembleMember):
                                          lr=self.lr,
                                          momentum=0.9)
 
-    def forward(self, x, t=1):
-
+    def forward(self, x):
         x = self.linear(x)
         return x
 
-    def calculate_loss(self, x, target):
-        output = self.forward(x)
-        loss = nn.CrossEntropyLoss()
+    def calculate_loss(self, inputs, labels):
+        output = self.forward(inputs)
 
-        return loss(output, target)
+        return self.loss(output, labels.type(torch.LongTensor))
 
 
 def main():

@@ -8,6 +8,7 @@ import utils
 import models
 import extra_models
 import torchvision
+import distilled_network
 
 
 def main():
@@ -24,11 +25,14 @@ def main():
                                                batch_size=4,
                                                shuffle=True,
                                                num_workers=0)
-    # model = models.NeuralNet(2, 3, 3, 2, lr=args.lr)
-    model = models.LinearNet(lr=args.lr)
+    model = models.NeuralNet(2, 3, 3, 2, lr=args.lr)
+    # model = models.LinearNet(lr=args.lr)
     model.train(train_loader, args.num_epochs)
     for p in model.parameters():
         print("grad", p)
+
+    distilled_model = distilled_network.NeuralNet(2, 3, 3, 2, model, lr=args.lr)
+    distilled_model.train(train_loader, args.num_epochs)
 
 
 def main_dump():
