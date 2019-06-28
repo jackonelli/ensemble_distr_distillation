@@ -13,9 +13,9 @@ class EnsembleMember(nn.Module, ABC):
         self.optimizer = None
 
     def train(self, train_loader, num_epochs):
-        # if self.loss is None or not issubclass(self.loss,
-        #                                        nn.modules.loss._Loss):
-        #     raise ValueError
+        if self.loss is None or not issubclass(type(self.loss),
+                                               nn.modules.loss._Loss):
+            raise ValueError("Must assign proper loss function to child.loss.")
         for epoch in range(1, num_epochs + 1):
             loss = self.train_epoch(train_loader)
             print("Epoch {}: Loss: {}".format(epoch, loss))

@@ -1,5 +1,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import torch.nn as nn
+import torch
+import utils
+
+
+def distill_model_comparison(distill_output, ensemble_output, metric):
+    """Comparison interface
+    distill_output and tensor output must match in some sense
+    """
 
 
 def accuracy_comparison(model, ensemble, data):
@@ -13,10 +22,6 @@ def accuracy_comparison(model, ensemble, data):
     model_accuracy = (1 / data.x.shape[0]) * np.sum(model_prediction == data.y)
 
     return ensemble_accuracy, model_accuracy
-
-
-def brier_score_comparison(model, ensemble, data):  # Eventuellt
-    pass
 
 
 def effect_of_ensemble_size():
@@ -55,18 +60,14 @@ def entropy_comparison_plot(model, ensemble, data):
     plt.show()
 
 
-def to_one_hot(y):
-    num_classes = np.max(y) + 1
-    # if num_classes > 2
-    return np.eye(num_classes)[y]
-
-
 def nll_comparison(model, ensemble, data):
-    ensemble_output = ensemble.prediction().data.numpy()
-    ensemble_nll = np.sum(-to_one_hot(data.y) * np.log(ensemble_output))
+    inputs, labels = data
+    ensemble_output = ensemble.prediction(inputs)
+    ensemble_nll = torch.sum(-utils.to_one_hot(labels) *
+                             torch.log(ensemble_output))
 
-    model_output = model.forward(data.x).data.numpy()
-    model_nll = np.sum(-to_one_hot(data.y) * np.log(model_output))
+    model_output = model.forward(inputs)
+    model_nll = torch.sum(-utils.to_one_hot(data.y) * torch.log(model_output))
 
     return ensemble_nll, model_nll
 
