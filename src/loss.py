@@ -8,14 +8,15 @@ class CrossEntropyLossOneHot(torch.autograd.Function):
     def forward(ctx, inputs, soft_targets):
         """TODO: extract convergence measure"""
         ctx.save_for_backward(inputs, soft_targets)
-        return torch.sum(-soft_targets * nn.functional.log_softmax(inputs),
+        return torch.sum(-soft_targets *
+                         nn.functional.log_softmax(inputs, dim=0),
                          dim=-1)
 
     @staticmethod
     def backward(ctx, grad_output):
         inputs, soft_targets = ctx.saved_tensors
 
-        return -soft_targets / inputs
+        return -soft_targets / inputs, None
 
 
 class CrossEntropyLossOneHotMatrix(torch.autograd.Function):
@@ -37,4 +38,4 @@ class CrossEntropyLossOneHotMatrix(torch.autograd.Function):
 
         grad_input = torch.stack(grad_input)
 
-        return grad_input
+        return grad_input, None

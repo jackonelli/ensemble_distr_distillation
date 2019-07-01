@@ -59,14 +59,11 @@ class NeuralNet(nn.Module):
             self.optimizer.zero_grad()
             inputs, labels = batch
 
-            if hard_targets:
-                loss = self.calculate_loss(inputs=inputs, t=t)
-            else:
-                loss = self.calculate_loss(inputs=inputs, labels=labels, t=t)
+            loss = self.calculate_loss(inputs=inputs, labels=labels, t=t)
 
             loss.sum().backward()
             self.optimizer.step()
-            running_loss += loss.item()
+            # running_loss += loss.item()
         return running_loss
 
     def train(self, train_loader, num_epochs):
