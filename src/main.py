@@ -31,7 +31,12 @@ def main():
     for p in model.parameters():
         print("grad", p)
 
-    distilled_model = distilled_network.NeuralNet(2, 3, 3, 2, model, lr=args.lr)
+    distilled_model = distilled_network.NeuralNet(2,
+                                                  3,
+                                                  3,
+                                                  2,
+                                                  model,
+                                                  lr=args.lr)
     distilled_model.train(train_loader, args.num_epochs)
 
 

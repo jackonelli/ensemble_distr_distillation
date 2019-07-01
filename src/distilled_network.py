@@ -6,8 +6,13 @@ import loss as custom_loss
 
 
 class NeuralNet(nn.Module):
-    def __init__(self, input_size, hidden_size_1, hidden_size_2, output_size,
-                 teacher, lr=0.001):
+    def __init__(self,
+                 input_size,
+                 hidden_size_1,
+                 hidden_size_2,
+                 output_size,
+                 teacher,
+                 lr=0.001):
         super(NeuralNet, self).__init__()
 
         self.input_size = input_size
