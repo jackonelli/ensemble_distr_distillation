@@ -45,9 +45,11 @@ class NeuralNet(nn.Module):
         outputs = self.forward(inputs)
         soft_targets = self.teacher.predict(inputs, t)
 
+        # Extra none loss
         loss = custom_loss.CrossEntropyLossOneHot.apply(outputs, soft_targets)
+        # loss = custom_loss.scalar_loss(outputs, soft_targets)
 
-        if labels is not None:
+        if labels is not None and False:
             loss += self.loss(outputs, labels.type(torch.LongTensor))
 
         return loss
@@ -63,7 +65,7 @@ class NeuralNet(nn.Module):
 
             loss.sum().backward()
             self.optimizer.step()
-            # running_loss += loss.item()
+            running_loss += loss.item()
         return running_loss
 
     def train(self, train_loader, num_epochs):
