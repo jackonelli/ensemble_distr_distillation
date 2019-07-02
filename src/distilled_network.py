@@ -5,20 +5,22 @@ import torch.optim as torch_optim
 import loss as custom_loss
 
 
-class NeuralNet(nn.Module):
+class PlainProbabilityDistribution(nn.Module):
     def __init__(self,
                  input_size,
                  hidden_size_1,
                  hidden_size_2,
                  output_size,
                  teacher,
+                 use_hard_labels=False,
                  lr=0.001):
-        super(NeuralNet, self).__init__()
+        super().__init__()
 
         self.input_size = input_size
         self.hidden_size_1 = hidden_size_1  # Or make a list or something
         self.hidden_size_2 = hidden_size_2
         self.output_size = output_size
+        self.use_hard_labels = use_hard_labels
         self.lr = lr
 
         self.fc1 = nn.Linear(self.input_size, self.hidden_size_1)
@@ -27,7 +29,7 @@ class NeuralNet(nn.Module):
 
         self.layers = [self.fc1, self.fc2, self.fc3]
 
-        self.loss = nn.CrossEntropyLoss()
+        self.loss = nn.NLLLoss()
         self.teacher = teacher
 
         self.optimizer = torch_optim.SGD(self.parameters(),
@@ -38,6 +40,7 @@ class NeuralNet(nn.Module):
         x = nn.functional.relu(self.fc1(x))
         x = nn.functional.relu(self.fc2(x))
         x = self.fc3(x)
+        x = nn.functional.softmax(x, dim=-1)
 
         return x
 
@@ -46,10 +49,10 @@ class NeuralNet(nn.Module):
         soft_targets = self.teacher.predict(inputs, t)
 
         # Extra none loss
-        loss = custom_loss.CrossEntropyLossOneHot.apply(outputs, soft_targets)
-        # loss = custom_loss.scalar_loss(outputs, soft_targets)
+        # loss = custom_loss.CrossEntropyLossOneHot.apply(outputs, soft_targets)
+        loss = custom_loss.scalar_loss(outputs, soft_targets)
 
-        if labels is not None and False:
+        if labels is not None and self.use_hard_labels:
             loss += self.loss(outputs, labels.type(torch.LongTensor))
 
         return loss
@@ -89,7 +92,7 @@ class NeuralNet(nn.Module):
 
 
 def main():
-    net = NeuralNet(20, 10, 5, 2)
+    net = PlainProbabilityDistribution(20, 10, 5, 2)
     print(net)
 
 

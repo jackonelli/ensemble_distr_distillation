@@ -25,15 +25,9 @@ def main():
     model = models.NeuralNet(2, 3, 3, 2, lr=args.lr)
     # model = models.LinearNet(lr=args.lr)
     model.train(train_loader, args.num_epochs)
-    for p in model.parameters():
-        print("grad", p)
 
-    distilled_model = distilled_network.NeuralNet(2,
-                                                  3,
-                                                  3,
-                                                  2,
-                                                  model,
-                                                  lr=args.lr)
+    distilled_model = distilled_network.PlainProbabilityDistribution(
+        2, 3, 3, 2, model, lr=args.lr)
     distilled_model.train(train_loader, args.num_epochs)
 
 
