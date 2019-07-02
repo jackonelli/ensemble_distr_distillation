@@ -10,9 +10,9 @@ def to_one_hot(labels, number_of_classes):
     return nn.functional.one_hot(labels, number_of_classes)
 
 
-def torch_settings(seed=1):
+def torch_settings(seed=1, use_gpu=False):
     """Pytorch settings"""
-    if torch.cuda.is_available():
+    if torch.cuda.is_available() and use_gpu:
         device = torch.device("cuda")
         torch.backends.cudnn.benchmark = True
         torch.cuda.manual_seed(seed)
@@ -42,6 +42,9 @@ def parse_args():
                         type=int,
                         default=1,
                         help="Random seed, NB both cuda and cpu")
+    parser.add_argument("--gpu",
+                        action="store_true",
+                        help="Use gpu, if available")
 
     return parser.parse_args()
 

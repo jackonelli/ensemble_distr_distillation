@@ -12,7 +12,7 @@ import distilled_network
 def main():
     """Main"""
     args = utils.parse_args()
-    device = utils.torch_settings(args.seed)
+    device = utils.torch_settings(args.seed, args.gpu)
     data = gaussian.SyntheticGaussianData(
         mean_0=[0, 0],
         mean_1=[-3, -3],
@@ -24,13 +24,12 @@ def main():
                                                shuffle=True,
                                                num_workers=0)
     model = models.NeuralNet(2, 3, 3, 2, lr=args.lr)
-    # model = models.LinearNet(lr=args.lr)
-    model.train(train_loader, args.num_epochs)
+    prob_ensemble = ensemble.Ensemble()
+    prob_ensemble.add_member(model)
+    prob_ensemble.train(train_loader, args.num_epochs)
 
     distilled_model = distilled_network.PlainProbabilityDistribution(
         2, 3, 3, 2, model, lr=args.lr)
-    prob_ensemble = ensemble.Ensemble()
-    prob_ensemble.add_member(distilled_model)
     distilled_model.train(train_loader, args.num_epochs)
 
 

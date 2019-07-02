@@ -64,8 +64,10 @@ class Ensemble():
         for _ in range(number_of):
             self.add_member(constructor())
 
-    def train(self, num_epochs):
-        pass
+    def train(self, train_loader, num_epochs):
+        """Multithreaded?"""
+        for member in self.members:
+            member.train(train_loader, num_epochs)
 
     def predict(self, x, t=1):
         pred = list()
