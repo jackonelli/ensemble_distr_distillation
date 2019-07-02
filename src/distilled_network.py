@@ -84,12 +84,6 @@ class PlainProbabilityDistribution(nn.Module):
             loss = self.train_epoch(train_loader, hard_targets=True)
             print("Epoch {}: Loss: {}".format(epoch, loss))
 
-    def predict(self, x, t=1):
-        x = self.forward(x)
-        x = self.temperature_softmax(x, t)
-
-        return x
-
 
 def main():
     net = PlainProbabilityDistribution(20, 10, 5, 2)

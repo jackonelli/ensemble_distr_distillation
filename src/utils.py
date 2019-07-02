@@ -44,3 +44,8 @@ def parse_args():
                         help="Random seed, NB both cuda and cpu")
 
     return parser.parse_args()
+
+
+def tensor_argmax(input_tensor):
+    value, ind = torch.max(input_tensor, dim=-1)
+    return ind, value
