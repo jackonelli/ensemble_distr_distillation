@@ -3,6 +3,7 @@ import csv
 import numpy as np
 import torch.utils.data
 import matplotlib.pyplot as plt
+import logging
 
 
 class SyntheticGaussianData(torch.utils.data.Dataset):
@@ -16,6 +17,7 @@ class SyntheticGaussianData(torch.utils.data.Dataset):
                  n_samples=1000,
                  ratio_0_to_1=0.5):
         super(SyntheticGaussianData).__init__()
+        self._log = logging.getLogger(self.__class__.__name__)
         self.mean_0 = np.array(mean_0)
         self.mean_1 = np.array(mean_1)
         self.cov_0 = np.array(cov_0)
@@ -26,7 +28,7 @@ class SyntheticGaussianData(torch.utils.data.Dataset):
         if self.file.exists() and reuse_data:
             self.validate_dataset()
         else:
-            print("Sampling new data")
+            self._log.info("Sampling new data")
             self.sample_new_data()
 
     def __len__(self):

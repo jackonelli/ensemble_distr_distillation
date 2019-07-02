@@ -7,6 +7,8 @@ import ensemble
 
 
 class PlainProbabilityDistribution(ensemble.EnsembleMember):
+    """Not necessarily an ensemble member but can be used as one"""
+
     def __init__(self,
                  input_size,
                  hidden_size_1,
@@ -75,14 +77,15 @@ class PlainProbabilityDistribution(ensemble.EnsembleMember):
     def train(self, train_loader, num_epochs, t=1):
 
         epoch_half = np.floor(num_epochs / 2).astype(np.int)
+        self._log.info("Training distilled network.")
 
         for epoch in range(1, epoch_half):
             loss = self.train_epoch(train_loader, t=t)
-            print("Epoch {}: Loss: {}".format(epoch, loss))
+            self._log.info("Epoch {}: Loss: {}".format(epoch, loss))
 
         for epoch in range(epoch_half, num_epochs + 1):
             loss = self.train_epoch(train_loader, t=t, hard_targets=True)
-            print("Epoch {}: Loss: {}".format(epoch, loss))
+            self._log.info("Epoch {}: Loss: {}".format(epoch, loss))
 
 
 def main():

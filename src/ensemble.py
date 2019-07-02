@@ -2,6 +2,7 @@
 from abc import ABC, abstractmethod
 import torch
 import torch.nn as nn
+import logging
 
 
 class EnsembleMember(nn.Module, ABC):
@@ -11,6 +12,7 @@ class EnsembleMember(nn.Module, ABC):
         super().__init__()
         self.loss = loss_function
         self.optimizer = None
+        self._log = logging.getLogger(self.__class__.__name__)
 
     def train(self, train_loader, num_epochs):
         if self.loss is None or not issubclass(type(self.loss),
@@ -18,7 +20,7 @@ class EnsembleMember(nn.Module, ABC):
             raise ValueError("Must assign proper loss function to child.loss.")
         for epoch in range(1, num_epochs + 1):
             loss = self.train_epoch(train_loader)
-            print("Epoch {}: Loss: {}".format(epoch, loss))
+            self._log.info("Epoch {}: Loss: {}".format(epoch, loss))
 
     def train_epoch(self, train_loader):
         """Train single epoch"""
@@ -52,13 +54,16 @@ class EnsembleMember(nn.Module, ABC):
 class Ensemble():
     def __init__(self):
         self.members = list()
+        self._log = logging.getLogger(self.__class__.__name__)
 
     def add_member(self, new_member):
         if issubclass(type(new_member), EnsembleMember):
+            self._log.info("Adding {} to ensemble".format(type(new_member)))
             self.members.append(new_member)
         else:
-            raise ValueError(
-                "Ensemble member must be an EnsembleMember subclass")
+            err_str = "Ensemble member must be an EnsembleMember subclass"
+            self._log.error(err_str)
+            raise ValueError(err_str)
 
     def add_multiple(self, number_of, constructor):
         for _ in range(number_of):
@@ -66,6 +71,7 @@ class Ensemble():
 
     def train(self, train_loader, num_epochs):
         """Multithreaded?"""
+        self._log.info("Training ensemble")
         for member in self.members:
             member.train(train_loader, num_epochs)
 

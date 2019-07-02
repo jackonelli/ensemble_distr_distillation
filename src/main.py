@@ -1,5 +1,7 @@
 """"Main entry point"""
 from pathlib import Path
+from datetime import datetime
+import logging
 import numpy as np
 import torch
 from dataloaders import gaussian
@@ -9,11 +11,16 @@ import distilled_network
 import ensemble
 import experiments
 
+logger = logging.getLogger(__name__)
+
 
 def main():
     """Main"""
     args = utils.parse_args()
+    log_file = Path("{}.log".format(datetime.now().strftime('%Y%m%d_%H%M%S')))
+    utils.setup_logger(log_path=Path.cwd() / args.log_dir / log_file)
     device = utils.torch_settings(args.seed, args.gpu)
+    logger.info("Creating dataloader")
     data = gaussian.SyntheticGaussianData(
         mean_0=[0, 0],
         mean_1=[-3, -3],

@@ -1,4 +1,6 @@
 """Utilities module"""
+import sys
+import logging
 import argparse
 from pathlib import Path
 import torch
@@ -36,8 +38,12 @@ def parse_args():
                         help="Retrain ensemble from scratch")
     parser.add_argument("--model_dir",
                         type=Path,
-                        default="../models",
+                        default="./models",
                         help="Model directory")
+    parser.add_argument("--log_dir",
+                        type=Path,
+                        default="./logs",
+                        help="Logs directory")
     parser.add_argument("--seed",
                         type=int,
                         default=1,
@@ -47,6 +53,43 @@ def parse_args():
                         help="Use gpu, if available")
 
     return parser.parse_args()
+
+
+LOG_FORMAT = "%(asctime)-15s %(levelname)-5s %(name)-15s - %(message)s"
+LOGGER = logging.getLogger(__name__)
+
+
+def setup_logger(log_path=None, logger=None, debug=False, fmt=LOG_FORMAT):
+    """Setup for a logger instance.
+
+    Args:
+        log_path (str, optional): full path
+        debug (bool, optional): Log mode
+        logger (logging.Logger, optional): root logger if None
+        fmt (str, optional): message format
+
+    """
+    logger = logger if logger else logging.getLogger()
+    fmt = logging.Formatter(fmt=fmt)
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(fmt)
+    logger.addHandler(stream_handler)
+
+    log_level = logging.DEBUG if debug else logging.INFO
+    logger.setLevel(log_level)
+    logger.handlers = []
+    stdout_handler = logging.StreamHandler(sys.stdout)
+    stdout_handler.setFormatter(fmt)
+    logger.addHandler(stdout_handler)
+
+    log_path = Path(log_path)
+    if log_path:
+        directory = log_path.parent
+        directory.mkdir(exist_ok=True)
+        file_handler = logging.FileHandler(log_path)
+        file_handler.setFormatter(fmt)
+        logger.addHandler(file_handler)
+        logger.info("Log at {}".format(log_path))
 
 
 def tensor_argmax(input_tensor):
