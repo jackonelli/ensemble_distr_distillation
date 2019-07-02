@@ -33,6 +33,28 @@ class TestMetrics(unittest.TestCase):
         nll = metrics.nll(true_one_hot, predictions)
         tt.assert_almost_equal(nll, 0.69314718 * torch.ones((2)))
 
+    def test_accuracy(self):
+        true_label = torch.tensor(1)
+        predictions = torch.tensor(1)
+        acc = metrics.accuracy(true_label, predictions)
+        self.assertAlmostEqual(acc, 1)
+
+    def test_accuracy_batch(self):
+        true_label = torch.tensor([1, 0, 2, 0])
+        predictions = torch.tensor([1, 1, 2, 1])
+        acc = metrics.accuracy(true_label, predictions)
+        self.assertAlmostEqual(acc, 0.5)
+        # Test two dim if ever used
+        true_label = torch.ones((3, 4))
+        predictions = torch.zeros((3, 4))
+        acc = metrics.accuracy(true_label, predictions)
+        self.assertAlmostEqual(acc, 0.0)
+        # Test two dim if ever used
+        true_label = torch.ones((3, 4))
+        predictions = torch.ones((3, 4))
+        acc = metrics.accuracy(true_label, predictions)
+        self.assertAlmostEqual(acc, 1.0)
+
 
 if __name__ == '__main__':
     unittest.main()
