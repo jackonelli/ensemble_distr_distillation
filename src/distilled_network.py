@@ -57,7 +57,7 @@ class PlainProbabilityDistribution(ensemble.EnsembleMember):
 
         return loss
 
-    def train_epoch(self, train_loader, t=1, hard_targets=False):
+    def train_epoch(self, train_loader, t, hard_targets=False):
         """Train single epoch"""
         running_loss = 0
         for batch in train_loader:
@@ -72,16 +72,16 @@ class PlainProbabilityDistribution(ensemble.EnsembleMember):
             running_loss += loss.item()
         return running_loss
 
-    def train(self, train_loader, num_epochs):
+    def train(self, train_loader, num_epochs, t=1):
 
         epoch_half = np.floor(num_epochs / 2).astype(np.int)
 
         for epoch in range(1, epoch_half):
-            loss = self.train_epoch(train_loader)
+            loss = self.train_epoch(train_loader, t=t)
             print("Epoch {}: Loss: {}".format(epoch, loss))
 
         for epoch in range(epoch_half, num_epochs + 1):
-            loss = self.train_epoch(train_loader, hard_targets=True)
+            loss = self.train_epoch(train_loader, t=t, hard_targets=True)
             print("Epoch {}: Loss: {}".format(epoch, loss))
 
 

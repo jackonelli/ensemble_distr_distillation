@@ -72,7 +72,7 @@ class Ensemble():
         for member in self.members:
             pred.append(member.predict(x, t))  # For future use rather
 
-        pred_mean = torch.zeros([x.size[0], self.members[0].output_size],
+        pred_mean = torch.zeros([x.shape[0], self.members[0].output_size],
                                 dtype=torch.float32)
         for p in pred:
             pred_mean += (1 / len(self.members)) * p
