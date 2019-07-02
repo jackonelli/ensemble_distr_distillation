@@ -3,8 +3,8 @@ import sys
 import logging
 import argparse
 from pathlib import Path
-import torch
-import torch.nn as nn
+# import torch
+# import torch.nn as nn
 
 
 def to_one_hot(labels, number_of_classes):
@@ -44,6 +44,10 @@ def parse_args():
                         type=Path,
                         default="./logs",
                         help="Logs directory")
+    parser.add_argument("--log_level",
+                        type=_log_level_arg,
+                        default=logging.INFO,
+                        help="Log level")
     parser.add_argument("--seed",
                         type=int,
                         default=1,
@@ -54,18 +58,32 @@ def parse_args():
 
     return parser.parse_args()
 
+def _log_level_arg(arg_string):
+    log_level = logging.INFO
+    if arg_string == "DEBUG":
+        log_level = logging.DEBUG
+    elif arg_string == "INFO":
+        log_level = logging.INFO
+    elif arg_string == "WARNING":
+        log_level = logging.WARNING
+    elif arg_string == "ERROR":
+        log_level = logging.WARNING
+    elif arg_string == "CRITICAL":
+        log_level = logging.WARNING
+    else:
+        raise ValueError("Invalid log level.")
+    return log_level
 
 LOG_FORMAT = "%(asctime)-15s %(levelname)-5s %(name)-15s - %(message)s"
-LOGGER = logging.getLogger(__name__)
 
 
-def setup_logger(log_path=None, logger=None, debug=False, fmt=LOG_FORMAT):
+def setup_logger(log_path=None, logger=None, log_level=logging.INFO, fmt=LOG_FORMAT):
     """Setup for a logger instance.
 
     Args:
         log_path (str, optional): full path
-        debug (bool, optional): Log mode
         logger (logging.Logger, optional): root logger if None
+        log_level (logging.LOGLEVEL, optional):
         fmt (str, optional): message format
 
     """
@@ -75,7 +93,6 @@ def setup_logger(log_path=None, logger=None, debug=False, fmt=LOG_FORMAT):
     stream_handler.setFormatter(fmt)
     logger.addHandler(stream_handler)
 
-    log_level = logging.DEBUG if debug else logging.INFO
     logger.setLevel(log_level)
     logger.handlers = []
     stdout_handler = logging.StreamHandler(sys.stdout)
@@ -86,7 +103,7 @@ def setup_logger(log_path=None, logger=None, debug=False, fmt=LOG_FORMAT):
     if log_path:
         directory = log_path.parent
         directory.mkdir(exist_ok=True)
-        file_handler = logging.FileHandler(log_path)
+        file_handler = logging.FileHandler(str(log_path))
         file_handler.setFormatter(fmt)
         logger.addHandler(file_handler)
         logger.info("Log at {}".format(log_path))

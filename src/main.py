@@ -18,7 +18,7 @@ def main():
     """Main"""
     args = utils.parse_args()
     log_file = Path("{}.log".format(datetime.now().strftime('%Y%m%d_%H%M%S')))
-    utils.setup_logger(log_path=Path.cwd() / args.log_dir / log_file)
+    utils.setup_logger(log_path=Path.cwd() / args.log_dir / log_file, log_level=args.log_level)
     device = utils.torch_settings(args.seed, args.gpu)
     logger.info("Creating dataloader")
     data = gaussian.SyntheticGaussianData(
