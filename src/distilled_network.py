@@ -60,6 +60,7 @@ class NeuralNet(nn.Module):
                 loss = self.calculate_loss(inputs=inputs, labels=labels, t=t)
 
             loss.sum().backward()
+
             self.optimizer.step()
             running_loss += loss.item()
         return running_loss
