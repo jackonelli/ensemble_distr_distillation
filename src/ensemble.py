@@ -54,10 +54,11 @@ class Ensemble():
         self.members = list()
 
     def add_member(self, new_member):
-        if issubclass(new_member, EnsembleMember):
+        if issubclass(type(new_member), EnsembleMember):
             self.members.append(new_member)
         else:
-            raise ValueError("Ensemble member must be nn.Module subclass")
+            raise ValueError(
+                "Ensemble member must be an EnsembleMember subclass")
 
     def add_multiple(self, number_of, constructor):
         for _ in range(number_of):

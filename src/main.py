@@ -5,6 +5,7 @@ import torch
 from dataloaders import gaussian
 import utils
 import models
+import ensemble
 import distilled_network
 
 
@@ -28,6 +29,8 @@ def main():
 
     distilled_model = distilled_network.PlainProbabilityDistribution(
         2, 3, 3, 2, model, lr=args.lr)
+    prob_ensemble = ensemble.Ensemble()
+    prob_ensemble.add_member(distilled_model)
     distilled_model.train(train_loader, args.num_epochs)
 
 

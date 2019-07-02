@@ -3,9 +3,10 @@ import torch
 import torch.nn as nn
 import torch.optim as torch_optim
 import loss as custom_loss
+import ensemble
 
 
-class PlainProbabilityDistribution(nn.Module):
+class PlainProbabilityDistribution(ensemble.EnsembleMember):
     def __init__(self,
                  input_size,
                  hidden_size_1,
@@ -14,7 +15,7 @@ class PlainProbabilityDistribution(nn.Module):
                  teacher,
                  use_hard_labels=False,
                  lr=0.001):
-        super().__init__()
+        super().__init__(nn.NLLLoss())
 
         self.input_size = input_size
         self.hidden_size_1 = hidden_size_1  # Or make a list or something
@@ -29,7 +30,6 @@ class PlainProbabilityDistribution(nn.Module):
 
         self.layers = [self.fc1, self.fc2, self.fc3]
 
-        self.loss = nn.NLLLoss()
         self.teacher = teacher
 
         self.optimizer = torch_optim.SGD(self.parameters(),
