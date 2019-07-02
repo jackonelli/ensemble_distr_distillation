@@ -5,8 +5,9 @@ import torch
 from dataloaders import gaussian
 import utils
 import models
-import ensemble
 import distilled_network
+import ensemble
+import experiments
 
 
 def main():

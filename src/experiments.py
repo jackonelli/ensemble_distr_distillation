@@ -3,6 +3,10 @@ import matplotlib.pyplot as plt
 import torch.nn as nn
 import torch
 import utils
+import distilled_network
+import ensemble
+import models
+from pathlib import Path
 
 
 def distill_model_comparison(distill_output, ensemble_output, metric):
@@ -11,15 +15,17 @@ def distill_model_comparison(distill_output, ensemble_output, metric):
     """
 
 
-def accuracy_comparison(model, ensemble, data):
-    ensemble_output = ensemble.prediction().data.numpy()
-    ensemble_prediction = np.argmax(ensemble_output, axis=-1)
-    ensemble_accuracy = (1 / data.x.shape[0]) * np.sum(
-        ensemble_prediction == data.y)
+def accuracy_comparison(model, ensemble, inputs, labels):
+    ensemble_output = ensemble.predict(inputs)
+    ensemble_prediction = torch.argmax(ensemble_output, dim=-1)
+    ensemble_accuracy = (1 / inputs.shape[0]) * (
+        ensemble_prediction == labels.type(
+            torch.LongTensor)).sum().data.numpy()
 
-    model_output = model.forward(data.x).data.numpy()
-    model_prediction = np.argmax(model_output)
-    model_accuracy = (1 / data.x.shape[0]) * np.sum(model_prediction == data.y)
+    model_output = model.forward(inputs)
+    model_prediction = torch.argmax(model_output, dim=-1)
+    model_accuracy = (1 / inputs.shape[0]) * (model_prediction == labels.type(
+        torch.LongTensor)).sum().data.numpy()
 
     return ensemble_accuracy, model_accuracy
 
@@ -33,24 +39,25 @@ def effect_of_model_capacity():
 
 
 def entropy(p):
-    return -p * np.log(p)
+    return -p * torch.log(p)
 
 
-def entropy_comparison(model, ensemble, data):
+def entropy_comparison(model, ensemble, inputs):
     # Comparing predictions vs entropy of ensemble and distilled model
-    ensemble_output = ensemble.prediction()
-    ensemble_entropy = (1 / data.x.shape[0]) * torch.sum(entropy(ensemble_output),
-                                                        axis=-1)
+    ensemble_output = ensemble.predict(inputs)
+    ensemble_entropy = (1 / inputs.shape[0]) * torch.sum(
+        entropy(ensemble_output), dim=-1)
 
-    model_output = model.forward(data.x)
-    model_entropy = (1 / data.x.shape[0]) * torch.sum(
-        entropy(model_output), axis=-1)  # Logiskt att kolla på detta värde?
+    model_output = model.forward(inputs)
+    model_entropy = (1 / inputs.shape[0]) * torch.sum(
+        entropy(model_output), dim=-1)  # Logiskt att kolla på detta värde?
 
-    return ensemble_entropy, model_entropy
+    return ensemble_entropy.data.numpy(), model_entropy.data.numpy()
 
 
-def entropy_comparison_plot(model, ensemble, data):
-    ensemble_entropy, model_entropy = entropy_comparison(model, ensemble, data)
+def entropy_comparison_plot(model, ensemble, inputs):
+    ensemble_entropy, model_entropy = entropy_comparison(
+        model, ensemble, inputs)
 
     num_bins = 100
     plt.hist(ensemble_entropy, bins=num_bins, density=True)
@@ -60,20 +67,19 @@ def entropy_comparison_plot(model, ensemble, data):
     plt.show()
 
 
-def nll_comparison(model, ensemble, data):
-    inputs, labels = data
-    ensemble_output = ensemble.prediction(inputs)
-    ensemble_nll = torch.sum(-utils.to_one_hot(labels) *
-                             torch.log(ensemble_output))
+def nll_comparison(model, ensemble, inputs, labels, number_of_classes):
+    one_hot_labels = utils.to_one_hot(labels, number_of_classes)
+
+    ensemble_output = ensemble.predict(inputs)
+    ensemble_nll = torch.sum(-one_hot_labels * torch.log(ensemble_output))
 
     model_output = model.forward(inputs)
-    model_nll = torch.sum(-utils.to_one_hot(data.y) * torch.log(model_output))
+    model_nll = torch.sum(-one_hot_labels * torch.log(model_output))
 
-    return ensemble_nll, model_nll
+    return ensemble_nll.data.numpy(), model_nll.data.numpy()
 
 
 # Sen lite andra allmänna osäkerhetstest?
-# Typ i Sensoy et al. så kollar de på entropi + accuracy när de lägger på brus på
 
 
 def noise_effect_on_entropy(model, ensemble, data):
@@ -104,3 +110,59 @@ def noise_effect_on_entropy(model, ensemble, data):
 def ood_test(ood_data):
     # What happens with accuracy, entropy etc.?
     pass
+
+
+def test():
+    args = utils.parse_args()
+    device = utils.torch_settings(args.seed)
+    data = gaussian.SyntheticGaussianData(
+        mean_0=[0, 0],
+        mean_1=[-3, -3],
+        cov_0=np.eye(2),
+        cov_1=np.eye(2),
+        store_file=Path("data/2d_gaussian_1000"))
+    train_loader = torch.utils.data.DataLoader(data,
+                                               batch_size=4,
+                                               shuffle=True,
+                                               num_workers=0)
+
+    prob_ensemble = ensemble.Ensemble()
+    num_ensemble_members = 10
+    for i in range(num_ensemble_members):
+        print("Training ensemble member number {}".format(i + 1))
+        model = models.NeuralNet(2, 3, 3, 2, lr=args.lr)
+        model.train(train_loader, args.num_epochs)
+        prob_ensemble.add_member(model)
+
+    distilled_model = distilled_network.PlainProbabilityDistribution(
+        2, 3, 3, 2, prob_ensemble, lr=0.001)
+
+    print("Training distilled network")
+    distilled_model.train(train_loader, args.num_epochs * 2, t=1.5)
+
+    test_data = gaussian.SyntheticGaussianData(
+        mean_0=[0, 0],
+        mean_1=[-3, -3],
+        cov_0=np.eye(2),
+        cov_1=np.eye(2),
+        n_samples=500,
+        store_file=Path("data/2d_gaussian_test"))
+
+    test_loader = torch.utils.data.DataLoader(test_data,
+                                              batch_size=500,
+                                              shuffle=False,
+                                              num_workers=0)
+    data, = test_loader
+    inputs = data[0]
+    labels = data[1]
+
+    ensemble_accuracy, model_accuracy = accuracy_comparison(
+        distilled_model, prob_ensemble, inputs, labels)
+    print(ensemble_accuracy)
+    print(model_accuracy)
+
+    # ensemble_nll, model_nll = experiments.nll_comparison(distilled_model, prob_ensemble, inputs, labels, 2)
+    # print(ensemble_nll)
+    # print(model_nll)
+
+    entropy_comparison_plot(distilled_model, prob_ensemble, inputs)
