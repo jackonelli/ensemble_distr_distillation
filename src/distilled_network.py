@@ -6,8 +6,13 @@ import loss as custom_loss
 
 
 class NeuralNet(nn.Module):
-    def __init__(self, input_size, hidden_size_1, hidden_size_2, output_size,
-                 teacher, lr=0.001):
+    def __init__(self,
+                 input_size,
+                 hidden_size_1,
+                 hidden_size_2,
+                 output_size,
+                 teacher,
+                 lr=0.001):
         super(NeuralNet, self).__init__()
 
         self.input_size = input_size
@@ -54,15 +59,12 @@ class NeuralNet(nn.Module):
             self.optimizer.zero_grad()
             inputs, labels = batch
 
-            if hard_targets:
-                loss = self.calculate_loss(inputs=inputs, t=t)
-            else:
-                loss = self.calculate_loss(inputs=inputs, labels=labels, t=t)
+            loss = self.calculate_loss(inputs=inputs, labels=labels, t=t)
 
             loss.sum().backward()
 
             self.optimizer.step()
-            running_loss += loss.item()
+            # running_loss += loss.item()
         return running_loss
 
     def train(self, train_loader, num_epochs):
