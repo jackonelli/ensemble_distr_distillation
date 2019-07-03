@@ -8,10 +8,11 @@ import logging
 class EnsembleMember(nn.Module, ABC):
     """Parent class for keeping common logic in one place"""
 
-    def __init__(self, loss_function):
+    def __init__(self, loss_function, device=None):
         super().__init__()
         self.loss = loss_function
         self.optimizer = None
+        self.device = device
         self._log = logging.getLogger(self.__class__.__name__)
 
     def train(self, train_loader, num_epochs):
@@ -28,6 +29,7 @@ class EnsembleMember(nn.Module, ABC):
         for batch in train_loader:
             self.optimizer.zero_grad()
             inputs, labels = batch
+            inputs, labels = inputs.to(self.device), labels.to(self.device)
             loss = self.calculate_loss(inputs, labels)
             loss.backward()
             self.optimizer.step()
