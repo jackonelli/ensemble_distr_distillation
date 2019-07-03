@@ -3,8 +3,8 @@ import sys
 import logging
 import argparse
 from pathlib import Path
-# import torch
-# import torch.nn as nn
+import torch
+import torch.nn as nn
 
 
 def to_one_hot(labels, number_of_classes):
@@ -58,8 +58,9 @@ def parse_args():
 
     return parser.parse_args()
 
+
 def _log_level_arg(arg_string):
-    log_level = logging.INFO
+    arg_string = arg_string.upper()
     if arg_string == "DEBUG":
         log_level = logging.DEBUG
     elif arg_string == "INFO":
@@ -74,10 +75,14 @@ def _log_level_arg(arg_string):
         raise ValueError("Invalid log level.")
     return log_level
 
+
 LOG_FORMAT = "%(asctime)-15s %(levelname)-5s %(name)-15s - %(message)s"
 
 
-def setup_logger(log_path=None, logger=None, log_level=logging.INFO, fmt=LOG_FORMAT):
+def setup_logger(log_path=None,
+                 logger=None,
+                 log_level=logging.INFO,
+                 fmt=LOG_FORMAT):
     """Setup for a logger instance.
 
     Args:
