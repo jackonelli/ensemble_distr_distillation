@@ -15,7 +15,7 @@ class PlainProbabilityDistribution(ensemble.EnsembleMember):
                  hidden_size_2,
                  output_size,
                  teacher,
-                 device=None,
+                 device=torch.device('cpu'),
                  use_hard_labels=False,
                  lr=0.001):
         super().__init__(nn.NLLLoss(), device=device)
@@ -52,8 +52,6 @@ class PlainProbabilityDistribution(ensemble.EnsembleMember):
         outputs = self.forward(inputs)
         soft_targets = self.teacher.predict(inputs, t)
 
-        # Extra none loss
-        # loss = custom_loss.CrossEntropyLossOneHot.apply(outputs, soft_targets)
         loss = custom_loss.scalar_loss(outputs, soft_targets)
 
         if labels is not None and self.use_hard_labels:

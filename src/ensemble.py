@@ -8,12 +8,13 @@ import logging
 class EnsembleMember(nn.Module, ABC):
     """Parent class for keeping common logic in one place"""
 
-    def __init__(self, loss_function, device=None):
+    def __init__(self, loss_function, device=torch.device('cpu')):
         super().__init__()
+        self._log = logging.getLogger(self.__class__.__name__)
         self.loss = loss_function
         self.optimizer = None
+        self._log.info("Moving model to device: {}".format(device))
         self.device = device
-        self._log = logging.getLogger(self.__class__.__name__)
 
     def train(self, train_loader, num_epochs):
         if self.loss is None or not issubclass(type(self.loss),

@@ -11,7 +11,7 @@ class NeuralNet(ensemble.EnsembleMember):
                  hidden_size_1,
                  hidden_size_2,
                  output_size,
-                 device=None,
+                 device=torch.device('cpu'),
                  learning_rate=0.001):
         super().__init__(loss_function=nn.CrossEntropyLoss(), device=device)
         self.input_size = input_size
@@ -28,7 +28,6 @@ class NeuralNet(ensemble.EnsembleMember):
         self.optimizer = torch_optim.SGD(self.parameters(),
                                          lr=self.learning_rate,
                                          momentum=0.9)
-        print(self.device)
         self.to(self.device)
 
     def forward(self, x):
