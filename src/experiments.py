@@ -78,7 +78,7 @@ def noise_effect_on_entropy(model, ensemble, inp):
     ])
     for i, e in enumerate(epsilon):
         input_perturbed = inp + np.random.normal(loc=0, scale=epsilon, size=inp.shape)
-        
+
         ensemble_output = ensemble.predict(input_perturbed)
         ensemble_entropy[i] = metrics.entropy(ensemble_output)
 
@@ -142,21 +142,14 @@ def test():
     inputs = data[0]
     labels = data[1]
 
-<<<<<<< HEAD
     ensemble_accuracy = calculate_accuracy(prob_ensemble, inputs, labels)
     distilled_model_accuracy = calculate_accuracy(distilled_model, inputs, labels)
-=======
-    ensemble_accuracy, model_accuracy = accuracy_comparison(
-        distilled_model, prob_ensemble, inputs, labels)
->>>>>>> f333cd3fa2e26485415c51d45ec84197509fe76c
+
     print(ensemble_accuracy)
     print(distilled_model_accuracy)
 
     entropy_comparison_plot(distilled_model, prob_ensemble, inputs)
-<<<<<<< HEAD
 
 
 if __name__ == '__main__':
     test()
-=======
->>>>>>> f333cd3fa2e26485415c51d45ec84197509fe76c
