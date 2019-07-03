@@ -5,10 +5,11 @@ import torch.nn as nn
 import logging
 import utils
 
+
 class EnsembleMember(nn.Module, ABC):
     """Parent class for keeping common logic in one place"""
 
-    def __init__(self, loss_function, device=torch.device('cpu')):
+    def __init__(self, loss_function, device=torch.device("cpu")):
         super().__init__()
         self._log = logging.getLogger(self.__class__.__name__)
         self.loss = loss_function
@@ -30,8 +31,7 @@ class EnsembleMember(nn.Module, ABC):
         for batch in train_loader:
             self.optimizer.zero_grad()
             inputs, labels = batch
-
-            #inputs, labels = inputs.to(self.device), labels.to(self.device)
+            inputs, labels = inputs.to(self.device), labels.to(self.device)
 
             loss = self.calculate_loss(inputs, labels)
             loss.backward()
