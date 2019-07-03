@@ -41,6 +41,8 @@ def entropy_comparison_plot(model, ensemble, inputs):
     ensemble_output = ensemble.predict(inputs)
     ensemble_entropy = metrics.entropy(ensemble_output)
 
+    return ensemble_entropy.data.numpy(), model_entropy.data.numpy()
+
     num_bins = 100
     plt.hist(ensemble_entropy, bins=num_bins, density=True)
     plt.hist(model_entropy, bins=num_bins, density=True)
@@ -64,7 +66,7 @@ def nll_comparison(model, ensemble, inputs, labels, number_of_classes):
 # Sen lite andra allmänna osäkerhetstest?
 
 
-def noise_effect_on_entropy(model, ensemble, data):
+def noise_effect_on_entropy(model, ensemble, inp):
     # Oklart om det här såhär de gör, men
     epsilon = np.linspace(0.0001, 1, 10)
 
@@ -75,11 +77,13 @@ def noise_effect_on_entropy(model, ensemble, data):
         len(epsilon),
     ])
     for i, e in enumerate(epsilon):
-        data_perturbed = data.copy()
-        data_perturbed.x = data_perturbed.x + np.random.normal(
-            loc=0, scale=epsilon, size=data.shape)
-        ensemble_entropy[i], model_entropy[i] = entropy_comparison(
-            model, ensemble, data_perturbed)
+        input_perturbed = inp + np.random.normal(loc=0, scale=epsilon, size=inp.shape)
+        
+        ensemble_output = ensemble.predict(input_perturbed)
+        ensemble_entropy[i] = metrics.entropy(ensemble_output)
+
+        model_output = ensemble.predict(input_perturbed)
+        model_entropy[i] = metrics.entropy(ensemble_output)
 
     plt.plot(epsilon, ensemble_entropy)
     plt.plot(epsilon, model_entropy)
@@ -138,13 +142,21 @@ def test():
     inputs = data[0]
     labels = data[1]
 
+<<<<<<< HEAD
     ensemble_accuracy = calculate_accuracy(prob_ensemble, inputs, labels)
     distilled_model_accuracy = calculate_accuracy(distilled_model, inputs, labels)
+=======
+    ensemble_accuracy, model_accuracy = accuracy_comparison(
+        distilled_model, prob_ensemble, inputs, labels)
+>>>>>>> f333cd3fa2e26485415c51d45ec84197509fe76c
     print(ensemble_accuracy)
     print(distilled_model_accuracy)
 
     entropy_comparison_plot(distilled_model, prob_ensemble, inputs)
+<<<<<<< HEAD
 
 
 if __name__ == '__main__':
     test()
+=======
+>>>>>>> f333cd3fa2e26485415c51d45ec84197509fe76c

@@ -3,6 +3,7 @@ import csv
 import numpy as np
 import torch.utils.data
 import matplotlib.pyplot as plt
+import logging
 
 
 class SyntheticGaussianData(torch.utils.data.Dataset):
@@ -16,6 +17,7 @@ class SyntheticGaussianData(torch.utils.data.Dataset):
                  n_samples=1000,
                  ratio_0_to_1=0.5):
         super(SyntheticGaussianData).__init__()
+        self._log = logging.getLogger(self.__class__.__name__)
         self.mean_0 = np.array(mean_0)
         self.mean_1 = np.array(mean_1)
         self.cov_0 = np.array(cov_0)
@@ -26,7 +28,7 @@ class SyntheticGaussianData(torch.utils.data.Dataset):
         if self.file.exists() and reuse_data:
             self.validate_dataset()
         else:
-            print("Sampling new data")
+            self._log.info("Sampling new data")
             self.sample_new_data()
 
     def __len__(self):
@@ -44,6 +46,23 @@ class SyntheticGaussianData(torch.utils.data.Dataset):
         labels = int(float(sample[-1]))
         return (np.array(inputs,
                          dtype=np.float32), np.array(labels, dtype=np.long))
+
+    def get_instance_of_label(self, label_requested):
+        sample = None
+        with self.file.open(newline="") as csv_file:
+            csv_reader = csv.reader(csv_file, delimiter=",", quotechar="|")
+            for count, row in enumerate(csv_reader):
+                sample = row
+                label_found = int(float(sample[-1]))
+                if label_found == label_requested:
+                    break
+            if not sample:
+                self._log.error("No data points with label {} found".format(
+                    label_requested))
+        inputs = sample[:-1]
+        return (np.array(inputs,
+                         dtype=np.float32), np.array(label_found,
+                                                     dtype=np.long))
 
     def sample_new_data(self):
         self.file.parent.mkdir(parents=True, exist_ok=True)

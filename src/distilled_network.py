@@ -7,15 +7,18 @@ import ensemble
 
 
 class PlainProbabilityDistribution(ensemble.EnsembleMember):
+    """Not necessarily an ensemble member but can be used as one"""
+
     def __init__(self,
                  input_size,
                  hidden_size_1,
                  hidden_size_2,
                  output_size,
                  teacher,
+                 device=torch.device('cpu'),
                  use_hard_labels=False,
                  lr=0.001):
-        super().__init__(nn.NLLLoss())
+        super().__init__(nn.NLLLoss(), device=device)
 
         self.input_size = input_size
         self.hidden_size_1 = hidden_size_1  # Or make a list or something
@@ -35,6 +38,7 @@ class PlainProbabilityDistribution(ensemble.EnsembleMember):
         self.optimizer = torch_optim.SGD(self.parameters(),
                                          lr=self.lr,
                                          momentum=0.9)
+        self.to(self.device)
 
     def forward(self, x):
         x = nn.functional.relu(self.fc1(x))
@@ -48,12 +52,10 @@ class PlainProbabilityDistribution(ensemble.EnsembleMember):
         outputs = self.forward(inputs)
         soft_targets = self.teacher.predict(inputs, t)
 
-        # Extra none loss
-        # loss = custom_loss.CrossEntropyLossOneHot.apply(outputs, soft_targets)
         loss = custom_loss.scalar_loss(outputs, soft_targets)
 
         if labels is not None and self.use_hard_labels:
-            loss += self.loss(outputs, labels.type(torch.LongTensor))
+            loss += self.loss(outputs, labels)
 
         return loss
 
@@ -63,6 +65,7 @@ class PlainProbabilityDistribution(ensemble.EnsembleMember):
         for batch in train_loader:
             self.optimizer.zero_grad()
             inputs, labels = batch
+            inputs, labels = inputs.to(self.device), labels.to(self.device)
 
             loss = self.calculate_loss(inputs=inputs, labels=labels, t=t)
 
@@ -75,14 +78,15 @@ class PlainProbabilityDistribution(ensemble.EnsembleMember):
     def train(self, train_loader, num_epochs, t=1):
 
         epoch_half = np.floor(num_epochs / 2).astype(np.int)
+        self._log.info("Training distilled network.")
 
         for epoch in range(1, epoch_half):
             loss = self.train_epoch(train_loader, t=t)
-            print("Epoch {}: Loss: {}".format(epoch, loss))
+            self._log.info("Epoch {}: Loss: {}".format(epoch, loss))
 
         for epoch in range(epoch_half, num_epochs + 1):
             loss = self.train_epoch(train_loader, t=t, hard_targets=True)
-            print("Epoch {}: Loss: {}".format(epoch, loss))
+            self._log.info("Epoch {}: Loss: {}".format(epoch, loss))
 
 
 def main():

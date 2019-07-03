@@ -11,13 +11,14 @@ class NeuralNet(ensemble.EnsembleMember):
                  hidden_size_1,
                  hidden_size_2,
                  output_size,
-                 lr=0.001):
-        super().__init__(loss_function=nn.CrossEntropyLoss())
+                 device=torch.device('cpu'),
+                 learning_rate=0.001):
+        super().__init__(loss_function=nn.CrossEntropyLoss(), device=device)
         self.input_size = input_size
         self.hidden_size_1 = hidden_size_1  # Or make a list or something
         self.hidden_size_2 = hidden_size_2
         self.output_size = output_size
-        self.lr = lr
+        self.learning_rate = learning_rate
 
         self.fc1 = nn.Linear(self.input_size, self.hidden_size_1)
         self.fc2 = nn.Linear(self.hidden_size_1, self.hidden_size_2)
@@ -25,8 +26,9 @@ class NeuralNet(ensemble.EnsembleMember):
 
         self.layers = [self.fc1, self.fc2, self.fc3]
         self.optimizer = torch_optim.SGD(self.parameters(),
-                                         lr=self.lr,
+                                         lr=self.learning_rate,
                                          momentum=0.9)
+        self.to(self.device)
 
     def forward(self, x):
         x = nn.functional.relu(self.fc1(x))
@@ -41,7 +43,7 @@ class NeuralNet(ensemble.EnsembleMember):
     def calculate_loss(self, inputs, labels):
         outputs = self.forward(inputs)
 
-        return self.loss(outputs, labels.type(torch.LongTensor))
+        return self.loss(outputs, labels)
 
     def predict(self, x, t=1):
         x = self.forward(x)
@@ -53,15 +55,15 @@ class NeuralNet(ensemble.EnsembleMember):
 class LinearNet(ensemble.EnsembleMember):
     """Simple linear binary classifier"""
 
-    def __init__(self, input_size=2, output_size=2, lr=0.01):
+    def __init__(self, input_size=2, output_size=2, learning_rate=0.01):
         super().__init__(loss_function=nn.CrossEntropyLoss())
 
         self.input_size = input_size
         self.output_size = output_size
-        self.lr = lr
+        self.learning_rate = learning_rate
         self.linear = nn.Linear(self.input_size, self.output_size)
         self.optimizer = torch_optim.SGD(self.parameters(),
-                                         lr=self.lr,
+                                         lr=self.learning_rate,
                                          momentum=0.9)
 
     def forward(self, x):
