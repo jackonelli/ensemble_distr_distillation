@@ -47,6 +47,23 @@ class SyntheticGaussianData(torch.utils.data.Dataset):
         return (np.array(inputs,
                          dtype=np.float32), np.array(labels, dtype=np.long))
 
+    def get_instance_of_label(self, label_requested):
+        sample = None
+        with self.file.open(newline="") as csv_file:
+            csv_reader = csv.reader(csv_file, delimiter=",", quotechar="|")
+            for count, row in enumerate(csv_reader):
+                sample = row
+                label_found = int(float(sample[-1]))
+                if label_found == label_requested:
+                    break
+            if not sample:
+                self._log.error("No data points with label {} found".format(
+                    label_requested))
+        inputs = sample[:-1]
+        return (np.array(inputs,
+                         dtype=np.float32), np.array(label_found,
+                                                     dtype=np.long))
+
     def sample_new_data(self):
         self.file.parent.mkdir(parents=True, exist_ok=True)
         size_0 = int(np.floor(self.n_samples * self.ratio_0_to_1))
