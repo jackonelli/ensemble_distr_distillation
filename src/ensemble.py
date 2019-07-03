@@ -26,6 +26,7 @@ class EnsembleMember(nn.Module, ABC):
         for batch in train_loader:
             self.optimizer.zero_grad()
             inputs, labels = batch
+
             loss = self.calculate_loss(inputs, labels)
             loss.backward()
             self.optimizer.step()

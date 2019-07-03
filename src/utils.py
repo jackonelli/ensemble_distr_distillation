@@ -5,6 +5,14 @@ import torch
 import torch.nn as nn
 
 
+class ReshapeTransform:
+    def __init__(self, new_size):
+        self.new_size = new_size
+
+    def __call__(self, img):
+        return torch.reshape(img, self.new_size)
+
+
 def to_one_hot(labels, number_of_classes):
     """Labels is a tensor of class indices"""
     return nn.functional.one_hot(labels, number_of_classes)
@@ -28,7 +36,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Ensemble")
     parser.add_argument("--num_epochs",
                         type=int,
-                        default=5,
+                        default=10,
                         help="Number of epochs")
     parser.add_argument("--lr", type=float, default=0.01, help="Learning rate")
     parser.add_argument("--retrain",

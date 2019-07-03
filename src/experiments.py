@@ -2,12 +2,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch.nn as nn
 import torch
-import utils
+import torchvision
 import distilled_network
 import ensemble
-import gaussian
+import dataloaders.gaussian as gaussian
+import metrics
 import models
+import utils
 from pathlib import Path
+
 
 def distill_model_comparison(distill_output, ensemble_output, metric):
     """Comparison interface
@@ -15,16 +18,12 @@ def distill_model_comparison(distill_output, ensemble_output, metric):
     """
 
 
-def accuracy_comparison(model, ensemble, inputs, labels):
-    ensemble_output = ensemble.predict(inputs)
-    ensemble_prediction = torch.argmax(ensemble_output, dim=-1)
-    ensemble_accuracy = (1 / inputs.shape[0]) * (ensemble_prediction == labels.type(torch.LongTensor)).sum().data.numpy()
+def calculate_accuracy(model, inputs, labels):
+    output = model.predict(inputs)
+    predicted_labels = torch.argmax(output, dim=-1)
+    accuracy = metrics.accuracy(labels, predicted_labels)
 
-    model_output = model.forward(inputs)
-    model_prediction = torch.argmax(model_output, dim=-1)
-    model_accuracy = (1 / inputs.shape[0]) * (model_prediction == labels.type(torch.LongTensor)).sum().data.numpy()
-
-    return ensemble_accuracy, model_accuracy
+    return accuracy
 
 
 def effect_of_ensemble_size():
@@ -35,25 +34,12 @@ def effect_of_model_capacity():
     pass
 
 
-def entropy(p):
-    return -p * torch.log(p)
-
-
-def entropy_comparison(model, ensemble, inputs):
-    # Comparing predictions vs entropy of ensemble and distilled model
-    ensemble_output = ensemble.predict(inputs)
-    ensemble_entropy = (1 / inputs.shape[0]) * torch.sum(entropy(ensemble_output),
-                                                         dim=-1)
-
-    model_output = model.forward(inputs)
-    model_entropy = (1 / inputs.shape[0]) * torch.sum(
-        entropy(model_output), dim=-1)  # Logiskt att kolla på detta värde?
-
-    return ensemble_entropy.data.numpy(), model_entropy.data.numpy()
-
-
 def entropy_comparison_plot(model, ensemble, inputs):
-    ensemble_entropy, model_entropy = entropy_comparison(model, ensemble, inputs)
+    model_output = model.predict(inputs)
+    model_entropy = metrics.entropy(model_output)
+
+    ensemble_output = ensemble.predict(inputs)
+    ensemble_entropy = metrics.entropy(ensemble_output)
 
     num_bins = 100
     plt.hist(ensemble_entropy, bins=num_bins, density=True)
@@ -107,9 +93,10 @@ def ood_test(ood_data):
     # What happens with accuracy, entropy etc.?
     pass
 
+
 def test():
+
     args = utils.parse_args()
-    device = utils.torch_settings(args.seed)
     data = gaussian.SyntheticGaussianData(
         mean_0=[0, 0],
         mean_1=[-3, -3],
@@ -122,7 +109,7 @@ def test():
                                                num_workers=0)
 
     prob_ensemble = ensemble.Ensemble()
-    num_ensemble_members = 10
+    num_ensemble_members = 1
     for i in range(num_ensemble_members):
         print("Training ensemble member number {}".format(i + 1))
         model = models.NeuralNet(2, 3, 3, 2, lr=args.lr)
@@ -151,13 +138,13 @@ def test():
     inputs = data[0]
     labels = data[1]
 
-    ensemble_accuracy, model_accuracy = accuracy_comparison(distilled_model, prob_ensemble, inputs, labels)
+    ensemble_accuracy = calculate_accuracy(prob_ensemble, inputs, labels)
+    distilled_model_accuracy = calculate_accuracy(distilled_model, inputs, labels)
     print(ensemble_accuracy)
-    print(model_accuracy)
-
-    # ensemble_nll, model_nll = experiments.nll_comparison(distilled_model, prob_ensemble, inputs, labels, 2)
-    # print(ensemble_nll)
-    # print(model_nll)
+    print(distilled_model_accuracy)
 
     entropy_comparison_plot(distilled_model, prob_ensemble, inputs)
 
+
+if __name__ == '__main__':
+    test()
