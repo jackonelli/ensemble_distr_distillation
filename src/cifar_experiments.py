@@ -28,10 +28,15 @@ def main():
                                                batch_size=4,
                                                shuffle=True,
                                                num_workers=1)
-    model = cifar_net.Net(device=device, learning_rate=args.lr)
+    model = cifar_net.EnsembleNet(device=device, learning_rate=args.lr)
     prob_ensemble = ensemble.Ensemble()
     prob_ensemble.add_member(model)
     prob_ensemble.train(train_loader, args.num_epochs)
+
+    distilled = cifar_net.DistilledNet(prob_ensemble,
+                                       device=device,
+                                       learning_rate=args.lr)
+    distilled.train(train_loader, args.num_epochs)
 
 
 if __name__ == "__main__":

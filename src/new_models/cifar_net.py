@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 import ensemble
 import loss as custom_loss
+import numpy as np
 
 
 class EnsembleNet(ensemble.EnsembleMember):
