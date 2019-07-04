@@ -1,6 +1,6 @@
 import torch
-import torch.nn as nn
 import torch.optim as torch_optim
+import torch.nn as nn
 import loss as custom_loss
 import ensemble
 
@@ -18,6 +18,7 @@ class NeuralNet(ensemble.EnsembleMember):
         self.hidden_size_1 = hidden_size_1  # Or make a list or something
         self.hidden_size_2 = hidden_size_2
         self.output_size = output_size
+        self.learning_rate = learning_rate
 
         self.fc1 = nn.Linear(self.input_size, self.hidden_size_1)
         self.fc2 = nn.Linear(self.hidden_size_1, self.hidden_size_2)
@@ -42,7 +43,7 @@ class NeuralNet(ensemble.EnsembleMember):
     def calculate_loss(self, inputs, labels):
         outputs = self.forward(inputs)
 
-        return self.loss(outputs, labels)
+        return self.loss(outputs, labels.type(torch.LongTensor))
 
     def predict(self, x, t=1):
         x = self.forward(x)

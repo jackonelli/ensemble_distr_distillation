@@ -138,9 +138,8 @@ def test():
                                               batch_size=500,
                                               shuffle=False,
                                               num_workers=0)
-    data, = test_loader
-    inputs = data[0]
-    labels = data[1]
+
+    inputs, labels = iter(test_loader).next()
 
     ensemble_accuracy = calculate_accuracy(prob_ensemble, inputs, labels)
     distilled_model_accuracy = calculate_accuracy(distilled_model, inputs, labels)
