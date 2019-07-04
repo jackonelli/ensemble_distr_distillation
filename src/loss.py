@@ -34,8 +34,8 @@ def dirichlet_neg_log_likelihood(alphas, target_distribution):
             alpha_c must be > 0 for all c.
         target_distribution (torch.tensor((B, C))): ensemble distribution
     """
-    neg_log_like = -((torch.log(target_distribution) *
-                      (alphas - 1.0)).sum(-1) + torch.lgamma(alphas.sum(-1)) -
-                     torch.lgamma(alphas).sum(-1))
+    neg_log_like = torch.sum(-(
+        (torch.log(target_distribution) * (alphas - 1.0)).sum(-1) +
+        torch.lgamma(alphas.sum(-1)) - torch.lgamma(alphas).sum(-1)))
     tmp_L1_loss = torch.nn.L1Loss()
     return tmp_L1_loss(neg_log_like, torch.zeros(neg_log_like.size()))
