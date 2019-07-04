@@ -31,7 +31,7 @@ class EnsembleMember(nn.Module, ABC):
             self.optimizer.zero_grad()
             inputs, labels = batch
 
-            #inputs, labels = inputs.to(self.device), labels.to(self.device)
+            inputs, labels = inputs.to(self.device), labels.to(self.device)
 
             loss = self.calculate_loss(inputs, labels)
             loss.backward()
@@ -91,3 +91,15 @@ class Ensemble():
             pred_mean += (1 / len(self.members)) * p
 
         return pred_mean
+
+    def save_ensemble(self, filepaths):
+
+        for member, filepath in zip(self.members, filepaths):
+            self._log.info("Saving ensemble member to path {}".format(filepath))
+            torch.save(member, filepath)
+
+    def load_ensemble(self, filepaths):
+
+        for filepath in filepaths:
+            self.add_member(torch.load(filepath))
+

@@ -17,7 +17,7 @@ class PlainProbabilityDistribution(ensemble.EnsembleMember):
                  teacher,
                  device=torch.device('cpu'),
                  use_hard_labels=False,
-                 lr=0.001):
+                 learning_rate=0.001):
         super().__init__(nn.NLLLoss(), device=device)
 
         self.input_size = input_size
@@ -25,7 +25,7 @@ class PlainProbabilityDistribution(ensemble.EnsembleMember):
         self.hidden_size_2 = hidden_size_2
         self.output_size = output_size
         self.use_hard_labels = use_hard_labels
-        self.lr = lr
+        self.learning_rate = learning_rate
 
         self.fc1 = nn.Linear(self.input_size, self.hidden_size_1)
         self.fc2 = nn.Linear(self.hidden_size_1, self.hidden_size_2)
@@ -36,7 +36,7 @@ class PlainProbabilityDistribution(ensemble.EnsembleMember):
         self.teacher = teacher
 
         self.optimizer = torch_optim.SGD(self.parameters(),
-                                         lr=self.lr,
+                                         lr=self.learning_rate,
                                          momentum=0.9)
         self.to(self.device)
 
@@ -48,18 +48,21 @@ class PlainProbabilityDistribution(ensemble.EnsembleMember):
 
         return x
 
+    def predict(self, x):  # For convenience
+        return self.forward(x)
+
     def calculate_loss(self, inputs, labels, t):
         outputs = self.forward(inputs)
         soft_targets = self.teacher.predict(inputs, t)
 
-        loss = custom_loss.scalar_loss(outputs, soft_targets)
+        loss = custom_loss.CrossEntropyLossOneHot.apply(outputs, soft_targets)
 
         if labels is not None and self.use_hard_labels:
-            loss += self.loss(outputs, labels)
+            loss += self.loss(outputs, labels.type(torch.LongTensor))
 
         return loss
 
-    def train_epoch(self, train_loader, t, hard_targets=False):
+    def train_epoch(self, train_loader, t):
         """Train single epoch"""
         running_loss = 0
         for batch in train_loader:
@@ -80,13 +83,12 @@ class PlainProbabilityDistribution(ensemble.EnsembleMember):
         epoch_half = np.floor(num_epochs / 2).astype(np.int)
         self._log.info("Training distilled network.")
 
-        for epoch in range(1, epoch_half):
+        for epoch in range(1, num_epochs + 1):
             loss = self.train_epoch(train_loader, t=t)
             self._log.info("Epoch {}: Loss: {}".format(epoch, loss))
 
-        for epoch in range(epoch_half, num_epochs + 1):
-            loss = self.train_epoch(train_loader, t=t, hard_targets=True)
-            self._log.info("Epoch {}: Loss: {}".format(epoch, loss))
+            if epoch == (epoch_half + 1):
+                self.use_hard_labels = True
 
 
 def main():

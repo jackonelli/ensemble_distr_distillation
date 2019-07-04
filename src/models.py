@@ -1,6 +1,6 @@
 import torch
-import torch.nn as nn
 import torch.optim as torch_optim
+import torch.nn as nn
 import loss as custom_loss
 import ensemble
 
@@ -43,7 +43,7 @@ class NeuralNet(ensemble.EnsembleMember):
     def calculate_loss(self, inputs, labels):
         outputs = self.forward(inputs)
 
-        return self.loss(outputs, labels)
+        return self.loss(outputs, labels.type(torch.LongTensor))
 
     def predict(self, x, t=1):
         x = self.forward(x)
