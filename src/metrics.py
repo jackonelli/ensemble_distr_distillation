@@ -77,3 +77,21 @@ def accuracy(true_labels, predicted_labels):
     if number_of_elements == 0:
         number_of_elements = 1
     return (true_labels == predicted_labels).sum().item() / number_of_elements
+
+
+def error(true_labels, predicted_labels):
+    """ Error
+    B = batch size
+
+    Args:
+        true_labels: torch.tensor(B)
+        predicted_labels: torch.tensor(B)
+
+    Returns:
+        Error: float
+    """
+    number_of_elements = np.prod(true_labels.size())
+    if number_of_elements == 0:
+        number_of_elements = 1
+
+    return (true_labels != predicted_labels).sum().item() / number_of_elements

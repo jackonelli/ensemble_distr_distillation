@@ -94,6 +94,13 @@ class Ensemble():
 
         return pred_mean
 
+    def hard_classification(self, inputs):
+        predicted_distribution = self.predict(inputs)
+        class_ind, confidence = utils.tensor_argmax(predicted_distribution)
+
+        return class_ind, confidence
+
+
     def save_ensemble(self, filepath):
 
         members_dict = {}
