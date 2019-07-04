@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import logging
 import utils
+import numpy as np
 
 
 class EnsembleMember(nn.Module, ABC):
@@ -32,7 +33,7 @@ class EnsembleMember(nn.Module, ABC):
             self.optimizer.zero_grad()
             inputs, labels = batch
 
-            inputs, labels = inputs.to(self.device), labels.to(self.deSvice)
+            inputs, labels = inputs.to(self.device), labels.to(self.device)
 
             loss = self.calculate_loss(inputs, labels)
             loss.backward()
@@ -93,16 +94,22 @@ class Ensemble():
 
         return pred_mean
 
-    def save_ensemble(self, filepaths):
+    def save_ensemble(self, filepath):
 
-        for member, filepath in zip(self.members, filepaths):
-            self._log.info("Saving ensemble member to path {}".format(filepath))
-            torch.save(member, filepath)
+        members_dict = {}
+        for i, member in enumerate(self.members):
+            members_dict["ensemble_member_{}".format(i)] = member  # To save memory one should save model.state_dict, but then we also need to save class-type etc., so I will keep it like this for now
 
-    def load_ensemble(self, filepaths):
+        torch.save(members_dict, filepath)
 
-        for filepath in filepaths:
-            self.add_member(torch.load(filepath))
+    def load_ensemble(self, filepath):
+
+        check_point = torch.load(filepath)
+
+        for key in check_point:
+            member = check_point[key]
+            #member.eval(), should be called if we have dropout or batch-norm in our layers, to make sure that self.train = False, just that it doesn't work for now
+            self.add_member(member)
 
 
 class DistilledNet(nn.Module, ABC):

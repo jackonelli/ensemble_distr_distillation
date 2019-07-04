@@ -106,7 +106,7 @@ def create_ensemble(train_loader, test_loader, num_ensemble_members, args):
         model.train(train_loader, args.num_epochs)
         LOGGER.info("Accuracy on test data: {}".format(get_accuracy(model, test_loader)))
         prob_ensemble.add_member(model)
-        filepaths.append(Path("models/ensemble_member_" + str(i+5)))
+        filepaths.append(Path("models/ensemble_member_" + str(i)))
 
     LOGGER.info("Ensemble accuracy on test data: {}".format(get_accuracy(prob_ensemble, test_loader)))
 
@@ -132,19 +132,6 @@ def create_distilled_model(train_loader, test_loader, ensemble, args):
     return distilled_model
 
 
-def load_ensemble(num_ensemble_members):
-
-    #Finns med stor sannolikhet något snyggare sätt att göra detta på
-    filepaths = []
-    for i in range(num_ensemble_members):
-        filepaths.append(Path("models/ensemble_member_" + str(i)))
-
-    prob_ensemble = ensemble.Ensemble()
-    prob_ensemble.load_ensemble(filepaths)
-
-    return prob_ensemble
-
-
 def main():
 
     args = utils.parse_args()
@@ -155,11 +142,15 @@ def main():
 
     train_loader, test_loader = load_mnist_data()
 
-    num_ensemble_members = 5
-    prob_ensemble = create_ensemble(train_loader, test_loader, num_ensemble_members, args)
-    #     distilled_model = torch.load(Path("data/distilled_model"))
+    num_ensemble_members = 10
 
-    distilled_model = create_distilled_model(train_loader, test_loader, prob_ensemble, args)
+    #     prob_ensemble = create_ensemble(train_loader, test_loader, num_ensemble_members, args)
+    #     distilled_model = create_distilled_model(train_loader, test_loader, prob_ensemble, args)
+
+    prob_ensemble = ensemble.Ensemble()
+    prob_ensemble.load_ensemble(Path("models/distilled_model"), num_ensemble_members)
+
+    distilled_model = torch.load(Path("models/distilled_model"))
 
     num_points = 10
     max_val = 90
@@ -186,10 +177,10 @@ def main():
     plt.legend(["Ensemble", "Ensemble member", "Distilled model"])
     plt.show()
 
-    print("True label is: {}".format(test_label))
-    print(ensemble_rotation_prediction.data.numpy())
-    print(ensemble_member_rotation_prediction.data.numpy())
-    print(distilled_model_rotation_prediction.data.numpy())
+    LOGGER.info("True label is: {}".format(test_label))
+    LOGGER.info(ensemble_rotation_prediction.data.numpy())
+    LOGGER.info(ensemble_member_rotation_prediction.data.numpy())
+    LOGGER.info(distilled_model_rotation_prediction.data.numpy())
 
 
 if __name__ == "__main__":

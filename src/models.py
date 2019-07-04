@@ -18,6 +18,7 @@ class NeuralNet(ensemble.EnsembleMember):
         self.hidden_size_1 = hidden_size_1  # Or make a list or something
         self.hidden_size_2 = hidden_size_2
         self.output_size = output_size
+        self.learning_rate = learning_rate
 
         self.fc1 = nn.Linear(self.input_size, self.hidden_size_1)
         self.fc2 = nn.Linear(self.hidden_size_1, self.hidden_size_2)
