@@ -180,6 +180,7 @@ def main():
     plt.plot(angles, ensemble_rotation_entropy.data.numpy(), 'o--')
     plt.plot(angles, ensemble_member_rotation_entropy.data.numpy(), 'o-')
     plt.plot(angles, distilled_model_rotation_entropy.data.numpy(), 'o-')
+
     plt.xlabel('Rotation angle')
     plt.ylabel('Entropy')
     plt.legend(["Ensemble", "Ensemble member", "Distilled model"])

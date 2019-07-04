@@ -11,14 +11,13 @@ class NeuralNet(ensemble.EnsembleMember):
                  hidden_size_1,
                  hidden_size_2,
                  output_size,
-                 device=torch.device('cpu'),
+                 device=torch.device("cpu"),
                  learning_rate=0.001):
         super().__init__(loss_function=nn.CrossEntropyLoss(), device=device)
         self.input_size = input_size
         self.hidden_size_1 = hidden_size_1  # Or make a list or something
         self.hidden_size_2 = hidden_size_2
         self.output_size = output_size
-        self.learning_rate = learning_rate
 
         self.fc1 = nn.Linear(self.input_size, self.hidden_size_1)
         self.fc2 = nn.Linear(self.hidden_size_1, self.hidden_size_2)

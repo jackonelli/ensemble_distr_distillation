@@ -51,7 +51,7 @@ class SyntheticGaussianData(torch.utils.data.Dataset):
         sample = None
         with self.file.open(newline="") as csv_file:
             csv_reader = csv.reader(csv_file, delimiter=",", quotechar="|")
-            for count, row in enumerate(csv_reader):
+            for row in csv_reader:
                 sample = row
                 label_found = int(float(sample[-1]))
                 if label_found == label_requested:

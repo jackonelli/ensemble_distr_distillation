@@ -1,15 +1,15 @@
-""""Main entry point"""
 from pathlib import Path
 from datetime import datetime
 import logging
 import numpy as np
 import torch
-from dataloaders import gaussian
+from dataloaders import cifar10
 import utils
 import models
 import distilled_network
 import ensemble
 import experiments
+from new_models import cifar_net
 
 LOGGER = logging.getLogger(__name__)
 
@@ -23,24 +23,20 @@ def main():
     LOGGER.info("Args: {}".format(args))
     device = utils.torch_settings(args.seed, args.gpu)
     LOGGER.info("Creating dataloader")
-    data = gaussian.SyntheticGaussianData(
-        mean_0=[0, 0],
-        mean_1=[-3, -3],
-        cov_0=np.eye(2),
-        cov_1=np.eye(2),
-        store_file=Path("data/2d_gaussian_1000"))
-    train_loader = torch.utils.data.DataLoader(data,
+    data = cifar10.Cifar10Data()
+    train_loader = torch.utils.data.DataLoader(data.set,
                                                batch_size=4,
                                                shuffle=True,
                                                num_workers=1)
-    model = models.NeuralNet(2, 3, 3, 2, device=device, learning_rate=args.lr)
+    model = cifar_net.EnsembleNet(device=device, learning_rate=args.lr)
     prob_ensemble = ensemble.Ensemble()
     prob_ensemble.add_member(model)
     prob_ensemble.train(train_loader, args.num_epochs)
 
-    distilled_model = distilled_network.PlainProbabilityDistribution(
-        2, 3, 3, 2, model, device=device, learning_rate=args.lr*0.1)
-    distilled_model.train(train_loader, args.num_epochs * 2)
+    distilled = cifar_net.DistilledNet(prob_ensemble,
+                                       device=device,
+                                       learning_rate=args.lr)
+    distilled.train(train_loader, args.num_epochs)
 
 
 if __name__ == "__main__":
