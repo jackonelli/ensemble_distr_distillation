@@ -17,24 +17,27 @@ import utils
 LOGGER = logging.getLogger(__name__)
 
 
-def create_distilled_model(train_loader, test_loader, ensemble, args, filepath):
+def create_distilled_model(train_loader, test_loader, args, ensemble, filepath,
+                           class_type=distilled_network.PlainProbabilityDistribution):
+    """Create a distilled network trained with ensemble output"""
 
     input_size = 784
     hidden_size_1 = 54
     hidden_size_2 = 32
     output_size = 10
 
-    distilled_model = distilled_network.PlainProbabilityDistribution(
-        input_size, hidden_size_1, hidden_size_2, output_size, ensemble, learning_rate=args.lr*0.1)
+    distilled_model = class_type(input_size, hidden_size_1, hidden_size_2, output_size, ensemble, learning_rate=args.lr*0.1)
+    # Will maybe need to try a decreasing learning rate or something
 
-    distilled_model.train(train_loader, args.num_epochs * 2, t=1)
+    distilled_model.train(train_loader, args.num_epochs * 4, t=2)
     LOGGER.info("Distilled model accuracy on test data: {}".format(get_accuracy_iter(distilled_model, test_loader)))
     torch.save(distilled_model, filepath)
 
     return distilled_model
 
 
-def create_ensemble(train_loader, test_loader, num_ensemble_members, args, filepath):
+def create_ensemble(train_loader, test_loader, args, num_ensemble_members, filepath):
+    """Create an ensemble model"""
 
     input_size = 784
     hidden_size_1 = 54
@@ -58,6 +61,7 @@ def create_ensemble(train_loader, test_loader, num_ensemble_members, args, filep
 
 
 def entropy_comparison_rotation(prob_ensemble, distilled_model, test_sample):
+    """Compare the entropy of ensemble and model on the output of a rotated data point"""
 
     test_img = test_sample[0][0].view(28, 28)
     test_label = test_sample[1][0]
@@ -92,7 +96,22 @@ def entropy_comparison_rotation(prob_ensemble, distilled_model, test_sample):
     plt.show()
 
 
+def dirichlet_test(train_loader, test_loader, args, ensemble):
+    """Train a distilled network that uses a Dirichlet distribution for prediction"""
+
+    filepath = Path("models/distilled_model_dirichlet_2")
+    distilled_model_dirichlet = create_distilled_model(train_loader, test_loader, args, ensemble, filepath,
+                                                       distilled_network.DirichletProbabilityDistribution)
+
+    # distilled_model_dirichlet = torch.load(filepath)
+
+
 def generate_rotated_data_set(img, angles):
+    """Generate a set of rotated images from a single image
+    Args:
+        img (tensor(dim=2)): image to be rotated
+        angles (tensor/ndarray): set of angles for which the image should be rotated
+    """
     img = torchvision.transforms.ToPILImage()(img)
     data_set = [torch.squeeze(torchvision.transforms.ToTensor()(torchvision.transforms.functional.rotate(img, angle=angle)))
                 for angle in angles]
@@ -101,6 +120,8 @@ def generate_rotated_data_set(img, angles):
 
 
 def get_accuracy(model, inputs, labels):
+    """Calculate error of model on data set"""
+
     predicted_labels, prob = model.hard_classification(inputs)
     accuracy = metrics.accuracy(labels, predicted_labels)
 
@@ -108,6 +129,7 @@ def get_accuracy(model, inputs, labels):
 
 
 def get_accuracy_iter(model, data_loader):
+    """Calculate accuracy of model on data in dataloader"""
 
     accuracy = 0
     num_batches = 0
@@ -120,6 +142,7 @@ def get_accuracy_iter(model, data_loader):
 
 
 def get_error_iter(model, data_loader):
+    """Calculate error of model on data in dataloader"""
 
     error = 0
     num_batches = 0
@@ -132,6 +155,7 @@ def get_error_iter(model, data_loader):
 
 
 def get_entropy(model, data_set):
+    """Calculate entropy of model output over a data set"""
 
     output = model.predict(data_set)
     entropy = metrics.entropy(output)
@@ -142,6 +166,7 @@ def get_entropy(model, data_set):
 
 
 def get_entropy_iter(model, test_loader):
+    """Calculate entropy of model output over a dataloader"""
 
     entropy = []
     for i, batch in enumerate(test_loader):
@@ -157,6 +182,7 @@ def get_entropy_iter(model, test_loader):
 
 
 def load_mnist_data(batch_size_train=32, batch_size_test=32):
+    """Loading of MNIST data set to dataloaders"""
 
     mnist_transform = torchvision.transforms.Compose([
                                        torchvision.transforms.ToTensor(),# torchvision.transforms.Normalize((0.1307,), (0.3081,)
@@ -178,6 +204,7 @@ def load_mnist_data(batch_size_train=32, batch_size_test=32):
 
 
 def noise_effect_on_entropy(model, ensemble, test_loader):
+    """Effect on entropy of ensemble and model with increasing noise added to the input"""
 
     ensemble_member = ensemble.members[0]
 
@@ -209,6 +236,7 @@ def noise_effect_on_entropy(model, ensemble, test_loader):
 
 
 def effect_of_ensemble_size(full_ensemble, train_loader, test_loader, args):
+    """Effect of ensemble size on error and nll of distilled model"""
 
     ensemble_size = len(full_ensemble.members)
     ensemble_member = full_ensemble.members[0]
@@ -227,7 +255,7 @@ def effect_of_ensemble_size(full_ensemble, train_loader, test_loader, args):
         concat_ensemble.add_member(full_ensemble.members[i])
 
         filepath = Path("models/distilled_models_concat/distilled_model_ensemble_size_{}".format(i+1))
-        distilled_model = torch.load(filepath)  # create_distilled_model(train_loader, test_loader, concat_ensemble, args, filepath)
+        distilled_model = torch.load(filepath)  # create_distilled_model(train_loader, test_loader, args, concat_ensemble, filepath)
 
         ensemble_error[i] = get_error_iter(concat_ensemble, test_loader)
         ensemble_member_error[i] = get_error_iter(ensemble_member, test_loader)
@@ -254,6 +282,7 @@ def effect_of_ensemble_size(full_ensemble, train_loader, test_loader, args):
 
 
 def entropy_histogram(ensemble, model, test_loader):
+    """Comparison of entropy histograms of ensemble and model"""
 
     ensemble_member = ensemble.members[0]
 
@@ -274,6 +303,11 @@ def entropy_histogram(ensemble, model, test_loader):
 
 
 def plot_data_set(data_set):
+    """Plot of image data set
+    Args:
+        data_set (list(len=10)): list of ten images/2D ndarrays
+    """
+
     fig, axes = plt.subplots(2, 5)
     axes[0, 0].imshow(data_set[0])
     axes[0, 1].imshow(data_set[1])
@@ -291,6 +325,7 @@ def plot_data_set(data_set):
 
 
 def main():
+    """Main"""
 
     args = utils.parse_args()
 
@@ -300,15 +335,21 @@ def main():
 
     train_loader, test_loader = load_mnist_data()
 
-    #     prob_ensemble = create_ensemble(train_loader, test_loader, num_ensemble_members, args)
-    #     distilled_model = create_distilled_model(train_loader, test_loader, prob_ensemble, args)
+
+
+    #num_ensemble_members = 10
+
+    ensemble_filepath = Path("models/mnist_ensemble_2")
+    distilled_model_filepath = Path("models/distilled_model_2")
+    #prob_ensemble = create_ensemble(train_loader, test_loader, args, num_ensemble_members, ensemble_filepath)
+    #distilled_model = create_distilled_model(train_loader, test_loader, args, prob_ensemble, distilled_model_filepath)
 
     prob_ensemble = ensemble.Ensemble()
-    prob_ensemble.load_ensemble(Path("models/mnist_ensemble"))
+    prob_ensemble.load_ensemble(ensemble_filepath)
+    distilled_model = torch.load(distilled_model_filepath)
 
-    distilled_model = torch.load(Path("models/distilled_model"))
-
-    effect_of_ensemble_size(prob_ensemble, train_loader, test_loader, args)
+    dirichlet_test(train_loader, test_loader, args, prob_ensemble)
+    #effect_of_ensemble_size(prob_ensemble, train_loader, test_loader, args)
     #entropy_histogram(prob_ensemble, distilled_model, test_loader)
     #test_sample = next(iter(test_loader))
     #entropy_comparison(prob_ensemble, distilled_model, test_sample)

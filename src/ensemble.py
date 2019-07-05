@@ -4,7 +4,6 @@ import torch
 import torch.nn as nn
 import logging
 import utils
-import numpy as np
 
 
 class EnsembleMember(nn.Module, ABC):
@@ -99,7 +98,6 @@ class Ensemble():
         class_ind, confidence = utils.tensor_argmax(predicted_distribution)
 
         return class_ind, confidence
-
 
     def save_ensemble(self, filepath):
 
