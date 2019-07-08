@@ -6,10 +6,12 @@ import loss as custom_loss
 import ensemble
 import utils
 
-
 # Can we put the distilled net parent class here instead?
 
-class PlainProbabilityDistribution(ensemble.EnsembleMember):  # Should instead use the DistilledNet parent class? I think maybe we nee some reconstruction here
+
+class PlainProbabilityDistribution(
+        ensemble.EnsembleMember
+):  # Should instead use the DistilledNet parent class? I think maybe we nee some reconstruction here
     """Not necessarily an ensemble member but can be used as one"""
 
     def __init__(self,
@@ -98,7 +100,9 @@ class PlainProbabilityDistribution(ensemble.EnsembleMember):  # Should instead u
 
 
 # Jag gör en egen klass här nu, tror det blir snyggast så
-class DirichletProbabilityDistribution(ensemble.EnsembleMember):  # Should instead use the DistilledNet parent class?
+class DirichletProbabilityDistribution(
+        ensemble.EnsembleMember
+):  # Should instead use the DistilledNet parent class?
     """Not necessarily an ensemble member but can be used as one"""
 
     def __init__(self,
@@ -156,7 +160,8 @@ class DirichletProbabilityDistribution(ensemble.EnsembleMember):  # Should inste
         if labels is not None and self.use_hard_labels:
             strength = torch.sum(alphas, dim=-1).unsqueeze(dim=1)
             p_hat = torch.div(alphas, strength)
-            loss += self.loss(p_hat, utils.to_one_hot(labels, self.output_size))
+            loss += self.loss(p_hat, utils.to_one_hot(labels,
+                                                      self.output_size))
 
         return loss
 

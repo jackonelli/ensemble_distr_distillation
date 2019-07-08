@@ -1,14 +1,12 @@
 from pathlib import Path
 from datetime import datetime
 import logging
-import numpy as np
 import torch
 from dataloaders import cifar10
 import utils
 import models
 import distilled_network
 import ensemble
-import experiments
 from new_models import cifar_net
 
 LOGGER = logging.getLogger(__name__)
