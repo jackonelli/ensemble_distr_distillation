@@ -11,6 +11,8 @@ import models
 import utils
 from pathlib import Path
 
+# VI KANSKE BARA SKA TA BORT DEN HÄR FILEN? OM VI INTE VILL HA DEN TILL 2D-TESTER
+
 
 def distill_model_comparison(distill_output, ensemble_output, metric):
     """Comparison interface
@@ -19,8 +21,7 @@ def distill_model_comparison(distill_output, ensemble_output, metric):
 
 
 def calculate_accuracy(model, inputs, labels):
-    output = model.predict(inputs)
-    predicted_labels = torch.argmax(output, dim=-1)
+    predicted_labels, prob = model.hard_classification(inputs)
     accuracy = metrics.accuracy(labels, predicted_labels)
 
     return accuracy
@@ -41,8 +42,6 @@ def entropy_comparison_plot(model, ensemble, inputs):
     ensemble_output = ensemble.predict(inputs)
     ensemble_entropy = metrics.entropy(ensemble_output)
 
-    return ensemble_entropy.data.numpy(), model_entropy.data.numpy()
-
     num_bins = 100
     plt.hist(ensemble_entropy, bins=num_bins, density=True)
     plt.hist(model_entropy, bins=num_bins, density=True)
@@ -61,36 +60,6 @@ def nll_comparison(model, ensemble, inputs, labels, number_of_classes):
     model_nll = torch.sum(-one_hot_labels * torch.log(model_output))
 
     return ensemble_nll.data.numpy(), model_nll.data.numpy()
-
-
-# Sen lite andra allmänna osäkerhetstest?
-
-
-def noise_effect_on_entropy(model, ensemble, inp):
-    # Oklart om det här såhär de gör, men
-    epsilon = np.linspace(0.0001, 1, 10)
-
-    ensemble_entropy = np.zeros([
-        len(epsilon),
-    ])
-    model_entropy = np.zeros([
-        len(epsilon),
-    ])
-    for i, e in enumerate(epsilon):
-        input_perturbed = inp + np.random.normal(loc=0, scale=epsilon, size=inp.shape)
-
-        ensemble_output = ensemble.predict(input_perturbed)
-        ensemble_entropy[i] = metrics.entropy(ensemble_output)
-
-        model_output = ensemble.predict(input_perturbed)
-        model_entropy[i] = metrics.entropy(ensemble_output)
-
-    plt.plot(epsilon, ensemble_entropy)
-    plt.plot(epsilon, model_entropy)
-    plt.xlabel('Epsilon')
-    plt.ylabel('Entropy')
-    plt.legend(['Ensemble model', 'Distilled model'])
-    plt.show()
 
 
 def ood_test(ood_data):
