@@ -18,7 +18,10 @@ class PlainProbabilityDistribution(ensemble.EnsembleMember):
                  device=torch.device('cpu'),
                  use_hard_labels=False,
                  learning_rate=0.001):
-        super().__init__(nn.NLLLoss(), device=device)
+        # super().__init__(nn.NLLLoss(), device=device)
+        super().__init__(
+            loss_function=custom_loss.dirichlet_neg_log_likelihood,
+            device=device)
 
         self.input_size = input_size
         self.hidden_size_1 = hidden_size_1  # Or make a list or something

@@ -28,9 +28,11 @@ def main():
                                                batch_size=4,
                                                shuffle=True,
                                                num_workers=1)
-    model = cifar_net.EnsembleNet(device=device, learning_rate=args.lr)
     prob_ensemble = ensemble.Ensemble()
-    prob_ensemble.add_member(model)
+    LOGGER.info("Adding {} ensemble members".format(args.num_ensemble_members))
+    for _ in range(args.num_ensemble_members):
+        prob_ensemble.add_member(
+            cifar_net.EnsembleNet(device=device, learning_rate=args.lr))
     prob_ensemble.train(train_loader, args.num_epochs)
 
     distilled = cifar_net.DistilledNet(prob_ensemble,

@@ -6,6 +6,7 @@ tags.temp
 tags.lock
 data
 *dump*
+.pylintrc
 
 models
 logs

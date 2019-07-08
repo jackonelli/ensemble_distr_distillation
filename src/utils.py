@@ -40,6 +40,10 @@ def parse_args():
                         type=int,
                         default=10,
                         help="Number of epochs")
+    parser.add_argument("--num_ensemble_members",
+                        type=int,
+                        default=5,
+                        help="Number of epochs")
     parser.add_argument("--lr", type=float, default=0.01, help="Learning rate")
     parser.add_argument("--retrain",
                         action="store_true",
