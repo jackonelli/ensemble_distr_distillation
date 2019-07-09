@@ -56,3 +56,14 @@ def sum_of_squares_bayes_risk(alphas, target_distribution):
     l_var = torch.mul(p_hat, (1 - p_hat) /
                       (strength + 1)).mean()  # Since MSELoss takes the mean
     return l_err + l_var
+
+
+def flat_prior(alphas):
+    """KL divergence between Dir(alpha) and Dir(1)"""
+    log_numerator = torch.lgamma(alphas.sum(-1))
+    log_denominator = torch.lgamma(
+        torch.tensor(alphas.size(0),
+                     dtype=torch.float)) + torch.lgamma(alphas).prod(-1)
+    exp_log_p = torch.digamma(alphas) - torch.digamma(alphas.sum())
+    digamma_term = torch.sum((alphas - 1.0) * exp_log_p, dim=-1)
+    return log_numerator - log_denominator + digamma_term
