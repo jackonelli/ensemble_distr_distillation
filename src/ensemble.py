@@ -17,15 +17,15 @@ class EnsembleMember(nn.Module, ABC):
         self._log.info("Moving model to device: {}".format(device))
         self.device = device
 
-    def train(self, train_loader, num_epochs):
+    def train(self, train_loader, num_epochs, metrics=list()):
         if self.loss is None or not issubclass(type(self.loss),
                                                nn.modules.loss._Loss):
             raise ValueError("Must assign proper loss function to child.loss.")
         for epoch in range(1, num_epochs + 1):
-            loss = self.train_epoch(train_loader)
+            loss = self._train_epoch(train_loader)
             self._log.info("Epoch {}: Loss: {}".format(epoch, loss))
 
-    def train_epoch(self, train_loader):
+    def _train_epoch(self, train_loader, metrics=list()):
         """Train single epoch"""
         running_loss = 0
         for batch in train_loader:
@@ -138,10 +138,10 @@ class DistilledNet(nn.Module, ABC):
             self._log.warning(
                 "Must assign proper loss function to child.loss.")
         for epoch in range(1, num_epochs + 1):
-            loss = self.train_epoch(train_loader)
+            loss = self._train_epoch(train_loader)
             self._log.info("Epoch {}: Loss: {}".format(epoch, loss))
 
-    def train_epoch(self, train_loader):
+    def _train_epoch(self, train_loader):
         """Train single epoch"""
         running_loss = 0
         for batch in train_loader:

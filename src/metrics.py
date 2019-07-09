@@ -1,9 +1,30 @@
 """Metrics"""
 import torch
 import numpy as np
+import utils
 
 
-def entropy(predicted_distribution):
+class Metric:
+    """Metric class"""
+
+    def __init__(self, function):
+        self.function = function
+        self.running_value = 0.0
+        self.counter = 0
+
+    def update(self, value):
+        self.running_value += value
+        self.counter += 1
+
+    def mean(self):
+        return self.running_value / self.counter
+
+    def reset(self):
+        self.running_value = 0.0
+        self.counter = 0
+
+
+def entropy(true_labels, predicted_distribution):
     """Entropy
 
     B = batch size, C = num classes
@@ -58,38 +79,39 @@ def brier_score(true_labels, predicted_distribution):
     Returns:
         Brier score(s): torch.tensor(B,)
     """
-
     true_labels_float = true_labels.float()
 
 
-def accuracy(true_labels, predicted_labels):
+def accuracy(true_labels, predicted_distribution):
     """ Accuracy
     B = batch size
 
     Args:
         true_labels: torch.tensor(B)
-        predicted_labels: torch.tensor(B)
+        predicted_distribution: torch.tensor(B)
 
     Returns:
         Accuracy: float
     """
+    predicted_labels, _ = utils.tensor_argmax(predicted_distribution)
     number_of_elements = np.prod(true_labels.size())
     if number_of_elements == 0:
         number_of_elements = 1
     return (true_labels == predicted_labels).sum().item() / number_of_elements
 
 
-def error(true_labels, predicted_labels):
+def error(true_labels, predicted_distribution):
     """ Error
     B = batch size
 
     Args:
         true_labels: torch.tensor(B)
-        predicted_labels: torch.tensor(B)
+        predicted_distribution: torch.tensor(B)
 
     Returns:
         Error: float
     """
+    predicted_labels = utils.tensor_argmax(predicted_distribution)
     number_of_elements = np.prod(true_labels.size())
     if number_of_elements == 0:
         number_of_elements = 1
