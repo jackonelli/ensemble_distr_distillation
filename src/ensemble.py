@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import logging
 import utils
+import metrics
 
 
 class EnsembleMember(nn.Module, ABC):
@@ -17,28 +18,31 @@ class EnsembleMember(nn.Module, ABC):
         self._log.info("Moving model to device: {}".format(device))
         self.device = device
 
-    def train(self, train_loader, num_epochs, metrics=list()):
+    def train(self, train_loader, num_epochs, metrics_dict):
+        if not isinstance(metrics_dict, metrics.MetricsDict):
+            self.log.error(
+                "Metrics must be of type MetricsDict, got {}".format(
+                    type(metrics_dict)))
         if self.loss is None or not issubclass(type(self.loss),
                                                nn.modules.loss._Loss):
             raise ValueError("Must assign proper loss function to child.loss.")
         for epoch in range(1, num_epochs + 1):
-            loss = self._train_epoch(train_loader)
-            self._log.info("Epoch {}: Loss: {}".format(epoch, loss))
+            self._train_epoch(train_loader, metrics_dict)
+            print("Epoch: {} {}".format(epoch, metrics_dict))
 
-    def _train_epoch(self, train_loader, metrics=list()):
+    def _train_epoch(self, train_loader, metrics_dict=None):
         """Train single epoch"""
-        running_loss = 0
         for batch in train_loader:
+            metrics_dict.reset()
             self.optimizer.zero_grad()
             inputs, labels = batch
-
             inputs, labels = inputs.to(self.device), labels.to(self.device)
+            outputs = self.forward(inputs)
 
-            loss = self.calculate_loss(inputs, labels)
+            loss = self.calculate_loss(outputs, labels)
             loss.backward()
             self.optimizer.step()
-            running_loss += loss.item()
-        return running_loss
+            metrics_dict.update(loss, outputs, labels)
 
     @abstractmethod
     def forward(self, inputs):
@@ -134,7 +138,6 @@ class DistilledNet(nn.Module, ABC):
     def train(self, train_loader, num_epochs):
         if self.loss is None or not issubclass(type(self.loss),
                                                nn.modules.loss._Loss):
-            # raise ValueError("Must assign proper loss function to child.loss.")
             self._log.warning(
                 "Must assign proper loss function to child.loss.")
         for epoch in range(1, num_epochs + 1):
