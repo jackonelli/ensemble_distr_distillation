@@ -30,17 +30,12 @@ def create_distilled_model(
     hidden_size_2 = 32
     output_size = 10
 
-    distilled_model = class_type(input_size,
-                                 hidden_size_1,
-                                 hidden_size_2,
-                                 output_size,
-                                 ensemble,
-                                 learning_rate=args.lr * 0.1)
+    distilled_model = class_type(input_size, hidden_size_1, hidden_size_2, output_size, ensemble, learning_rate=args.lr)
     # Will maybe need to try a decreasing learning rate or something
 
-    distilled_model.train(train_loader, args.num_epochs * 4, t=2)
-    LOGGER.info("Distilled model accuracy on test data: {}".format(
-        get_accuracy_iter(distilled_model, test_loader)))
+    distilled_model.train(train_loader, args.num_epochs * 8, t=1.5)
+    LOGGER.info("Distilled model accuracy on test data: {}".format(get_accuracy_iter(distilled_model, test_loader)))
+
     torch.save(distilled_model, filepath)
 
     return distilled_model

@@ -41,7 +41,7 @@ def dirichlet_neg_log_likelihood(alphas, target_distribution):
     return tmp_L1_loss(neg_log_like, torch.zeros(neg_log_like.size()))
 
 
-def sum_of_squares_bayes_risk(alphas, target_distribution):
+def sum_of_squares_bayes_risk(alphas, target_distribution, lambda_t, hard_targets=None):
     """Bayes risk of sum of squares
     B = batch size, C = num classes
 
@@ -53,9 +53,16 @@ def sum_of_squares_bayes_risk(alphas, target_distribution):
     strength = torch.sum(alphas, dim=-1).unsqueeze(dim=1)
     p_hat = torch.div(alphas, strength)
     l_err = torch.nn.MSELoss()(target_distribution, p_hat)
-    l_var = torch.mul(p_hat, (1 - p_hat) /
-                      (strength + 1)).mean()  # Since MSELoss takes the mean
-    return l_err + l_var
+
+    l_var = torch.mul(p_hat, (1 - p_hat) / (strength + 1)).mean()   # Since MSELoss takes the mean
+
+    lambda_t = 0
+    if hard_targets is not None:
+        l_reg = torch.mul(lambda_t/10, hard_targets + (1 - hard_targets) * alphas).mean() # ELLER SKA JAG LÄGGA IN HARD LABELS HÄR KANSKE?
+    else:
+        l_reg = 0
+
+    return l_err + l_var + l_reg
 
 
 def flat_prior(alphas):

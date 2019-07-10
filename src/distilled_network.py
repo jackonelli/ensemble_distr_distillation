@@ -88,15 +88,15 @@ class PlainProbabilityDistribution(
 
     def train(self, train_loader, num_epochs, t=1):
 
-        epoch_half = np.floor(num_epochs / 2).astype(np.int)
+        #epoch_half = np.floor(num_epochs / 2).astype(np.int)
         self._log.info("Training distilled network.")
-
+        self.use_hard_labels = True
         for epoch in range(1, num_epochs + 1):
             loss = self.train_epoch(train_loader, t=t)
             self._log.info("Epoch {}: Loss: {}".format(epoch, loss))
 
-            if epoch == (epoch_half + 1):
-                self.use_hard_labels = True
+            #if epoch == (epoch_half + 1):
+              #  self.use_hard_labels = True
 
 
 # Jag gör en egen klass här nu, tror det blir snyggast så
@@ -155,13 +155,16 @@ class DirichletProbabilityDistribution(
         alphas = self.forward(inputs) + 1
         soft_targets = self.teacher.predict(inputs, t)
 
-        loss = custom_loss.sum_of_squares_bayes_risk(alphas, soft_targets)
+        lambda_t = np.min([1.0, t / 10])
+        loss = custom_loss.sum_of_squares_bayes_risk(alphas, soft_targets, lambda_t)
 
         if labels is not None and self.use_hard_labels:
-            strength = torch.sum(alphas, dim=-1).unsqueeze(dim=1)
-            p_hat = torch.div(alphas, strength)
-            loss += self.loss(p_hat, utils.to_one_hot(labels,
-                                                      self.output_size))
+            loss = custom_loss.sum_of_squares_bayes_risk(alphas, soft_targets, lambda_t,
+                                                         utils.to_one_hot(labels, self.output_size).type(torch.FloatTensor))
+
+            #strength = torch.sum(alphas, dim=-1).unsqueeze(dim=1)
+            #p_hat = torch.div(alphas, strength)
+            #loss += self.loss(p_hat, utils.to_one_hot(labels, self.output_size).type(torch.FloatTensor))
 
         return loss
 
@@ -184,6 +187,8 @@ class DirichletProbabilityDistribution(
     def train(self, train_loader, num_epochs, t=1):
 
         #epoch_half = np.floor(num_epochs / 2).astype(np.int)
+
+        self.use_hard_labels = True
         self._log.info("Training distilled network.")
 
         for epoch in range(1, num_epochs + 1):
@@ -191,7 +196,7 @@ class DirichletProbabilityDistribution(
             self._log.info("Epoch {}: Loss: {}".format(epoch, loss))
 
             #if epoch == (epoch_half + 1):
-            #    self.use_hard_labels = True
+              #  self.use_hard_labels = True
 
 
 def main():
