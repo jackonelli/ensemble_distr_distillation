@@ -34,15 +34,14 @@ class NeuralNet(ensemble.EnsembleMember):
         x = nn.functional.relu(self.fc1(x))
         x = nn.functional.relu(self.fc2(x))
         x = self.fc3(x)
+        x = self.temperature_softmax(x)
         return x
 
     @staticmethod
     def temperature_softmax(x, t=1):
         return nn.functional.softmax(x / t, dim=-1)
 
-    def calculate_loss(self, inputs, labels):
-        outputs = self.forward(inputs)
-
+    def calculate_loss(self, outputs, labels):
         return self.loss(outputs, labels.type(torch.LongTensor))
 
     def predict(self, x, t=1):

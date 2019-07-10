@@ -27,6 +27,7 @@ class EnsembleNet(ensemble.EnsembleMember):
         x = nn.functional.relu(self.fc1(x))
         x = nn.functional.relu(self.fc2(x))
         x = self.fc3(x)
+        x = nn.functional.softmax(x, dim=-1)
         return x
 
     def calculate_loss(self, inputs, labels):

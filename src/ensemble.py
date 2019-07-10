@@ -28,7 +28,7 @@ class EnsembleMember(nn.Module, ABC):
             raise ValueError("Must assign proper loss function to child.loss.")
         for epoch in range(1, num_epochs + 1):
             self._train_epoch(train_loader, metrics_dict)
-            print("Epoch: {} {}".format(epoch, metrics_dict))
+            self._log.info("Epoch: {} {}".format(epoch, metrics_dict))
 
     def _train_epoch(self, train_loader, metrics_dict=None):
         """Train single epoch"""
@@ -42,7 +42,7 @@ class EnsembleMember(nn.Module, ABC):
             loss = self.calculate_loss(outputs, labels)
             loss.backward()
             self.optimizer.step()
-            metrics_dict.update(loss, outputs, labels)
+            metrics_dict.update(loss, labels, outputs)
 
     @abstractmethod
     def forward(self, inputs):
@@ -79,11 +79,11 @@ class Ensemble():
         for _ in range(number_of):
             self.add_member(constructor())
 
-    def train(self, train_loader, num_epochs):
+    def train(self, train_loader, num_epochs, metrics):
         """Multithreaded?"""
         self._log.info("Training ensemble")
         for member in self.members:
-            member.train(train_loader, num_epochs)
+            member.train(train_loader, num_epochs, metrics)
 
     def predict(self, x, t=1):
         pred = list()

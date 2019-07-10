@@ -93,7 +93,7 @@ class MetricsDict:
     def update(self, loss, true_labels, predicted_distribution):
         """To be run at every epoch."""
         self.loss += loss
-        for metric in self._dict:
+        for metric in self._dict.values():
             metric.add_sample(true_labels, predicted_distribution)
 
     def reset(self):

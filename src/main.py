@@ -5,6 +5,7 @@ import logging
 import numpy as np
 import torch
 from dataloaders import gaussian
+import metrics
 import utils
 import models
 import distilled_network
@@ -33,14 +34,19 @@ def main():
                                                batch_size=4,
                                                shuffle=True,
                                                num_workers=1)
+    ensemble_metric = metrics.MetricsDict()
+    ensemble_metric.add_by_keys("accuracy")
+
     model = models.NeuralNet(2, 3, 3, 2, device=device, learning_rate=args.lr)
     prob_ensemble = ensemble.Ensemble()
     prob_ensemble.add_member(model)
-    prob_ensemble.train(train_loader, args.num_epochs)
+    prob_ensemble.train(train_loader, args.num_epochs, ensemble_metric)
 
+    distill_metrics = metrics.MetricsDict()
+    distill_metrics.add_by_keys("entropy")
     distilled_model = distilled_network.PlainProbabilityDistribution(
         2, 3, 3, 2, model, device=device, learning_rate=args.lr * 0.1)
-    distilled_model.train(train_loader, args.num_epochs * 2)
+    distilled_model.train(train_loader, args.num_epochs * 2, distill_metrics)
 
 
 if __name__ == "__main__":
