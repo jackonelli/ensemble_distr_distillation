@@ -111,7 +111,8 @@ def test():
     inputs, labels = iter(test_loader).next()
 
     ensemble_accuracy = calculate_accuracy(prob_ensemble, inputs, labels)
-    distilled_model_accuracy = calculate_accuracy(distilled_model, inputs, labels)
+    distilled_model_accuracy = calculate_accuracy(distilled_model, inputs,
+                                                  labels)
 
     print(ensemble_accuracy)
     print(distilled_model_accuracy)

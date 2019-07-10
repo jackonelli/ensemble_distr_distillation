@@ -39,7 +39,7 @@ def main():
     prob_ensemble.train(train_loader, args.num_epochs)
 
     distilled_model = distilled_network.PlainProbabilityDistribution(
-        2, 3, 3, 2, model, device=device, learning_rate=args.lr*0.1)
+        2, 3, 3, 2, model, device=device, learning_rate=args.lr * 0.1)
     distilled_model.train(train_loader, args.num_epochs * 2)
 
 

@@ -5,7 +5,9 @@ tags
 tags.temp
 tags.lock
 data
+*.pdf
 *dump*
+.pylintrc
 
 models
 logs
