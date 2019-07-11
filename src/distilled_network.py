@@ -96,7 +96,7 @@ class PlainProbabilityDistribution(
             self._log.info("Epoch {}: Loss: {}".format(epoch, loss))
 
             #if epoch == (epoch_half + 1):
-              #  self.use_hard_labels = True
+            #  self.use_hard_labels = True
 
 
 # Jag gör en egen klass här nu, tror det blir snyggast så
@@ -156,11 +156,14 @@ class DirichletProbabilityDistribution(
         soft_targets = self.teacher.predict(inputs, t)
 
         lambda_t = np.min([1.0, t / 10])
-        loss = custom_loss.sum_of_squares_bayes_risk(alphas, soft_targets, lambda_t)
+        loss = custom_loss.sum_of_squares_bayes_risk(alphas, soft_targets,
+                                                     lambda_t)
 
         if labels is not None and self.use_hard_labels:
-            loss = custom_loss.sum_of_squares_bayes_risk(alphas, soft_targets, lambda_t,
-                                                         utils.to_one_hot(labels, self.output_size).type(torch.FloatTensor))
+            loss = custom_loss.sum_of_squares_bayes_risk(
+                alphas, soft_targets, lambda_t,
+                utils.to_one_hot(labels,
+                                 self.output_size).type(torch.FloatTensor))
 
             #strength = torch.sum(alphas, dim=-1).unsqueeze(dim=1)
             #p_hat = torch.div(alphas, strength)
@@ -196,7 +199,7 @@ class DirichletProbabilityDistribution(
             self._log.info("Epoch {}: Loss: {}".format(epoch, loss))
 
             #if epoch == (epoch_half + 1):
-              #  self.use_hard_labels = True
+            #  self.use_hard_labels = True
 
 
 def main():
