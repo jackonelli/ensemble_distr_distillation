@@ -43,9 +43,9 @@ def main():
     prob_ensemble.train(train_loader, args.num_epochs, ensemble_metric)
 
     distill_metrics = metrics.MetricsDict()
-    distill_metrics.add_by_keys("entropy")
+    # distill_metrics.add_by_keys("entropy")
     distilled_model = distilled_network.PlainProbabilityDistribution(
-        2, 3, 3, 2, model, device=device, learning_rate=args.lr * 0.1)
+        2, 3, 3, 2, model, device=device, learning_rate=args.lr * 0.001)
     distilled_model.train(train_loader, args.num_epochs * 2, distill_metrics)
 
 

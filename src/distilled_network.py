@@ -51,7 +51,7 @@ class PlainProbabilityDistribution(
     def forward(self, x):
         x = nn.functional.relu(self.fc1(x))
         x = nn.functional.relu(self.fc2(x))
-        x = nn.functional.relu(self.fc3(x))
+        x = torch.exp(self.fc3(x))
 
         return x
 
@@ -82,7 +82,10 @@ class PlainProbabilityDistribution(
                                        soft_targets=soft_targets,
                                        t=t)
 
-            loss.sum().backward()
+            loss.backward()
+            # print(loss)
+            # print(outputs)
+            # break
 
             self.optimizer.step()
             metrics_dict.update(loss, labels, outputs)
@@ -180,6 +183,7 @@ class DirichletProbabilityDistribution(
             inputs, labels = inputs.to(self.device), labels.to(self.device)
 
             loss = self.calculate_loss(inputs=inputs, labels=labels, t=t)
+            print(loss)
 
             loss.backward()
 

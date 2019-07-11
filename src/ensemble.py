@@ -153,7 +153,7 @@ class DistilledNet(nn.Module, ABC):
             inputs, labels = inputs.to(self.device), labels.to(self.device)
 
             loss = self.calculate_loss(inputs, labels)
-            loss.backward()
+            loss.sum().backward()
             self.optimizer.step()
             running_loss += loss.item()
         return running_loss

@@ -114,11 +114,11 @@ def entropy(true_labels, predicted_distribution):
         predicted_distribution: torch.tensor((B, C))
 
     Returns:
-        entropy(ies): torch.tensor(B,)
+        entropy: float
     """
 
     return -torch.sum(
-        predicted_distribution * torch.log(predicted_distribution), dim=-1)
+        predicted_distribution * torch.log(predicted_distribution))
 
 
 def nll(true_labels, predicted_distribution):
@@ -134,12 +134,11 @@ def nll(true_labels, predicted_distribution):
         predicted_distribution: torch.tensor((B, C))
 
     Returns:
-        nll(s): torch.tensor(B,)
+        nll: float
     """
 
     true_labels_float = true_labels.float()
-    return -torch.sum(true_labels_float * torch.log(predicted_distribution),
-                      dim=-1)
+    return -torch.sum(true_labels_float * torch.log(predicted_distribution))
 
 
 def brier_score(true_labels, predicted_distribution):
@@ -155,7 +154,7 @@ def brier_score(true_labels, predicted_distribution):
         predicted_distribution: torch.tensor((B, C))
 
     Returns:
-        Brier score(s): torch.tensor(B,)
+        Brier score: float
     """
     true_labels_float = true_labels.float()
     LOGGER.error("Adding unimplemented Brier score.")
