@@ -38,7 +38,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Ensemble")
     parser.add_argument("--num_epochs",
                         type=int,
-                        default=20,
+                        default=10,
                         help="Number of epochs")
     parser.add_argument("--num_ensemble_members",
                         type=int,

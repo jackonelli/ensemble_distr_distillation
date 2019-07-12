@@ -134,6 +134,7 @@ class DirichletProbabilityDistribution(
         self.optimizer = torch_optim.SGD(self.parameters(),
                                          lr=self.learning_rate,
                                          momentum=0.9)
+
         self.to(self.device)
 
     def forward(self, x):
@@ -143,7 +144,7 @@ class DirichletProbabilityDistribution(
 
         return x
 
-    # OBS: SOM DET ÄR UPPBYGGT NU, FUNGERAR INTE HARD-CLASSIFICATION I DISTILLED_NET PARENT-KLASSEN
+    # OBS: SOM DET ÄR UPPBYGGT NU, FUNGERAR INTE HARD-CLASSIFICATION I DISTILLED_NET-PARENT-KLASSEN
     def predict(self, x):
         alphas = self.forward(x) + 1
         strength = torch.sum(alphas, dim=-1).unsqueeze(dim=1)
@@ -155,12 +156,17 @@ class DirichletProbabilityDistribution(
         alphas = self.forward(inputs) + 1
         soft_targets = self.teacher.predict(inputs, t)
 
-        lambda_t = np.min([1.0, t / 10])
-        loss = custom_loss.sum_of_squares_bayes_risk(alphas, soft_targets, lambda_t)
+        #loss = custom_loss.dirichlet_neg_log_likelihood(alphas, soft_targets)
+        #loss = custom_loss.flat_prior(alphas)
 
-        if labels is not None and self.use_hard_labels:
-            loss = custom_loss.sum_of_squares_bayes_risk(alphas, soft_targets, lambda_t,
-                                                         utils.to_one_hot(labels, self.output_size).type(torch.FloatTensor))
+        #
+        loss = custom_loss.sum_of_squares_bayes_risk(alphas, soft_targets)
+        #
+        # if labels is not None and self.use_hard_labels:
+        #     lambda_t = np.min([1.0, t / 10])
+        #     loss = custom_loss.sum_of_squares_bayes_risk(alphas, soft_targets, lambda_t,
+        #                                                  utils.to_one_hot(labels, self.output_size).
+        #                                                  type(torch.FloatTensor))
 
             #strength = torch.sum(alphas, dim=-1).unsqueeze(dim=1)
             #p_hat = torch.div(alphas, strength)
@@ -186,17 +192,23 @@ class DirichletProbabilityDistribution(
 
     def train(self, train_loader, num_epochs, t=1):
 
-        #epoch_half = np.floor(num_epochs / 2).astype(np.int)
+        scheduler = torch_optim.lr_scheduler.StepLR(self.optimizer, step_size=5, gamma=0.1)
+        epoch_half = np.floor(num_epochs / 2).astype(np.int)
 
-        self.use_hard_labels = True
         self._log.info("Training distilled network.")
 
         for epoch in range(1, num_epochs + 1):
             loss = self.train_epoch(train_loader, t=t)
             self._log.info("Epoch {}: Loss: {}".format(epoch, loss))
 
-            #if epoch == (epoch_half + 1):
-              #  self.use_hard_labels = True
+            if t > 1 and np.mod(epoch, 10) == 0:
+                self._log.info("Decreasing t to {}".format(t-1))
+                t -= 1
+
+            if epoch == epoch_half:
+                self.use_hard_labels = True
+
+            scheduler.step()
 
 
 def main():
