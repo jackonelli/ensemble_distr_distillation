@@ -96,7 +96,7 @@ class PlainProbabilityDistribution(
             self._log.info("Epoch {}: Loss: {}".format(epoch, loss))
 
             #if epoch == (epoch_half + 1):
-              #  self.use_hard_labels = True
+            #  self.use_hard_labels = True
 
 
 # Jag gör en egen klass här nu, tror det blir snyggast så
@@ -205,11 +205,10 @@ class DirichletProbabilityDistribution(
                 self._log.info("Decreasing t to {}".format(t-1))
                 t -= 1
 
-            if epoch == epoch_half:
-                self.use_hard_labels = True
+            #if epoch == epoch_half:
+             #   self.use_hard_labels = True
 
             scheduler.step()
-
 
 def main():
     net = PlainProbabilityDistribution(20, 10, 5, 2)

@@ -42,6 +42,7 @@ def dirichlet_neg_log_likelihood(alphas, target_distribution):
 
 
 def sum_of_squares_bayes_risk(alphas, target_distribution, lambda_t=None, hard_targets=None):
+
     """Bayes risk of sum of squares
     B = batch size, C = num classes
 
@@ -54,7 +55,8 @@ def sum_of_squares_bayes_risk(alphas, target_distribution, lambda_t=None, hard_t
     p_hat = torch.div(alphas, strength)
     l_err = torch.nn.MSELoss()(target_distribution, p_hat)
 
-    l_var = torch.mul(p_hat, (1 - p_hat) / (strength + 1)).mean()   # Since MSELoss takes the mean
+    l_var = torch.mul(p_hat, (1 - p_hat) /
+                      (strength + 1)).mean()  # Since MSELoss takes the mean
 
     if hard_targets is not None:
         alphas_tilde = hard_targets + (1 - hard_targets) * alphas
