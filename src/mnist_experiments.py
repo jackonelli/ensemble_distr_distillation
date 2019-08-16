@@ -30,11 +30,9 @@ def create_distilled_model(
     output_size = 10
 
     distilled_model = class_type(input_size, hidden_size_1, hidden_size_2, output_size, ensemble,
-                                 learning_rate=args.lr*100)
-    # Will maybe need to try a decreasing learning rate or something
+                                 learning_rate=args.lr*10)
 
-    distilled_model.train(train_loader, args.num_epochs*10
-                          , t=10)
+    distilled_model.train(train_loader, args.num_epochs, t=1)
     LOGGER.info("Distilled model accuracy on test data: {}".format(get_accuracy_iter(distilled_model, test_loader)))
 
     torch.save(distilled_model, filepath)
@@ -42,8 +40,7 @@ def create_distilled_model(
     return distilled_model
 
 
-def create_ensemble(train_loader, test_loader, args, num_ensemble_members,
-                    filepath):
+def create_ensemble(train_loader, test_loader, args, num_ensemble_members, filepath):
     """Create an ensemble model"""
 
     input_size = 784
@@ -98,11 +95,11 @@ def entropy_comparison_rotation(prob_ensemble, distilled_model, test_sample):
 
     LOGGER.info("True label is: {}".format(test_label))
     LOGGER.info("Ensemble prediction: {}".format(
-        ensemble_rotation_prediction.data.numpy()))
+        ensemble_rotation_prediction))
     LOGGER.info("Ensemble member prediction: {}".format(
-        ensemble_member_rotation_prediction.data.numpy()))
+        ensemble_member_rotation_prediction))
     LOGGER.info("Distilled model predictions: {}".format(
-        distilled_model_rotation_prediction.data.numpy()))
+        distilled_model_rotation_prediction))
 
     angles = angles.data.numpy()
     plt.plot(angles, ensemble_rotation_entropy.data.numpy(), 'o--')
@@ -189,7 +186,7 @@ def get_entropy(model, data_set):
     output = model.predict(data_set)
     entropy = metrics.entropy(output)
 
-    prediction = torch.argmax(output, dim=-1)
+    prediction = torch.max(output, dim=-1)
 
     return entropy, prediction
 
@@ -384,24 +381,28 @@ def main():
     #num_ensemble_members = 10
 
     ensemble_filepath = Path("models/mnist_ensemble_2")
-    distilled_model_filepath = Path("models/distilled_model_dirichlet_best_yet_test_t1_more_training")
+    distilled_model_filepath = Path("models/distilled_model_dirichlet_test")
+
 
     #prob_ensemble = create_ensemble(train_loader, test_loader, args, num_ensemble_members, ensemble_filepath)
-    #distilled_model = create_distilled_model(train_loader, test_loader, args, prob_ensemble, distilled_model_filepath)
 
     prob_ensemble = ensemble.Ensemble()
     prob_ensemble.load_ensemble(ensemble_filepath)
-    distilled_model = torch.load(distilled_model_filepath)
-    # DENNA VERKADE ÄNDÅ BLI BRA, MEN NU VET JAG INTE
-    # DENNA SKA ÄNDÅ VARA BÄTTRE ÄN DEN ANDRA, KANSKE KAN FORTSÄTTA TRÄNA DEN?
+    LOGGER.info("Ensemble accuracy on test data: {}".format(
+        get_accuracy_iter(prob_ensemble, test_loader)))
+
+    class_type = distilled_network.DirichletProbabilityDistribution
+    distilled_model = create_distilled_model(train_loader, test_loader, args, prob_ensemble, distilled_model_filepath,
+                                             class_type)
+
+    #distilled_model = torch.load(distilled_model_filepath)
 
     #dirichlet_test(train_loader, test_loader, args, prob_ensemble)
     #effect_of_ensemble_size(prob_ensemble, train_loader, test_loader, args)
     entropy_histogram(prob_ensemble, distilled_model, test_loader)
-    #test_sample = next(iter(test_loader))
-    #entropy_comparison_rotation(prob_ensemble, distilled_model, test_sample)
+    test_sample = next(iter(test_loader))
+    entropy_comparison_rotation(prob_ensemble, distilled_model, test_sample)
     #noise_effect_on_entropy(distilled_model, prob_ensemble, test_loader)
-
 
 if __name__ == "__main__":
     main()
