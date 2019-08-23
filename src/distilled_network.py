@@ -158,8 +158,10 @@ class DirichletProbabilityDistribution(
 
         if labels is not None and self.use_hard_labels:
             lambda_t = np.min([1.0, t / 10])
-            hard_targets = utils.to_one_hot(labels, self.output_size).type(torch.FloatTensor)
-            loss = custom_loss.sum_of_squares_bayes_risk(alphas, soft_targets, hard_targets, lambda_t)
+            hard_targets = utils.to_one_hot(labels, self.output_size).type(
+                torch.FloatTensor)
+            loss = custom_loss.sum_of_squares_bayes_risk(
+                alphas, soft_targets, hard_targets, lambda_t)
         else:
             loss = custom_loss.sum_of_squares_bayes_risk(alphas, soft_targets)
 
@@ -172,6 +174,7 @@ class DirichletProbabilityDistribution(
             self.optimizer.zero_grad()
             inputs, labels = batch
             inputs, labels = inputs.to(self.device), labels.to(self.device)
+            parameter_samples = self.generate_parameter_samples(inputs)
 
             loss = self.calculate_loss(inputs=inputs, labels=labels, t=t)
 
@@ -183,7 +186,9 @@ class DirichletProbabilityDistribution(
 
     def train(self, train_loader, num_epochs, t=1):
 
-        scheduler = torch_optim.lr_scheduler.StepLR(self.optimizer, step_size=5, gamma=0.1)
+        scheduler = torch_optim.lr_scheduler.StepLR(self.optimizer,
+                                                    step_size=5,
+                                                    gamma=0.1)
         #epoch_half = np.floor(num_epochs / 2).astype(np.int)
         self.use_hard_labels = True
 
@@ -194,11 +199,11 @@ class DirichletProbabilityDistribution(
             self._log.info("Epoch {}: Loss: {}".format(epoch, loss))
 
             if t > 1 and np.mod(epoch, 10) == 0:
-                self._log.info("Decreasing t to {}".format(t-1))
+                self._log.info("Decreasing t to {}".format(t - 1))
                 t -= 1
 
             #if epoch == epoch_half:
-             #   self.use_hard_labels = True
+            #   self.use_hard_labels = True
 
             scheduler.step()
 
