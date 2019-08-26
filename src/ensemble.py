@@ -62,6 +62,9 @@ class Ensemble():
         self.members = list()
         self._log = logging.getLogger(self.__class__.__name__)
 
+    def __len__(self):
+        return len(self.members)
+
     def add_member(self, new_member):
         if issubclass(type(new_member), EnsembleMember):
             self._log.info("Adding {} to ensemble".format(type(new_member)))
@@ -78,7 +81,10 @@ class Ensemble():
     def train(self, train_loader, num_epochs):
         """Multithreaded?"""
         self._log.info("Training ensemble")
-        for member in self.members:
+        ensemble_size = len(self)
+        for ind, member in enumerate(self.members):
+            self._log.info("Training member {}/{}".format(
+                ind + 1, ensemble_size))
             member.train(train_loader, num_epochs)
 
     def predict(self, x, t=1):
