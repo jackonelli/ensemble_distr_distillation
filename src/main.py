@@ -29,17 +29,34 @@ def main():
         cov_0=np.eye(2),
         cov_1=np.eye(2),
         store_file=Path("data/2d_gaussian_1000"))
+
+    # TODO: Automated dims
+    input_size = 2
+    output_size = 2
+
     train_loader = torch.utils.data.DataLoader(data,
                                                batch_size=4,
                                                shuffle=True,
                                                num_workers=1)
-    model = models.NeuralNet(2, 3, 3, 2, device=device, learning_rate=args.lr)
-    prob_ensemble = ensemble.Ensemble()
-    prob_ensemble.add_member(model)
+    prob_ensemble = ensemble.Ensemble(output_size)
+    for _ in range(args.num_ensemble_members):
+        model = models.NeuralNet(input_size,
+                                 3,
+                                 3,
+                                 output_size,
+                                 device=device,
+                                 learning_rate=args.lr)
+        prob_ensemble.add_member(model)
     prob_ensemble.train(train_loader, args.num_epochs)
 
-    distilled_model = distilled_network.PlainProbabilityDistribution(
-        2, 3, 3, 2, model, device=device, learning_rate=args.lr * 0.1)
+    distilled_model = distilled_network.DirichletProbabilityDistribution(
+        input_size,
+        3,
+        3,
+        output_size,
+        teacher=prob_ensemble,
+        device=device,
+        learning_rate=args.lr * 0.1)
     distilled_model.train(train_loader, args.num_epochs * 2)
 
 
