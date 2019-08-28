@@ -59,16 +59,6 @@ class TestDirichletLoss(unittest.TestCase):
         tt.assert_almost_equal(
             torch.ones(alphas.size(0)) * true_loss, flat_prior)
 
-    def test_real_data(self):
-        target_distribution = torch.tensor([[[1.0859e-03, 9.9891e-01],
-                                             [7.6349e-04, 9.9924e-01],
-                                             [9.7512e-04, 9.9902e-01]]])
-
-        alphas = torch.tensor([0.0001, 0.1436])
-        dir_nll = loss.dirichlet_neg_log_likelihood(alphas,
-                                                    target_distribution)
-        print(dir_nll)
-
 
 if __name__ == '__main__':
     unittest.main()

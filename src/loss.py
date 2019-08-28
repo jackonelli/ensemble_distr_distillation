@@ -36,8 +36,12 @@ def dirichlet_neg_log_likelihood(alphas, target_distribution):
 
 def _dirichlet_sufficient_statistics(target_distribution):
     """
+    Args:
         target_distribution (torch.tensor((B, N, C))): ensemble distribution
             N probability vectors for every data point (B in total).
+    Returns:
+        sufficient_statistics (torch.tensor((B, C))):
+            Averages over ensemble members
     """
     return torch.mean(torch.log(target_distribution), 1)
 
@@ -129,17 +133,6 @@ def type_two_maximum_likelihood(alphas,
 
 
 def flat_prior(alphas):
-    """KL divergence between Dir(alpha) and Dir(1)"""
-    log_numerator = torch.lgamma(alphas.sum(-1))
-    log_denominator = torch.lgamma(
-        torch.tensor(alphas.size(0),
-                     dtype=torch.float)) + torch.lgamma(alphas).prod(-1)
-    exp_log_p = torch.digamma(alphas) - torch.digamma(alphas.sum())
-    digamma_term = torch.sum((alphas - 1.0) * exp_log_p, dim=-1)
-    return torch.sum(log_numerator - log_denominator + digamma_term)
-
-
-def flat_prior_2(alphas):
     """KL divergence between Dir(alpha) and Dir(1)"""
     log_numerator = torch.lgamma(alphas.sum(-1))
     log_denominator = torch.lgamma(
