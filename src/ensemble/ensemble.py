@@ -18,6 +18,9 @@ class EnsembleMember(nn.Module, ABC):
         self.device = device
 
     def train(self, train_loader, num_epochs, metrics=list()):
+        """Common train method for all ensemble member classes
+        Should NOT be overridden!
+        """
         if self.loss is None or not issubclass(type(self.loss),
                                                nn.modules.loss._Loss):
             raise ValueError("Must assign proper loss function to child.loss.")
@@ -26,7 +29,9 @@ class EnsembleMember(nn.Module, ABC):
             self._log.info("Epoch {}: Loss: {}".format(epoch, loss))
 
     def _train_epoch(self, train_loader, metrics=list()):
-        """Train single epoch"""
+        """Common train epoch method for all ensemble member classes
+        Should NOT be overridden!
+        """
         running_loss = 0
         for batch in train_loader:
             self.optimizer.zero_grad()
@@ -59,6 +64,11 @@ class EnsembleMember(nn.Module, ABC):
 
 class Ensemble():
     def __init__(self, output_size):
+        """The ensemble member needs to track the size
+        of the output of the ensemble
+        This can be automatically inferred but it would look ugly
+        and this now works as a sanity check as well
+        """
         self.members = list()
         self._log = logging.getLogger(self.__class__.__name__)
         self.output_size = output_size
@@ -87,7 +97,12 @@ class Ensemble():
 
     def predict(self, input_, t=1):
         """Ensemble prediction
+        Returns the predictions of all individual ensemble members.
+        The return is actually a tuple with (pred_mean, all_predictions)
+        for backwards compatibility but this should be removed.
         B = batch size, K = num output params, N = ensemble size
+        TODO: Remove pred_mean and let the
+        distilled model chose what to do with the output
 
         Args:
             input_ (torch.tensor((B, data_dim))): data batch
@@ -95,14 +110,12 @@ class Ensemble():
         Returns:
             predictions (torch.tensor((B, N, K)))
         """
+
         batch_size = input_.size(0)
         predictions = torch.zeros((batch_size, self.size, self.output_size))
         for member_ind, member in enumerate(self.members):
             predictions[:, member_ind, :] = member.predict(input_, t)
-
-        pred_mean = torch.mean(predictions, 1)
-        # TODO: Remove pred_mean and let the distilled model chose what to do with the output
-        return pred_mean, predictions
+        return predictions
 
     def hard_classification(self, inputs):
         predicted_distribution = self.predict(inputs)

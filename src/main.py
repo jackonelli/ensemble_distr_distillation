@@ -7,9 +7,8 @@ import torch
 from dataloaders import gaussian
 import utils
 import models
-import distilled_network
-import ensemble
-import experiments
+from distilled import dirichlet_probability_distribution
+from ensemble import ensemble
 
 LOGGER = logging.getLogger(__name__)
 
@@ -49,7 +48,7 @@ def main():
         prob_ensemble.add_member(model)
     prob_ensemble.train(train_loader, args.num_epochs)
 
-    distilled_model = distilled_network.DirichletProbabilityDistribution(
+    distilled_model = dirichlet_probability_distribution.DirichletProbabilityDistribution(
         input_size,
         3,
         3,

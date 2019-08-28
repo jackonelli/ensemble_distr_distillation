@@ -2,7 +2,7 @@ import torch
 import torch.optim as torch_optim
 import torch.nn as nn
 import loss as custom_loss
-import ensemble
+from ensemble import ensemble
 
 
 class NeuralNet(ensemble.EnsembleMember):
