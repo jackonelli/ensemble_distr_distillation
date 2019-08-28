@@ -126,6 +126,13 @@ def setup_logger(log_path=None,
         logger.info("Log at {}".format(log_path))
 
 
+def hard_classification(predicted_distribution):
+    """Hard classification from forwards' probability distribution
+    """
+    class_ind, confidence = tensor_argmax(predicted_distribution)
+    return class_ind, confidence
+
+
 def tensor_argmax(input_tensor):
     value, ind = torch.max(input_tensor, dim=-1)
     return ind, value

@@ -11,12 +11,12 @@ from src import metrics
 class TestMetrics(unittest.TestCase):
     def test_entropy(self):
         predictions = torch.tensor([0.3, 0.7])
-        entropy = metrics.entropy(None, predictions)
+        entropy = metrics.entropy(predictions)
         self.assertAlmostEqual(entropy.item(), 0.61086430205)
 
     def test_entropy_batch(self):
         predictions = torch.tensor([[0.3, 0.7], [0.7, 0.3]])
-        entropy = metrics.entropy(None, predictions)
+        entropy = metrics.entropy(predictions)
         tt.assert_almost_equal(entropy,
                                torch.tensor([0.61086430205, 0.61086430205]))
 
