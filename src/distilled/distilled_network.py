@@ -26,6 +26,9 @@ class DistilledNet(nn.Module, ABC):
         self.device = device
 
     def train(self, train_loader, num_epochs):
+        """ Common train method for all distilled networks
+        Should NOT be overridden!
+        """
 
         scheduler = torch_optim.lr_scheduler.StepLR(self.optimizer,
                                                     step_size=5,
@@ -40,7 +43,8 @@ class DistilledNet(nn.Module, ABC):
                 scheduler.step()
 
     def _train_epoch(self, train_loader):
-        """Train single epoch
+        """Common train epoch method for all distilled networks
+        Should NOT be overridden!
         TODO: Make sure train_loader returns None for labels,
         if no labels are available.
         """
