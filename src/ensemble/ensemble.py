@@ -53,14 +53,6 @@ class EnsembleMember(nn.Module, ABC):
     def calculate_loss(self, inputs, labels):
         pass
 
-    def hard_classification(self, inputs):
-        """Hard classification from forwards' probability distribution
-        """
-
-        predicted_distribution = self.forward(inputs)
-        class_ind, confidence = utils.tensor_argmax(predicted_distribution)
-        return class_ind, confidence
-
 
 class Ensemble():
     def __init__(self, output_size):
@@ -116,12 +108,6 @@ class Ensemble():
         for member_ind, member in enumerate(self.members):
             predictions[:, member_ind, :] = member.predict(input_, t)
         return predictions
-
-    def hard_classification(self, inputs):
-        predicted_distribution = self.predict(inputs)
-        class_ind, confidence = utils.tensor_argmax(predicted_distribution)
-
-        return class_ind, confidence
 
     def save_ensemble(self, filepath):
 

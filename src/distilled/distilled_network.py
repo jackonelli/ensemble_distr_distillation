@@ -72,11 +72,3 @@ class DistilledNet(nn.Module, ABC):
     @abstractmethod
     def calculate_loss(self, outputs, teacher_predictions, labels=None):
         pass
-
-    def hard_classification(self, inputs):
-        """Hard classification from forwards' probability distribution
-        """
-
-        predicted_distribution = self.forward(inputs)
-        class_ind, confidence = utils.tensor_argmax(predicted_distribution)
-        return class_ind, confidence
