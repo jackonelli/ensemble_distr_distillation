@@ -18,7 +18,7 @@ class DistilledNet(nn.Module, ABC):
         self.loss = loss_function
         if self.loss is None or not issubclass(type(self.loss),
                                                nn.modules.loss._Loss):
-            #  raise ValueError("Must assign proper loss function to child.loss.")
+            raise ValueError("Must assign proper loss function to child.loss.")
             self._log.warning(
                 "Must assign proper loss function to child.loss.")
         self.optimizer = None
