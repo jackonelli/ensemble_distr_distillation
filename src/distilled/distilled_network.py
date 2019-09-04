@@ -13,6 +13,7 @@ class DistilledNet(nn.Module, ABC):
         self._log = logging.getLogger(self.__class__.__name__)
         self.teacher = teacher
         self.loss = loss_function
+        self.metrics = dict()
         if self.loss is None or not issubclass(type(self.loss),
                                                nn.modules.loss._Loss):
             # raise ValueError("Must assign proper loss function to child.loss.")
@@ -33,10 +34,10 @@ class DistilledNet(nn.Module, ABC):
         self.use_hard_labels = True
 
         self._log.info("Training distilled network.")
-        for epoch in range(1, num_epochs + 1):
+        for epoch_number in range(1, num_epochs + 1):
             loss = self._train_epoch(train_loader)
-            self._log.info("Epoch {}: Loss: {}".format(epoch, loss))
-            if self._learning_rate_condition(epoch):
+            self._print_epoch(epoch_number, loss)
+            if self._learning_rate_condition(epoch_number):
                 scheduler.step()
 
     def _train_epoch(self, train_loader):
@@ -46,6 +47,7 @@ class DistilledNet(nn.Module, ABC):
         if no labels are available.
         """
         running_loss = 0
+        self._reset_metrics()
         for batch in train_loader:
             self.optimizer.zero_grad()
             inputs, labels = batch
@@ -57,7 +59,25 @@ class DistilledNet(nn.Module, ABC):
             loss.backward()
             self.optimizer.step()
             running_loss += loss.item()
+            self._update_metrics(outputs, labels)
         return running_loss
+
+    def _add_metric(self, metric):
+        self.metrics[metric.name] = metric
+
+    def _update_metrics(self, outputs, labels):
+        for metric in self.metrics.values():
+            metric.update(labels=labels, outputs=outputs)
+
+    def _reset_metrics(self):
+        for metric in self.metrics.values():
+            metric.reset()
+
+    def _print_epoch(self, epoch_number, loss):
+        epoch_string = "Epoch {}: Loss: {}".format(epoch_number, loss)
+        for metric in self.metrics.values():
+            epoch_string += " {}".format(metric)
+        self._log.info(epoch_string)
 
     def _learning_rate_condition(self, epoch):
         """Evaluate condition for increasing learning rate
