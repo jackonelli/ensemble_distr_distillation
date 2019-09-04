@@ -3,7 +3,6 @@ from abc import ABC, abstractmethod
 import torch
 import torch.nn as nn
 import logging
-import utils
 
 
 class EnsembleMember(nn.Module, ABC):
@@ -43,7 +42,11 @@ class EnsembleMember(nn.Module, ABC):
             loss.backward()
             self.optimizer.step()
             running_loss += loss.item()
+            self._print_epoch(metrics)
         return running_loss
+
+    def _print_epoch(self, metrics):
+        pass
 
     @abstractmethod
     def forward(self, inputs):

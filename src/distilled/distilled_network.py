@@ -1,11 +1,8 @@
 import logging
 from abc import ABC, abstractmethod
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as torch_optim
-import loss as custom_loss
-import utils
 
 
 class DistilledNet(nn.Module, ABC):
@@ -18,7 +15,7 @@ class DistilledNet(nn.Module, ABC):
         self.loss = loss_function
         if self.loss is None or not issubclass(type(self.loss),
                                                nn.modules.loss._Loss):
-            raise ValueError("Must assign proper loss function to child.loss.")
+            # raise ValueError("Must assign proper loss function to child.loss.")
             self._log.warning(
                 "Must assign proper loss function to child.loss.")
         self.optimizer = None
