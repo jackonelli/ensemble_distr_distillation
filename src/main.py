@@ -9,6 +9,7 @@ import utils
 import models
 from distilled import dirichlet_probability_distribution
 from ensemble import ensemble
+import metrics
 
 LOGGER = logging.getLogger(__name__)
 
@@ -46,6 +47,8 @@ def main():
                                  device=device,
                                  learning_rate=args.lr)
         prob_ensemble.add_member(model)
+    acc_metric = metrics.Metric(name="Acc", function=metrics.accuracy)
+    prob_ensemble.add_metrics([acc_metric])
     prob_ensemble.train(train_loader, args.num_epochs)
 
     distilled_model = dirichlet_probability_distribution.DirichletProbabilityDistribution(

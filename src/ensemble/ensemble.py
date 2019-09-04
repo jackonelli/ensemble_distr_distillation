@@ -1,8 +1,9 @@
 """Ensemble class"""
+import logging
 from abc import ABC, abstractmethod
 import torch
 import torch.nn as nn
-import logging
+import metrics
 
 
 class EnsembleMember(nn.Module, ABC):
@@ -12,6 +13,7 @@ class EnsembleMember(nn.Module, ABC):
         super().__init__()
         self._log = logging.getLogger(self.__class__.__name__)
         self.loss = loss_function
+        self.metrics = dict()
         self.optimizer = None
         self._log.info("Moving model to device: {}".format(device))
         self.device = device
@@ -23,37 +25,54 @@ class EnsembleMember(nn.Module, ABC):
         if self.loss is None or not issubclass(type(self.loss),
                                                nn.modules.loss._Loss):
             raise ValueError("Must assign proper loss function to child.loss.")
-        for epoch in range(1, num_epochs + 1):
+        for epoch_number in range(1, num_epochs + 1):
             loss = self._train_epoch(train_loader)
-            self._log.info("Epoch {}: Loss: {}".format(epoch, loss))
+            self._print_epoch(epoch_number, loss)
 
     def _train_epoch(self, train_loader, metrics=list()):
         """Common train epoch method for all ensemble member classes
         Should NOT be overridden!
         """
-        running_loss = 0
+
+        running_loss = 0.0
         for batch in train_loader:
             self.optimizer.zero_grad()
+            self._reset_metrics()
             inputs, labels = batch
 
             inputs, labels = inputs.to(self.device), labels.to(self.device)
 
-            loss = self.calculate_loss(inputs, labels)
+            outputs = self.forward(inputs)
+            loss = self.calculate_loss(outputs, labels)
             loss.backward()
             self.optimizer.step()
             running_loss += loss.item()
-            self._print_epoch(metrics)
+            self._update_metrics(outputs, labels)
         return running_loss
 
-    def _print_epoch(self, metrics):
-        pass
+    def _add_metric(self, metric):
+        self.metrics[metric.name] = metric
+
+    def _update_metrics(self, outputs, labels):
+        for metric in self.metrics.values():
+            metric.update(labels=labels, outputs=outputs)
+
+    def _reset_metrics(self):
+        for metric in self.metrics.values():
+            metric.reset()
+
+    def _print_epoch(self, epoch_number, loss):
+        epoch_string = "Epoch {}: Loss: {}".format(epoch_number, loss)
+        for metric in self.metrics.values():
+            epoch_string += " {}".format(metric)
+        self._log.info(epoch_string)
 
     @abstractmethod
     def forward(self, inputs):
         pass
 
     @abstractmethod
-    def calculate_loss(self, inputs, labels):
+    def calculate_loss(self, outputs, labels):
         pass
 
 
@@ -89,6 +108,17 @@ class Ensemble():
         for ind, member in enumerate(self.members):
             self._log.info("Training member {}/{}".format(ind + 1, self.size))
             member.train(train_loader, num_epochs)
+
+    def add_metrics(self, metrics_list):
+        for metric in metrics_list:
+            if issubclass(type(metric), metrics.Metric):
+                for member in self.members:
+                    member.metrics[metric.name] = metric
+                    self._log.info("Adding metric: {}".format(metric.name))
+            else:
+                self._log.error(
+                    "Metric {} does not inherit from metric.Metric.".format(
+                        metric))
 
     def predict(self, input_, t=1):
         """Ensemble prediction

@@ -1,30 +1,42 @@
 """Metrics"""
+import logging
 import torch
 import numpy as np
 import utils
+
+LOGGER = logging.getLogger(__name__)
 
 
 class Metric:
     """Metric class"""
 
-    def __init__(self, function):
+    def __init__(self, name, function):
+        self.name = name
         self.function = function
         self.running_value = 0.0
         self.counter = 0
 
-    def update(self, value):
-        self.running_value += value
+    def __str__(self):
+        return "{}: {}".format(self.name, self.mean())
+
+    def update(self, labels, outputs):
+        self.running_value += self.function(labels, outputs)
         self.counter += 1
 
     def mean(self):
-        return self.running_value / self.counter
+        if self.counter > 0:
+            mean = self.running_value / self.counter
+        else:
+            mean = float("nan")
+            LOGGER.warning("Trying to calculate mean on unpopulated metric.")
+        return mean
 
     def reset(self):
         self.running_value = 0.0
         self.counter = 0
 
 
-def entropy(predicted_distribution):
+def entropy(true_labels, predicted_distribution):
     """Entropy
 
     B = batch size, C = num classes
@@ -33,6 +45,7 @@ def entropy(predicted_distribution):
     then the output is a tensor with B values
 
     Args:
+        NOT USED true_labels: torch.tensor((B, C))
         predicted_distribution: torch.tensor((B, C))
 
     Returns:

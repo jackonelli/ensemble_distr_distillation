@@ -40,8 +40,7 @@ class NeuralNet(ensemble.EnsembleMember):
     def temperature_softmax(x, t=1):
         return nn.functional.softmax(x / t, dim=-1)
 
-    def calculate_loss(self, inputs, labels):
-        outputs = self.forward(inputs)
+    def calculate_loss(self, outputs, labels):
 
         return self.loss(outputs, labels.type(torch.LongTensor))
 
