@@ -1,5 +1,0 @@
-numpy
-torch
-torchvision
-matplotlib
-matplot2tikz
