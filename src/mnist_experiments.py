@@ -1,4 +1,3 @@
-import math
 import numpy as np
 import torch
 import torchvision
@@ -34,7 +33,7 @@ def create_distilled_model(
                                  learning_rate=args.lr*10)
 
     distilled_model.train(train_loader, args.num_epochs, t=1)
-    LOGGER.info("Distilled model accuracy on test data: {}".format(get_accuracy_iter(distilled_model, test_loader)))
+    LOGGER.info("Distilled model accuracy on test data: {}".format(get_accuracy(distilled_model, test_loader)))
 
     torch.save(distilled_model, filepath)
 
@@ -60,11 +59,11 @@ def create_ensemble(train_loader, test_loader, args, num_ensemble_members, filep
                                  learning_rate=args.lr)
         model.train(train_loader, args.num_epochs)
         LOGGER.info("Accuracy on test data: {}".format(
-            get_accuracy_iter(model, test_loader)))
+            get_accuracy(model, test_loader)))
         prob_ensemble.add_member(model)
 
     LOGGER.info("Ensemble accuracy on test data: {}".format(
-        get_accuracy_iter(prob_ensemble, test_loader)))
+        get_accuracy(prob_ensemble, test_loader)))
 
     prob_ensemble.save_ensemble(filepath)
 
@@ -125,9 +124,9 @@ def dirichlet_test(train_loader, test_loader, args, ensemble):
     distilled_model_dirichlet.train(train_loader, args.num_epochs*2, t=1)
     torch.save(distilled_model_dirichlet, Path("models/distilled_model_dirichlet_best_yet_test_t1_more_training"))
 
-    LOGGER.info("Distilled model accuracy on train data: {}".format(get_accuracy_iter(distilled_model_dirichlet,
+    LOGGER.info("Distilled model accuracy on train data: {}".format(get_accuracy(distilled_model_dirichlet,
                                                                                       train_loader)))
-    LOGGER.info("Accuracy on test data: {}".format(get_accuracy_iter(distilled_model_dirichlet, test_loader)))
+    LOGGER.info("Accuracy on test data: {}".format(get_accuracy(distilled_model_dirichlet, test_loader)))
 
 
 def generate_rotated_data_set(img, angles):
@@ -146,23 +145,15 @@ def generate_rotated_data_set(img, angles):
     return data_set
 
 
-def get_accuracy(model, inputs, labels):
-    """Calculate error of model on data set"""
-
-    predicted_distribution = model.predict(inputs)
-    accuracy = metrics.accuracy(labels, predicted_distribution)
-
-    return accuracy
-
-
-def get_accuracy_iter(model, data_loader):
+def get_accuracy(model, data_loader):
     """Calculate accuracy of model on data in dataloader"""
 
     accuracy = 0
     num_batches = 0
     for batch in data_loader:
         inputs, labels = batch
-        accuracy += get_accuracy(model, inputs, labels)
+        predicted_distribution = model.predict(inputs)
+        accuracy += metrics.accuracy(labels, predicted_distribution)
         num_batches += 1
 
     return accuracy / num_batches
@@ -171,14 +162,8 @@ def get_accuracy_iter(model, data_loader):
 def get_error_iter(model, data_loader):
     """Calculate error of model on data in dataloader"""
 
-    error = 0
-    num_batches = 0
-    for batch in data_loader:
-        inputs, labels = batch
-        error += (1 - get_accuracy(model, inputs, labels))
-        num_batches += 1
-
-    return error / num_batches
+    error = 1 - get_accuracy(model, data_loader)
+    return error
 
 
 def get_entropy(model, data_set):
@@ -206,6 +191,7 @@ def get_entropy_iter(model, test_loader):
             entropy = torch.cat((entropy, batch_entropy), dim=0)
 
     return entropy
+
 
 def noise_effect_on_entropy(model, ensemble, test_loader):
     """Effect on entropy of ensemble and model with increasing noise added to the input"""
@@ -368,7 +354,7 @@ def main():
     prob_ensemble = ensemble.Ensemble()
     prob_ensemble.load_ensemble(ensemble_filepath)
     LOGGER.info("Ensemble accuracy on test data: {}".format(
-        get_accuracy_iter(prob_ensemble, test_loader)))
+        get_accuracy(prob_ensemble, test_loader)))
 
     class_type = distilled_network.DirichletProbabilityDistribution
     distilled_model = create_distilled_model(train_loader, test_loader, args, prob_ensemble, distilled_model_filepath,
