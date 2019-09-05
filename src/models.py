@@ -6,6 +6,8 @@ from ensemble import ensemble
 
 
 class NeuralNet(ensemble.EnsembleMember):
+    """Obsolete"""
+
     def __init__(self,
                  input_size,
                  hidden_size_1,
@@ -14,6 +16,8 @@ class NeuralNet(ensemble.EnsembleMember):
                  device=torch.device("cpu"),
                  learning_rate=0.001):
         super().__init__(loss_function=nn.CrossEntropyLoss(), device=device)
+        self._log.warning(
+            "This class has been moved to ensemble/simple_classifier")
         self.input_size = input_size
         self.hidden_size_1 = hidden_size_1  # Or make a list or something
         self.hidden_size_2 = hidden_size_2

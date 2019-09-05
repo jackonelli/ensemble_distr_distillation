@@ -9,6 +9,7 @@ import utils
 import models
 from distilled import dirichlet_probability_distribution
 from ensemble import ensemble
+from ensemble import simple_classifier
 import metrics
 
 LOGGER = logging.getLogger(__name__)
@@ -40,12 +41,12 @@ def main():
                                                num_workers=1)
     prob_ensemble = ensemble.Ensemble(output_size)
     for _ in range(args.num_ensemble_members):
-        model = models.NeuralNet(input_size,
-                                 3,
-                                 3,
-                                 output_size,
-                                 device=device,
-                                 learning_rate=args.lr)
+        model = simple_classifier.SimpleClassifier(input_size,
+                                                   3,
+                                                   3,
+                                                   output_size,
+                                                   device=device,
+                                                   learning_rate=args.lr)
         prob_ensemble.add_member(model)
     acc_metric = metrics.Metric(name="Acc", function=metrics.accuracy)
     prob_ensemble.add_metrics([acc_metric])
