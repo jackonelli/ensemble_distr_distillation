@@ -1,12 +1,13 @@
 """Loss module"""
 import torch
 import torch.nn as nn
-
+import numpy as np
 
 def scalar_loss(inputs, soft_targets):
     """I think it might be simpler to just use functions for custom loss
     as long as we only use torch functions we should be ok.
     """
+
     return torch.sum(-soft_targets * torch.log(inputs))
 
 
@@ -46,6 +47,71 @@ def _dirichlet_sufficient_statistics(target_distribution):
     return torch.mean(torch.log(target_distribution), 1)
 
 
+def gaussian_neg_log_likelihood(mean, var, target, scale=1):
+    """Negative log likelihood loss for the Gaussian distribution
+    B = batch size, D = dimension of target (num classes), N = ensemble size
+
+    Args:
+        mean (torch.tensor((B, N, D))): mean values of y|x for every x in
+            batch (and for every ensemble member).
+        var (torch.tensor((B, N, D))): variance of y|x for every x in
+            batch (and for every ensemble member).
+        target (torch.tensor((B, N, D))): sample from the normal
+            distribution, if not an ensemble prediction N=1.
+        scale (torch.tensor(B, 1)): scaling parameter for the variance
+            (/covariance matrix) for every x in batch.
+    """
+
+    normalizer = 0
+    ll = 0
+    for i in np.arange(mean.size(1)):
+        cov_mat = [torch.diag(var[b, i, :]) for b in np.arange(target.size(0))]
+        normalizer += np.stack([0.5 * (target.size(-1) * torch.log(2 * np.pi) + torch.log(torch.det(cov_mat_i)))
+                               for cov_mat_i in cov_mat], axis=0)
+
+        ll += np.stack([0.5 * torch.transpose(target - mean[b, i, :]) * (1 / scale) * torch.inverse(cov_mat_i)
+                            * (target - mean[b, i, :]) for b, cov_mat_i in enumerate(cov_mat)], axis=0)
+
+    return normalizer + ll
+
+
+def inverse_wishart_neg_log_likelihood(psi, nu, target):
+    """Negative log likelihood loss for the inverse-Wishart distribution
+    B = batch size, D = target dimension, N = ensemble size
+
+    Args:
+        psi (torch.tensor((B, D))): diagonal of psi (parameter in inverse-Wishart distribution)  # HOPPAS DET RÄCKER MED DIAGONALEN?
+            for every x in batch.
+        nu (torch.tensor((B, D))): degrees-of-freedom of the inverse-Wishart distribution
+            every x in batch, nu > D - 1.
+        target (torch.tensor((B, N, D))): variance (diagonal of covariance matrix)
+            as output by N ensemble members.
+    """
+
+    normalizer = 0
+    ll = 0
+    for i in np.arange(target.size(1)):
+        # CAN I DO ANYTHING ABOUT THIS UGLY LIST THING?
+        cov_mat = np.stack([torch.diag(target[b, i, :]) for b in np.arange(target.size(0))], axis=0)
+        cov_mat_det = np.stack([torch.det(cov_mat_i) for cov_mat_i in cov_mat], axis=0)
+        psi_mat = np.stack([torch.diag(psi[b, i, :]) for b in np.arange(target.size(0))], axis=0)
+        psi_mat_det = np.stack([torch.det(psi_mat_i) for psi_mat_i in psi_mat], axis=0)
+
+        normalizer += - (nu / 2) * torch.log(psi_mat_det) + (nu * target.size(-1) / 2) * torch.log(2) + torch.lgamma(nu/2)\
+            + ((nu + target.size(-1) + 1) / 2) * cov_mat_det
+        ll += np.stack([0.5 * torch.trace(psi_mat * torch.inverse(cov_mat_i)) for cov_mat_i in cov_mat], axis=0)
+
+    return normalizer + ll
+
+
+def gaussian_inv_wishart_neg_log_likelihood(mean, sigma, mu_0, scale, psi, nu):
+
+    nll_gaussian = gaussian_neg_log_likelihood(mu_0, sigma, mean, scale)
+    nll_inverse_wishart = inverse_wishart_neg_log_likelihood(psi, nu, sigma)
+
+    return nll_gaussian + nll_inverse_wishart
+
+
 def sum_of_squares_bayes_risk(alphas,
                               target_distribution,
                               hard_targets=None,
@@ -69,7 +135,7 @@ def sum_of_squares_bayes_risk(alphas,
 
     if hard_targets is not None:
         alphas_tilde = hard_targets + (1 - hard_targets) * alphas
-        l_reg = lambda_t * flat_prior_2(alphas_tilde) / alphas.shape[-1]
+        l_reg = lambda_t * flat_prior(alphas_tilde) / alphas.shape[-1]
     else:
         l_reg = 0
 
@@ -97,7 +163,7 @@ def cross_entropy_bayes_risk(alphas,
 
     if hard_targets is not None:
         alphas_tilde = hard_targets + (1 - hard_targets) * alphas
-        l_reg = lambda_t * flat_prior_2(alphas_tilde) / alphas.shape[-1]
+        l_reg = lambda_t * flat_prior(alphas_tilde) / alphas.shape[-1]
     else:
         l_reg = 0
 
@@ -125,7 +191,7 @@ def type_two_maximum_likelihood(alphas,
 
     if hard_targets is not None:
         alphas_tilde = hard_targets + (1 - hard_targets) * alphas
-        l_reg = lambda_t * flat_prior_2(alphas_tilde) / alphas.shape[-1]
+        l_reg = lambda_t * flat_prior(alphas_tilde) / alphas.shape[-1]
     else:
         l_reg = 0
 
