@@ -141,6 +141,7 @@ class EnsembleMember(nn.Module, ABC):
             self.optimizer.step()
             running_loss += loss.item()
             self._update_metrics(outputs, labels)
+
         return running_loss
 
     def _add_metric(self, metric):

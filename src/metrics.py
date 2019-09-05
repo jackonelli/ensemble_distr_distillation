@@ -36,7 +36,7 @@ class Metric:
         self.counter = 0
 
 
-def entropy(true_labels, predicted_distribution):
+def entropy(predicted_distribution):
     """Entropy
 
     B = batch size, C = num classes
@@ -130,3 +130,24 @@ def error(true_labels, predicted_distribution):
         number_of_elements = 1
 
     return (true_labels != predicted_labels).sum().item() / number_of_elements
+
+
+def squared_error(targets, predictions):
+    """ Error
+    B = batch size
+    D = output dimension
+
+    Args:
+        targets: torch.tensor(B, D)
+        predictions: torch.tensor(B, 2D), vector of estimated mean and variances of the
+                     normal distribution of targets arranged as [mean_1, ..., mean_D, var_1, ..., var_D]
+
+    Returns:
+        Error: float
+    """
+
+    number_of_elements = targets.size()
+    if number_of_elements == 0:
+        number_of_elements = 1
+
+    return ((targets - predictions[:targets.size()])**2).sum().item() / number_of_elements

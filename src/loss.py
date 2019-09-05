@@ -1,7 +1,7 @@
 """Loss module"""
 import torch
-import torch.nn as nn
 import numpy as np
+
 
 def scalar_loss(inputs, soft_targets):
     """I think it might be simpler to just use functions for custom loss

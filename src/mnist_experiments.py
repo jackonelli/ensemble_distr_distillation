@@ -10,7 +10,7 @@ import ensemble
 import metrics
 import models
 import utils
-from dataloaders.mnist import MnistData
+from dataloaders import mnist
 
 LOGGER = logging.getLogger(__name__)
 
@@ -87,11 +87,11 @@ def entropy_comparison_rotation(prob_ensemble, distilled_model, test_sample):
         [data_point.view(28 * 28) for data_point in rotated_data_set])
     ensemble_member = prob_ensemble.members[0]
     ensemble_rotation_entropy, ensemble_rotation_prediction = get_entropy(
-        prob_ensemble, rotated_data_set)
+        prob_ensemble, [rotated_data_set])
     ensemble_member_rotation_entropy, ensemble_member_rotation_prediction = \
-        get_entropy(ensemble_member, rotated_data_set)
+        get_entropy(ensemble_member, [rotated_data_set])
     distilled_model_rotation_entropy, distilled_model_rotation_prediction = \
-        get_entropy(distilled_model, rotated_data_set)
+        get_entropy(distilled_model, [rotated_data_set])
 
     LOGGER.info("True label is: {}".format(test_label))
     LOGGER.info("Ensemble prediction: {}".format(
@@ -159,38 +159,20 @@ def get_accuracy(model, data_loader):
     return accuracy / num_batches
 
 
-def get_error_iter(model, data_loader):
-    """Calculate error of model on data in dataloader"""
-
-    error = 1 - get_accuracy(model, data_loader)
-    return error
-
-
-def get_entropy(model, data_set):
-    """Calculate entropy of model output over a data set"""
-
-    output = model.predict(data_set)
-    entropy = metrics.entropy(output)
-
-    prediction = torch.max(output, dim=-1)
-
-    return entropy, prediction
-
-
-def get_entropy_iter(model, test_loader):
+def get_entropy(model, test_loader):
     """Calculate entropy of model output over a dataloader"""
 
     entropy = []
+    prediction = []
     for i, batch in enumerate(test_loader):
         inputs, labels = batch
-        if i == 0:
-            entropy, _ = get_entropy(model, inputs)
 
-        else:
-            batch_entropy, _ = get_entropy(model, inputs)
-            entropy = torch.cat((entropy, batch_entropy), dim=0)
+        output = model.predict(inputs)
+        entropy.append(metrics.entropy(output))
 
-    return entropy
+        prediction.append(torch.max(output, dim=-1))
+
+    return torch.stack(entropy, dim=0), torch.stack(prediction, dim=0)
 
 
 def noise_effect_on_entropy(model, ensemble, test_loader):
@@ -218,12 +200,9 @@ def noise_effect_on_entropy(model, ensemble, test_loader):
             input_perturbed = inputs + distr.sample(
                 (inputs.shape[0], inputs.shape[1]))
 
-            entropy, _ = get_entropy(ensemble, input_perturbed)
-            ensemble_entropy[i] += torch.sum(entropy)
-            entropy, _ = get_entropy(ensemble_member, input_perturbed)
-            ensemble_member_entropy[i] += torch.sum(entropy)
-            entropy, _ = get_entropy(model, input_perturbed)
-            model_entropy[i] += torch.sum(entropy)
+            ensemble_entropy[i] += torch.sum(get_entropy(ensemble, input_perturbed)[0])
+            ensemble_member_entropy[i] += torch.sum(get_entropy(ensemble_member, input_perturbed)[0])
+            model_entropy[i] += torch.sum(get_entropy(model, input_perturbed)[0])
 
     epsilon = epsilon.data.numpy()
     plt.plot(epsilon, ensemble_entropy.data.numpy())
@@ -261,15 +240,15 @@ def effect_of_ensemble_size(full_ensemble, train_loader, test_loader, args):
             filepath
         )  # create_distilled_model(train_loader, test_loader, args, concat_ensemble, filepath)
 
-        ensemble_error[i] = get_error_iter(concat_ensemble, test_loader)
-        ensemble_member_error[i] = get_error_iter(ensemble_member, test_loader)
-        distilled_model_error[i] = get_error_iter(distilled_model, test_loader)
+        ensemble_error[i] = 1 - get_accuracy(concat_ensemble, test_loader)
+        ensemble_member_error[i] = 1 - get_accuracy(ensemble_member, test_loader)
+        distilled_model_error[i] = 1 - get_accuracy(distilled_model, test_loader)
         ensemble_nll[i] = torch.sum(
-            get_entropy_iter(concat_ensemble, test_loader))
+            get_entropy(concat_ensemble, test_loader)[0])
         ensemble_member_nll[i] = torch.sum(
-            get_entropy_iter(ensemble_member, test_loader))
+            get_entropy(ensemble_member, test_loader)[0])
         distilled_model_nll[i] = torch.sum(
-            get_entropy_iter(distilled_model, test_loader))
+            get_entropy(distilled_model, test_loader)[0])
 
     fig, axes = plt.subplots(1, 2)
     axes[0].plot(np.arange(ensemble_size), ensemble_error.data.numpy())
@@ -293,9 +272,9 @@ def entropy_histogram(ensemble, model, test_loader):
 
     ensemble_member = ensemble.members[0]
 
-    ensemble_entropy = get_entropy_iter(ensemble, test_loader).data.numpy()
-    ensemble_member_entropy = get_entropy_iter(ensemble_member, test_loader).data.numpy()
-    distilled_model_entropy = get_entropy_iter(model, test_loader).data.numpy()
+    ensemble_entropy = get_entropy(ensemble, test_loader).data.numpy()
+    ensemble_member_entropy = get_entropy(ensemble_member, test_loader).data.numpy()
+    distilled_model_entropy = get_entropy(model, test_loader).data.numpy()
 
     num_bins = 100
     plt.hist(ensemble_entropy, bins=num_bins, alpha=0.5, density=True)
@@ -340,8 +319,18 @@ def main():
     utils.setup_logger(log_path=Path.cwd() / args.log_dir / log_file,
                        log_level=args.log_level)
 
-    train_loader = MnistData()
-    test_loader = MnistData(train=False)
+    train_set = mnist.MnistData()
+    test_set = mnist.MnistData(train=False)
+
+    train_loader = torch.utils.data.DataLoader(train_set,
+                                               batch_size=32,
+                                               shuffle=True,
+                                               num_workers=1)
+
+    test_loader = torch.utils.data.DataLoader(test_set,
+                                              batch_size=4,
+                                              shuffle=True,
+                                              num_workers=1)
 
     #num_ensemble_members = 10
 
