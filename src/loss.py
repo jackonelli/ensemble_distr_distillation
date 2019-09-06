@@ -47,7 +47,7 @@ def _dirichlet_sufficient_statistics(target_distribution):
     return torch.mean(torch.log(target_distribution), 1)
 
 
-def gaussian_neg_log_likelihood(parameters, target, scale=1):
+def gaussian_neg_log_likelihood(parameters, target, scale=1.0):
     """Negative log likelihood loss for the Gaussian distribution
     B = batch size, D = dimension of target (num classes), N = ensemble size
 
@@ -64,33 +64,35 @@ def gaussian_neg_log_likelihood(parameters, target, scale=1):
     mean = parameters[0]
     var = parameters[1]
 
-    if mean.dim == 
-
     normalizer = 0
     ll = 0
     for i in np.arange(mean.size(1)):
         cov_mat = [torch.diag(var[b, i, :]) for b in np.arange(target.size(0))]
-        normalizer += np.stack([0.5 * (target.size(-1) * torch.log(2 * np.pi) + torch.log(torch.det(cov_mat_i)))
-                               for cov_mat_i in cov_mat], axis=0)
+        normalizer += torch.stack([0.5 * (target.size(-1) * torch.log(torch.tensor(2 * np.pi))
+                                          + torch.log(torch.det(cov_mat_i)))
+                                  for cov_mat_i in cov_mat], dim=0)
 
-        ll += np.stack([0.5 * torch.transpose(target - mean[b, i, :]) * (1 / scale) * torch.inverse(cov_mat_i)
-                            * (target - mean[b, i, :]) for b, cov_mat_i in enumerate(cov_mat)], axis=0)
+        ll += torch.sum(torch.stack([0.5 * (target[b, :] - mean[b, i, :]) * (1 / scale) * torch.inverse(cov_mat_i)
+                        * torch.transpose((target[b, :] - mean[b, i, :]), 0, -1)
+                        for b, cov_mat_i in enumerate(cov_mat)], dim=0), dim=1) / mean.size(1)  # Mean over ensembles
 
-    return normalizer + ll
+    return torch.mean(normalizer + torch.sum(ll, dim=-1))  # Sum over dimensions, mean over batch
 
 
-def inverse_wishart_neg_log_likelihood(psi, nu, target):
+def inverse_wishart_neg_log_likelihood(parameters, target):
     """Negative log likelihood loss for the inverse-Wishart distribution
     B = batch size, D = target dimension, N = ensemble size
 
     Args:
-        psi (torch.tensor((B, D))): diagonal of psi (parameter in inverse-Wishart distribution)  # HOPPAS DET RÄCKER MED DIAGONALEN?
-            for every x in batch.
-        nu (torch.tensor((B, D))): degrees-of-freedom of the inverse-Wishart distribution
-            every x in batch, nu > D - 1.
-        target (torch.tensor((B, N, D))): variance (diagonal of covariance matrix)
+        parameters (torch.tensor((B, D)), torch.tensor((B, D))):
+            diagonal of psi and degrees-of-freedom, nu > D - 1, of the
+            inverse-Wishart distribution for every x in batch.
+        target (torch.tensor((B, D))): variance (diagonal of covariance matrix)
             as output by N ensemble members.
     """
+
+    psi = parameters[0]
+    nu = parameters[1]
 
     normalizer = 0
     ll = 0
@@ -108,10 +110,20 @@ def inverse_wishart_neg_log_likelihood(psi, nu, target):
     return normalizer + ll
 
 
-def gaussian_inv_wishart_neg_log_likelihood(mean, sigma, mu_0, scale, psi, nu):
+def gaussian_inv_wishart_neg_log_likelihood(parameters, targets):
+    """Negative log likelihood loss for the Gaussian inverse-Wishart distribution
+        B = batch size, D = target dimension, N = ensemble size
 
-    nll_gaussian = gaussian_neg_log_likelihood(mu_0, sigma, mean, scale)
-    nll_inverse_wishart = inverse_wishart_neg_log_likelihood(psi, nu, sigma)
+        Args:
+        parameters (torch.tensor((B, 1, D)), torch.tensor((B, 1, D)),
+             torch.tensor((B, 1, D)), torch.tensor((B, 1, D)): parameters of the normal distribution (mu_0, scale)
+             and of the inverse-Wishart distribution (psi, nu)
+        targets (torch.tensor((B, N, D)), torch.tensor((B, N, D)): mean and variance (diagonal of covariance
+             matrix) as output by N ensemble members.
+        """
+
+    nll_gaussian = gaussian_neg_log_likelihood(parameters[0:2], targets[0])
+    nll_inverse_wishart = inverse_wishart_neg_log_likelihood(parameters[2:4], targets[1])
 
     return nll_gaussian + nll_inverse_wishart
 

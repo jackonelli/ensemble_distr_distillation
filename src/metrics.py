@@ -139,15 +139,15 @@ def squared_error(targets, predictions):
 
     Args:
         targets: torch.tensor(B, D)
-        predictions: torch.tensor(B, 2D), vector of estimated mean and variances of the
-                     normal distribution of targets arranged as [mean_1, ..., mean_D, var_1, ..., var_D]
+        predictions: (torch.tensor(B, D), torch.tensor(B, D)), tuple of estimated mean and variances of the
+                     normal distribution of targets
 
     Returns:
         Error: float
     """
 
-    number_of_elements = targets.size()
+    number_of_elements = targets.size(0)
     if number_of_elements == 0:
         number_of_elements = 1
 
-    return ((targets - predictions[:targets.size()])**2).sum().item() / number_of_elements
+    return ((targets - predictions[0])**2).sum().item() / number_of_elements

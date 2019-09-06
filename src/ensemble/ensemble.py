@@ -70,7 +70,11 @@ class Ensemble():
         batch_size = input_.size(0)
         predictions = torch.zeros((batch_size, self.size, self.output_size))
         for member_ind, member in enumerate(self.members):
-            predictions[:, member_ind, :] = member.predict(input_, t)
+            if t is None:
+                predictions[:, member_ind, :] = member.predict(input_)
+            else:
+                predictions[:, member_ind, :] = member.predict(input_, t)
+
         return predictions
 
     def save_ensemble(self, filepath):

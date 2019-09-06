@@ -1,7 +1,7 @@
 import torch
 import torch.optim as torch_optim
 import torch.nn as nn
-from ensemble import ensemble
+from src.ensemble import ensemble
 
 
 class SimpleClassifier(ensemble.EnsembleMember):
@@ -12,6 +12,7 @@ class SimpleClassifier(ensemble.EnsembleMember):
                  output_size,
                  device=torch.device("cpu"),
                  learning_rate=0.001):
+
         super().__init__(loss_function=nn.CrossEntropyLoss(), device=device)
         self.input_size = input_size
         self.hidden_size_1 = hidden_size_1  # Or make a list or something

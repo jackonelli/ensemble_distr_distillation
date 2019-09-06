@@ -10,7 +10,7 @@ print(sys.path)
 from src.dataloaders import gaussian
 import src.utils as utils
 import src.models as models
-from src.distilled import dirichlet_probability_distribution
+from src.distilled import logits_probability_distribution
 from src.ensemble import ensemble
 from src.ensemble import simple_classifier
 import src.metrics as metrics
@@ -36,6 +36,7 @@ def main():
 
     # TODO: Automated dims
     input_size = 2
+    hidden_size = 3
     output_size = 2
 
     train_loader = torch.utils.data.DataLoader(data,
@@ -46,8 +47,8 @@ def main():
     prob_ensemble = ensemble.Ensemble(output_size)
     for _ in range(args.num_ensemble_members):
         model = simple_classifier.SimpleClassifier(input_size,
-                                                   3,
-                                                   3,
+                                                   hidden_size,
+                                                   hidden_size,
                                                    output_size,
                                                    device=device,
                                                    learning_rate=args.lr)
@@ -56,10 +57,10 @@ def main():
     prob_ensemble.add_metrics([acc_metric])
     prob_ensemble.train(train_loader, args.num_epochs)
 
-    distilled_model = dirichlet_probability_distribution.DirichletProbabilityDistribution(
+    distilled_model = logits_probability_distribution.LogitsProbabilityDistribution(
         input_size,
-        3,
-        3,
+        hidden_size,
+        hidden_size,
         output_size,
         teacher=prob_ensemble,
         device=device,

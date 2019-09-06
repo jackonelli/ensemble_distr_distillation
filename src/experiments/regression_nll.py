@@ -7,12 +7,39 @@ print(sys.path)
 
 from src.dataloaders import one_dim_regression
 import src.utils as utils
-from src.distilled import dirichlet_probability_distribution
+from src.distilled import niw_probability_distribution
 from src.ensemble import ensemble
 from src.ensemble import simple_regressor
 import src.metrics as metrics
+import matplotlib.pyplot as plt
+import numpy as np
 
 LOGGER = logging.getLogger(__name__)
+
+
+def plot_predictions(prob_ensemble):
+
+    data = one_dim_regression.SyntheticRegressionData(n_samples=500, train=False,
+                                                      store_file=Path("data/one_dim_reg_500"))
+
+    test_loader = torch.utils.data.DataLoader(data,
+                                              batch_size=16,
+                                              shuffle=True,
+                                              num_workers=0)
+
+    x_batch, y_batch = next(iter(test_loader))
+
+    predictions = prob_ensemble.predict(x_batch, t=None)
+
+    plt.scatter(np.squeeze(x_batch), y_batch, label="Data")
+
+    for i in np.arange(prob_ensemble.size):
+        plt.errorbar(np.squeeze(x_batch), predictions[:, i, 0].data.numpy(),
+                     predictions[:, i, 1].data.numpy(),
+                     label="Ensemble member predictions " + str(i), marker='.')
+
+    plt.legend()
+    plt.show()
 
 
 def main():
@@ -29,11 +56,11 @@ def main():
             store_file=Path("data/one_dim_reg_1000"))
 
     input_size = 1
-    hidden_size = 10
+    hidden_size = 5
     output_size = 2
 
     train_loader = torch.utils.data.DataLoader(data,
-                                               batch_size=4,
+                                               batch_size=16,
                                                shuffle=True,
                                                num_workers=0)
 
@@ -47,11 +74,13 @@ def main():
                                                  learning_rate=args.lr)
         prob_ensemble.add_member(model)
 
-    err_metric = metrics.Metric(name="Acc", function=metrics.accuracy)
+    err_metric = metrics.Metric(name="Err", function=metrics.squared_error)
     prob_ensemble.add_metrics([err_metric])
     prob_ensemble.train(train_loader, args.num_epochs)
 
-    # distilled_model = dirichlet_probability_distribution.DirichletProbabilityDistribution(
+    plot_predictions(prob_ensemble)
+
+    # distilled_model = niw_probability_distribution.NiwProbabilityDistribution(
     #     input_size,
     #     hidden_size,
     #     hidden_size,

@@ -19,9 +19,9 @@ def create_distilled_model(
         train_loader,
         test_loader,
         args,
-        ensemble,
+        prob_ensemble,
         filepath,
-        class_type=distilled_network.PlainProbabilityDistribution):
+        class_type=dirichlet_probability_distribution.DirichletProbabilityDistribution):
     """Create a distilled network trained with ensemble output"""
 
     input_size = 784
@@ -29,7 +29,7 @@ def create_distilled_model(
     hidden_size_2 = 32
     output_size = 10
 
-    distilled_model = class_type(input_size, hidden_size_1, hidden_size_2, output_size, ensemble,
+    distilled_model = class_type(input_size, hidden_size_1, hidden_size_2, output_size, prob_ensemble,
                                  learning_rate=args.lr*10)
 
     distilled_model.train(train_loader, args.num_epochs, t=1)
@@ -345,7 +345,7 @@ def main():
     LOGGER.info("Ensemble accuracy on test data: {}".format(
         get_accuracy(prob_ensemble, test_loader)))
 
-    class_type = distilled_network.DirichletProbabilityDistribution
+    class_type = dirichlet_probability_distribution.DirichletProbabilityDistribution
     distilled_model = create_distilled_model(train_loader, test_loader, args, prob_ensemble, distilled_model_filepath,
                                              class_type)
 
