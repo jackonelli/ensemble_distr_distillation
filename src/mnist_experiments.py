@@ -5,12 +5,21 @@ import logging
 from matplotlib import pyplot as plt
 from pathlib import Path
 from datetime import datetime
+<<<<<<< HEAD
 from src.distilled import dirichlet_probability_distribution
 from src.ensemble import ensemble
 import src.metrics as metrics
 import src.models as models
 import src.utils as utils
 from src.dataloaders import mnist
+=======
+import distilled_network
+import ensemble
+import metrics
+import models
+import utils
+from dataloaders import mnist
+>>>>>>> 4d95c77f1e27473be9140e7c0c7c299fed3ae676
 
 LOGGER = logging.getLogger(__name__)
 
@@ -19,9 +28,15 @@ def create_distilled_model(
         train_loader,
         test_loader,
         args,
+<<<<<<< HEAD
         prob_ensemble,
         filepath,
         class_type=dirichlet_probability_distribution.DirichletProbabilityDistribution):
+=======
+        ensemble,
+        filepath,
+        class_type=distilled_network.PlainProbabilityDistribution):
+>>>>>>> 4d95c77f1e27473be9140e7c0c7c299fed3ae676
     """Create a distilled network trained with ensemble output"""
 
     input_size = 784
@@ -29,7 +44,11 @@ def create_distilled_model(
     hidden_size_2 = 32
     output_size = 10
 
+<<<<<<< HEAD
     distilled_model = class_type(input_size, hidden_size_1, hidden_size_2, output_size, prob_ensemble,
+=======
+    distilled_model = class_type(input_size, hidden_size_1, hidden_size_2, output_size, ensemble,
+>>>>>>> 4d95c77f1e27473be9140e7c0c7c299fed3ae676
                                  learning_rate=args.lr*10)
 
     distilled_model.train(train_loader, args.num_epochs, t=1)
@@ -345,7 +364,11 @@ def main():
     LOGGER.info("Ensemble accuracy on test data: {}".format(
         get_accuracy(prob_ensemble, test_loader)))
 
+<<<<<<< HEAD
     class_type = dirichlet_probability_distribution.DirichletProbabilityDistribution
+=======
+    class_type = distilled_network.DirichletProbabilityDistribution
+>>>>>>> 4d95c77f1e27473be9140e7c0c7c299fed3ae676
     distilled_model = create_distilled_model(train_loader, test_loader, args, prob_ensemble, distilled_model_filepath,
                                              class_type)
 
@@ -358,6 +381,9 @@ def main():
     entropy_comparison_rotation(prob_ensemble, distilled_model, test_sample)
     #noise_effect_on_entropy(distilled_model, prob_ensemble, test_loader)
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 4d95c77f1e27473be9140e7c0c7c299fed3ae676
 if __name__ == "__main__":
     main()

@@ -1,6 +1,6 @@
 import logging
 import torchvision
-import utils
+import src.utils as utils
 
 
 class MnistData():
@@ -15,6 +15,7 @@ class MnistData():
                                              batch_size=4,
                                              shuffle=False,
                                              num_workers=1)
+
     """
 
     def __init__(self, root="./data", train=True):

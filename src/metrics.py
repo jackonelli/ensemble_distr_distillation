@@ -2,7 +2,11 @@
 import logging
 import torch
 import numpy as np
+<<<<<<< HEAD
 import src.utils as utils
+=======
+import utils
+>>>>>>> 4d95c77f1e27473be9140e7c0c7c299fed3ae676
 
 LOGGER = logging.getLogger(__name__)
 
@@ -139,15 +143,28 @@ def squared_error(targets, predictions):
 
     Args:
         targets: torch.tensor(B, D)
+<<<<<<< HEAD
         predictions: (torch.tensor(B, D), torch.tensor(B, D)), tuple of estimated mean and variances of the
                      normal distribution of targets
+=======
+        predictions: torch.tensor(B, 2D), vector of estimated mean and variances of the
+                     normal distribution of targets arranged as [mean_1, ..., mean_D, var_1, ..., var_D]
+>>>>>>> 4d95c77f1e27473be9140e7c0c7c299fed3ae676
 
     Returns:
         Error: float
     """
 
+<<<<<<< HEAD
     number_of_elements = targets.size(0)
     if number_of_elements == 0:
         number_of_elements = 1
 
     return ((targets - predictions[0])**2).sum().item() / number_of_elements
+=======
+    number_of_elements = targets.size()
+    if number_of_elements == 0:
+        number_of_elements = 1
+
+    return ((targets - predictions[:targets.size()])**2).sum().item() / number_of_elements
+>>>>>>> 4d95c77f1e27473be9140e7c0c7c299fed3ae676

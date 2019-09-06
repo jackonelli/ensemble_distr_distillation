@@ -1,8 +1,13 @@
 import torch
 import torch.optim as torch_optim
 import torch.nn as nn
+<<<<<<< HEAD
 import src.loss as custom_loss
 from src.ensemble import ensemble
+=======
+import loss as custom_loss
+from ensemble import ensemble
+>>>>>>> 4d95c77f1e27473be9140e7c0c7c299fed3ae676
 
 
 class NeuralNet(ensemble.EnsembleMember):

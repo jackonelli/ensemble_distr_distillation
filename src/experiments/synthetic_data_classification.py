@@ -7,6 +7,7 @@ import torch
 import sys
 print(sys.path)
 
+<<<<<<< HEAD
 from src.dataloaders import gaussian
 import src.utils as utils
 import src.models as models
@@ -14,6 +15,15 @@ from src.distilled import dirichlet_probability_distribution
 from src.ensemble import ensemble
 from src.ensemble import simple_classifier
 import src.metrics as metrics
+=======
+from dataloaders import gaussian
+import utils
+import models
+from distilled import dirichlet_probability_distribution
+from ensemble import ensemble
+from ensemble import simple_classifier
+import metrics
+>>>>>>> 4d95c77f1e27473be9140e7c0c7c299fed3ae676
 
 LOGGER = logging.getLogger(__name__)
 
@@ -41,8 +51,12 @@ def main():
     train_loader = torch.utils.data.DataLoader(data,
                                                batch_size=4,
                                                shuffle=True,
+<<<<<<< HEAD
                                                num_workers=0)
 
+=======
+                                               num_workers=1)
+>>>>>>> 4d95c77f1e27473be9140e7c0c7c299fed3ae676
     prob_ensemble = ensemble.Ensemble(output_size)
     for _ in range(args.num_ensemble_members):
         model = simple_classifier.SimpleClassifier(input_size,

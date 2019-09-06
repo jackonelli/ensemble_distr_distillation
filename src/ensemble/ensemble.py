@@ -108,8 +108,10 @@ class EnsembleMember(nn.Module, ABC):
         self.optimizer = None
         self._log.info("Moving model to device: {}".format(device))
         self.device = device
+
         if self.loss is None:  # or not issubclass(type(self.loss),
                                #                nn.modules.loss._Loss): THIS DOES NOT WORK OUT
+
             raise ValueError("Must assign proper loss function to child.loss.")
 
     def train(self, train_loader, num_epochs, metrics=list()):
