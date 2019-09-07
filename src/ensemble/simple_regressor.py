@@ -7,7 +7,7 @@ import src.loss as custom_loss
 
 class SimpleRegressor(ensemble.EnsembleMember):
     """Regression network that predicts the parameters of a normal distribution"""
-    # ELLER KAN KANSKE ANVÄDA DENNA FÖR NIW OCKSÅ, MEN FÅR FIXA HUR JAG HANTERAR OUTPUTEN
+    # ELLER KAN KANSKE ANVÄnDA DENNA FÖR NIW OCKSÅ, MEN FÅR FIXA HUR JAG HANTERAR OUTPUTEN
 
     def __init__(self,
                  input_size,
