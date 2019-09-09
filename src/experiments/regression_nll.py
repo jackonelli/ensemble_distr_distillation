@@ -57,40 +57,42 @@ def main():
 
     input_size = 1
     hidden_size = 5
-    output_size = 2
+    ensemble_output_size = 2
 
     train_loader = torch.utils.data.DataLoader(data,
                                                batch_size=16,
                                                shuffle=True,
                                                num_workers=0)
 
-    prob_ensemble = ensemble.Ensemble(output_size)
-    for _ in range(args.num_ensemble_members):
-        model = simple_regressor.SimpleRegressor(input_size,
-                                                 hidden_size,
-                                                 hidden_size,
-                                                 output_size,
-                                                 device=device,
-                                                 learning_rate=args.lr)
-        prob_ensemble.add_member(model)
-
-    err_metric = metrics.Metric(name="Err", function=metrics.squared_error)
-    prob_ensemble.add_metrics([err_metric])
-    prob_ensemble.train(train_loader, args.num_epochs)
-
-    plot_predictions(prob_ensemble)
+    prob_ensemble = ensemble.Ensemble(ensemble_output_size)
+    # for _ in range(args.num_ensemble_members):
+    #     model = simple_regressor.SimpleRegressor(input_size,
+    #                                              hidden_size,
+    #                                              hidden_size,
+    #                                              output_size,
+    #                                              device=device,
+    #                                              learning_rate=args.lr)
+    #     prob_ensemble.add_member(model)
+    #
+    # err_metric = metrics.Metric(name="Err", function=metrics.squared_error)
+    # prob_ensemble.add_metrics([err_metric])
+    # prob_ensemble.train(train_loader, args.num_epochs)
 
     ensemble_filepath = Path("models/simple_reg_ensemble")
-    prob_ensemble.save_ensemble(ensemble_filepath)
+    prob_ensemble.load_ensemble(ensemble_filepath)
 
-    #prob_ensemble = ensemble.Ensemble()
-    #prob_ensemble.load_ensemble(ensemble_filepath)
+    # plot_predictions(prob_ensemble)
+
+    #prob_ensemble.save_ensemble(ensemble_filepath)
+
+    distilled_output_size = 4
 
     distilled_model = niw_probability_distribution.NiwProbabilityDistribution(
         input_size,
         hidden_size,
         hidden_size,
-        output_size,
+        distilled_output_size,
+        target_dim=1,
         teacher=prob_ensemble,
         device=device,
         learning_rate=args.lr * 0.1)

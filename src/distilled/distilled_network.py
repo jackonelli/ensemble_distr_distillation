@@ -31,7 +31,7 @@ class DistilledNet(nn.Module, ABC):
         scheduler = torch_optim.lr_scheduler.StepLR(self.optimizer,
                                                     step_size=5,
                                                     gamma=0.1)
-        self.use_hard_labels = True
+        self.use_hard_labels = False
 
         self._log.info("Training distilled network.")
         for epoch_number in range(1, num_epochs + 1):
@@ -52,9 +52,10 @@ class DistilledNet(nn.Module, ABC):
             self.optimizer.zero_grad()
             inputs, labels = batch
             inputs, labels = inputs.to(self.device), labels.to(self.device)
-            teacher_predictions = self.teacher.predict(inputs)
+            teacher_predictions = self.teacher.predict(inputs, t=None)  # TO DO: FIX THE t SO THAT THIS FUNCTION IS MORE FLEXIBLE
 
             outputs = self.forward(inputs)
+
             loss = self.calculate_loss(outputs, teacher_predictions, labels)
             loss.backward()
             self.optimizer.step()

@@ -46,35 +46,40 @@ def _dirichlet_sufficient_statistics(target_distribution):
     """
     return torch.mean(torch.log(target_distribution), 1)
 
-def gaussian_neg_log_likelihood(parameters, target, scale=1.0):
+
+def gaussian_neg_log_likelihood(parameters, target, scale=None):
     """Negative log likelihood loss for the Gaussian distribution
     B = batch size, D = dimension of target (num classes), N = ensemble size
 
     Args:
-        parameters (torch.tensor((B, N, D)), torch.tensor((B, N, D))):
+        parameters (torch.tensor((B, 1, D)), torch.tensor((B, 1, D))):
             mean values and variances of y|x for every x in
             batch (and for every ensemble member).
         target (torch.tensor((B, N, D))): sample from the normal
             distribution, if not an ensemble prediction N=1.
-        scale (torch.tensor(B, 1)): scaling parameter for the variance
+        scale (torch.tensor(B, 1, 1)): scaling parameter for the variance
             (/covariance matrix) for every x in batch.
     """
 
     mean = parameters[0]
     var = parameters[1]
 
+    if scale is None:
+        scale = torch.ones([target.size(0), 1, 1])
+
     normalizer = 0
     ll = 0
-    for i in np.arange(mean.size(1)):
+    for i in np.arange(target.size(1)):
         cov_mat = [torch.diag(var[b, i, :]) for b in np.arange(target.size(0))]
 
         normalizer += torch.stack([0.5 * (target.size(-1) * torch.log(torch.tensor(2 * np.pi))
                                           + torch.log(torch.det(cov_mat_i)))
-                                  for cov_mat_i in cov_mat], dim=0)
+                                  for cov_mat_i in cov_mat], dim=0) / target.size(1)
 
-        ll += torch.sum(torch.stack([0.5 * (target[b, :] - mean[b, i, :]) * (1 / scale) * torch.inverse(cov_mat_i)
-                        * torch.transpose((target[b, :] - mean[b, i, :]), 0, -1)
-                        for b, cov_mat_i in enumerate(cov_mat)], dim=0), dim=1) / mean.size(1)  # Mean over ensembles
+        ll += torch.sum(torch.stack([0.5 * (target[b, i, :] - mean[b, 0, :]) * (1 / scale[b, 0, 0])
+                                     * torch.inverse(cov_mat_i)
+                        * torch.transpose((target[b, i, :] - mean[b, 0, :]), 0, -1)
+                        for b, cov_mat_i in enumerate(cov_mat)], dim=0), dim=1) / target.size(1)  # Mean over ensembles
 
     return torch.mean(normalizer + torch.sum(ll, dim=-1))  # Sum over dimensions, mean over batch
 
@@ -84,33 +89,37 @@ def inverse_wishart_neg_log_likelihood(parameters, target):
     B = batch size, D = target dimension, N = ensemble size
 
     Args:
-        parameters (torch.tensor((B, D)), torch.tensor((B, D))):
+        parameters (torch.tensor((B, 1, D)), torch.tensor((B, 1, D))):
             diagonal of psi and degrees-of-freedom, nu > D - 1, of the
             inverse-Wishart distribution for every x in batch.
-        target (torch.tensor((B, D))): variance (diagonal of covariance matrix)
+        target (torch.tensor((B, N, D))): variance (diagonal of covariance matrix)
             as output by N ensemble members.
             """
 
     psi = parameters[0]
-    nu = parameters[1]
+    nu = torch.squeeze(parameters[1], dim=1)
 
     normalizer = 0
     ll = 0
     for i in np.arange(target.size(1)):
         # CAN I DO ANYTHING ABOUT THIS UGLY LIST THING?
-        cov_mat = np.stack([torch.diag(target[b, i, :]) for b in np.arange(target.size(0))], axis=0)
-        cov_mat_det = np.stack([torch.det(cov_mat_i) for cov_mat_i in cov_mat], axis=0)
-        psi_mat = np.stack([torch.diag(psi[b, i, :]) for b in np.arange(target.size(0))], axis=0)
-        psi_mat_det = np.stack([torch.det(psi_mat_i) for psi_mat_i in psi_mat], axis=0)
+        cov_mat = [torch.diag(target[b, i, :]) for b in np.arange(target.size(0))]
+        cov_mat_det = torch.unsqueeze(torch.stack([torch.det(cov_mat_i) for cov_mat_i in cov_mat],
+                                                                  dim=0), dim=1)
+        psi_mat = [torch.diag(psi[b, 0, :]) for b in np.arange(target.size(0))]
+        psi_mat_det = torch.unsqueeze(torch.stack([torch.det(psi_mat_i) for psi_mat_i in psi_mat], dim=0), dim=1)
 
-        normalizer += - (nu / 2) * torch.log(psi_mat_det) + (nu * target.size(-1) / 2) * torch.log(2) + torch.lgamma(nu/2)\
-            + ((nu + target.size(-1) + 1) / 2) * cov_mat_det
-        ll += np.stack([0.5 * torch.trace(psi_mat * torch.inverse(cov_mat_i)) for cov_mat_i in cov_mat], axis=0)
+        normalizer += (- (nu / 2) * torch.log(psi_mat_det) + (nu * target.size(-1) / 2) * \
+                      torch.log(torch.tensor(2, dtype=torch.float32)) + torch.lgamma(nu/2)\
+            + ((nu + target.size(-1) + 1) / 2) * cov_mat_det) / target.size(1)
+        ll += torch.stack([0.5 * torch.trace(psi_mat_i * torch.inverse(cov_mat_i)) for psi_mat_i, cov_mat_i
+                           in zip(psi_mat, cov_mat)], dim=0) / target.size(1)
 
-    return normalizer + ll
+    # TODO: DUBBLE CHECK THIS WHEN WE HAVE D > 1
+    return torch.mean(torch.sum(normalizer, dim=1) + ll)  # Sum over dimensions, mean over batch
 
 
-def gaussian_inv_wishart_neg_log_likelihood(parameters, targets):
+def gaussian_inv_wishart_neg_log_likelihood(parameters, targets, true_targets=None):
     """Negative log likelihood loss for the Gaussian inverse-Wishart distribution
         B = batch size, D = target dimension, N = ensemble size
 
@@ -118,11 +127,12 @@ def gaussian_inv_wishart_neg_log_likelihood(parameters, targets):
         parameters (torch.tensor((B, 1, D)), torch.tensor((B, 1, D)),
              torch.tensor((B, 1, D)), torch.tensor((B, 1, D)): parameters of the normal distribution (mu_0, scale)
              and of the inverse-Wishart distribution (psi, nu)
-        targets (torch.tensor((B, N, D)), torch.tensor((B, N, D)): mean and variance (diagonal of covariance
+        targets (torch.tensor((B, N, 2*D))): mean and variance (diagonal of covariance
              matrix) as output by N ensemble members.
+        true_targets (torch.tensor(B, D)): true output of the training data
         """
 
-    nll_gaussian = gaussian_neg_log_likelihood(parameters[0:2], targets[0])
+    nll_gaussian = gaussian_neg_log_likelihood((parameters[0], targets[1]),  targets[0], parameters[1])
     nll_inverse_wishart = inverse_wishart_neg_log_likelihood(parameters[2:4], targets[1])
 
     return nll_gaussian + nll_inverse_wishart

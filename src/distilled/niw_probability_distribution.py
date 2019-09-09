@@ -5,7 +5,7 @@ import src.loss as custom_loss
 import src.distilled.distilled_network as distilled_network
 
 
-class LogitsProbabilityDistribution(distilled_network.DistilledNet):
+class NiwProbabilityDistribution(distilled_network.DistilledNet):
     def __init__(self,
                  input_size,
                  hidden_size_1,
@@ -50,9 +50,10 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
         x = self.fc3(x)
 
         mu = x[:, :, :self.target_dim]
-        scale = torch.nn.relu(x[:, :, self.target_dim:(self.target_dim+1)])
+        scale = torch.exp(x[:, :, self.target_dim:(self.target_dim+1)])
         psi = torch.exp(x[:, :, (self.target_dim+1):(2*self.target_dim+1)])
-        nu = torch.nn.relu(x[:, :, (2*self.target_dim+1):]) + (self.target_dim - 1)
+        # Degrees of freedom should be at least D - 1
+        nu = nn.functional.relu(x[:, :, (2*self.target_dim+1):]) + (self.target_dim - 1)
 
         return mu, scale, psi, nu
 
@@ -66,5 +67,5 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
         """Calculate loss function
         Wrapper function for the loss function.
         """
-        return self.loss(outputs, (teacher_predictions[:, :, :int((self.target_dim / 2))],
-                                   teacher_predictions[:, :, int((self.target_dim / 2)):]))
+        return self.loss(outputs, (teacher_predictions[:, :, :self.target_dim],
+                                   teacher_predictions[:, :, self.target_dim:]))
