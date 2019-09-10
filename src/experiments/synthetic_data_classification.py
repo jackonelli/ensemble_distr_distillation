@@ -9,7 +9,6 @@ print(sys.path)
 
 from src.dataloaders import gaussian
 import src.utils as utils
-import src.models as models
 from src.distilled import dirichlet_probability_distribution
 from src.ensemble import ensemble
 from src.ensemble import simple_classifier
