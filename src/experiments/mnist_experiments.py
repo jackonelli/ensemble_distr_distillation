@@ -8,7 +8,6 @@ from datetime import datetime
 from src.distilled import dirichlet_probability_distribution
 from src.ensemble import ensemble
 import src.metrics as metrics
-import src.models as models
 import src.utils as utils
 from src.dataloaders import mnist
 
