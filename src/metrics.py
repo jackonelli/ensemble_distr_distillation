@@ -2,7 +2,7 @@
 import logging
 import torch
 import numpy as np
-import utils
+import src.utils as utils
 
 LOGGER = logging.getLogger(__name__)
 
@@ -43,6 +43,8 @@ def entropy(true_labels, predicted_distribution):
     Labels as one hot vectors
     Note: if a batch with B samples is given,
     then the output is a tensor with B values
+    The true labels argument is simply there for conformity
+    so that the entropy metric functions like any metric.
 
     Args:
         NOT USED true_labels: torch.tensor((B, C))
@@ -130,3 +132,30 @@ def error(true_labels, predicted_distribution):
         number_of_elements = 1
 
     return (true_labels != predicted_labels).sum().item() / number_of_elements
+
+
+def squared_error(targets, predictions):
+    """ Error
+    B = batch size
+    D = output dimension
+
+    Args:
+        targets: torch.tensor(B, D)
+        predictions: (torch.tensor(B, D), torch.tensor(B, D)), tuple of estimated mean and variances of the
+                     normal distribution of targets
+
+    Returns:
+        Error: float
+    """
+
+    number_of_elements = targets.size(0)
+    if number_of_elements == 0:
+        number_of_elements = 1
+
+    return ((targets - predictions[0])**2).sum().item() / number_of_elements
+    number_of_elements = targets.size()
+    if number_of_elements == 0:
+        number_of_elements = 1
+
+    return ((targets - predictions[:targets.size()])**
+            2).sum().item() / number_of_elements

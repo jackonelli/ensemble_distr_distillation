@@ -32,7 +32,7 @@ class DistilledNet(nn.Module, ABC):
         scheduler = torch_optim.lr_scheduler.StepLR(self.optimizer,
                                                     step_size=5,
                                                     gamma=0.1)
-        self.use_hard_labels = True
+        self.use_hard_labels = False
 
         self._log.info("Training distilled network.")
         for epoch_number in range(1, num_epochs + 1):
@@ -53,15 +53,29 @@ class DistilledNet(nn.Module, ABC):
             self.optimizer.zero_grad()
             inputs, labels = batch
             inputs, labels = inputs.to(self.device), labels.to(self.device)
-            teacher_predictions = self.teacher.predict(inputs)
+            teacher_predictions = self._generate_teacher_predictions(inputs)
 
             outputs = self.forward(inputs)
+
             loss = self.calculate_loss(outputs, teacher_predictions, labels)
             loss.backward()
             self.optimizer.step()
             running_loss += loss.item()
             self._update_metrics(outputs, labels)
         return running_loss
+
+    def _generate_teacher_predictions(self, inputs):
+        """Generate teacher predictions
+        The intention is to get the logits of the ensemble members
+        and then apply some transformation to get the desired predictions.
+        Default implementation is to recreate the exact ensemble member output.
+        Override this method if another logit transformation is desired,
+        e.g. unit transformation if desired predictions
+        are the logits themselves
+        """
+
+        logits = self.teacher.get_logits(inputs)
+        return self.teach.transform_logits(logits)
 
     def _add_metric(self, metric):
         self.metrics[metric.name] = metric

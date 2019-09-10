@@ -4,13 +4,15 @@ from datetime import datetime
 import logging
 import numpy as np
 import torch
+import sys
+print(sys.path)
 
-from dataloaders import gaussian
-import utils
-from src.distilled import dirichlet_probability_distribution as dirichlet
+from src.dataloaders import gaussian
+import src.utils as utils
+from src.distilled import logits_probability_distribution
 from src.ensemble import ensemble
 from src.ensemble import simple_classifier
-import metrics
+import src.metrics as metrics
 
 LOGGER = logging.getLogger(__name__)
 
@@ -31,19 +33,21 @@ def main():
         cov_1=np.eye(2),
         store_file=Path("data/2d_gaussian_1000"))
 
+    # TODO: Automated dims
+    input_size = 2
+    hidden_size = 3
+    output_size = 2
+
     train_loader = torch.utils.data.DataLoader(data,
                                                batch_size=4,
                                                shuffle=True,
-                                               num_workers=1)
+                                               num_workers=0)
 
-    # TODO: Automated dims
-    input_size = 2
-    output_size = 2
     prob_ensemble = ensemble.Ensemble(output_size)
     for _ in range(args.num_ensemble_members):
         model = simple_classifier.SimpleClassifier(input_size,
-                                                   3,
-                                                   3,
+                                                   hidden_size,
+                                                   hidden_size,
                                                    output_size,
                                                    device=device,
                                                    learning_rate=args.lr)
@@ -52,10 +56,10 @@ def main():
     prob_ensemble.add_metrics([acc_metric])
     prob_ensemble.train(train_loader, args.num_epochs)
 
-    distilled_model = dirichlet.DirichletProbabilityDistribution(
+    distilled_model = logits_probability_distribution.LogitsProbabilityDistribution(
         input_size,
-        3,
-        3,
+        hidden_size,
+        hidden_size,
         output_size,
         teacher=prob_ensemble,
         device=device,

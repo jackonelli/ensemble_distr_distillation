@@ -5,7 +5,7 @@ import src.loss as custom_loss
 import src.distilled.distilled_network as distilled_network
 
 
-class DirichletProbabilityDistribution(distilled_network.DistilledNet):
+class LogitsProbabilityDistribution(distilled_network.DistilledNet):
     def __init__(self,
                  input_size,
                  hidden_size_1,
@@ -17,7 +17,7 @@ class DirichletProbabilityDistribution(distilled_network.DistilledNet):
                  learning_rate=0.001):
         super().__init__(
             teacher=teacher,
-            loss_function=custom_loss.dirichlet_neg_log_likelihood,
+            loss_function=custom_loss.gaussian_neg_log_likelihood,
             device=device)
 
         self.input_size = input_size
@@ -40,24 +40,23 @@ class DirichletProbabilityDistribution(distilled_network.DistilledNet):
         self.to(self.device)
 
     def forward(self, x):
-        """Estimate alpha parameters
-        Note the + 1 shift.
-        This was added for stability (Dirichlet support: alpha > 0)
-        not ideal since we might want alpha < 1
+        """Estimate parameters of distribution
         """
 
         x = nn.functional.relu(self.fc1(x))
         x = nn.functional.relu(self.fc2(x))
-        x = nn.functional.relu(self.fc3(x))
-        x = x + 1
+        x = self.fc3(x)
 
-        return x
+        mean = x[:, :, :int((self.output_size / 2))]
+        var = torch.exp(x[:, :, int((self.output_size / 2)):])
+
+        return mean, var
 
     def predict(self, input_):
         """Predict parameters
         Wrapper function for the forward function.
         """
-        return self.forward(input_)
+        return torch.cat(self.forward(input_), dim=-1)
 
     def calculate_loss(self, outputs, teacher_predictions, labels=None):
         """Calculate loss function

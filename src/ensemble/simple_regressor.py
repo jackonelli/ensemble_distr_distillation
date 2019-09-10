@@ -2,8 +2,13 @@ import torch
 import torch.optim as torch_optim
 import torch.nn as nn
 from src.ensemble import ensemble
+import src.loss as custom_loss
 
-class SimpleClassifier(ensemble.EnsembleMember):
+
+class SimpleRegressor(ensemble.EnsembleMember):
+    """Regression network that predicts the parameters of a normal distribution"""
+    # ELLER KAN KANSKE ANVÄnDA DENNA FÖR NIW OCKSÅ, MEN FÅR FIXA HUR JAG HANTERAR OUTPUTEN
+
     def __init__(self,
                  input_size,
                  hidden_size_1,
@@ -12,7 +17,8 @@ class SimpleClassifier(ensemble.EnsembleMember):
                  device=torch.device("cpu"),
                  learning_rate=0.001):
 
-        super().__init__(loss_function=nn.CrossEntropyLoss(), device=device)
+        super().__init__(loss_function=custom_loss.gaussian_neg_log_likelihood, device=device)
+
         self.input_size = input_size
         self.hidden_size_1 = hidden_size_1  # Or make a list or something
         self.hidden_size_2 = hidden_size_2
@@ -34,18 +40,16 @@ class SimpleClassifier(ensemble.EnsembleMember):
         x = nn.functional.relu(self.fc2(x))
         x = self.fc3(x)
 
-        return x
+        mean = x[:, :, :int((self.output_size / 2))]
+        var = torch.exp(x[:, :, int((self.output_size / 2)):])
 
-    @staticmethod
-    def temperature_softmax(x, t=1):
-        return nn.functional.softmax(x / t, dim=-1)
+        return mean, var
 
-    def calculate_loss(self, outputs, labels):
+    def calculate_loss(self, outputs, targets):
+        return self.loss(outputs, targets)
 
-        return self.loss(outputs, labels.type(torch.LongTensor))
+    def predict(self, x):
+        x = torch.cat(self.forward(x), dim=-1)
 
-    def predict(self, x, t=1):
-        x = self.forward(x)
-        x = self.temperature_softmax(x, t)
+        return torch.squeeze(x)
 
-        return x

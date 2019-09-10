@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 import torch
 import torch.nn as nn
 import torch.optim as torch_optim
-import metrics
+import src.metrics as metrics
 
 
 class Ensemble():
@@ -51,7 +51,50 @@ class Ensemble():
                     "Metric {} does not inherit from metric.Metric.".format(
                         metric))
 
-    def predict(self, input_, t=1):
+    def get_logits(self, inputs):
+        """Ensemble logits
+        Returns the logits of all individual ensemble members.
+        B = batch size, K = num output params, N = ensemble size
+
+        Args:
+            inputs (torch.tensor((B, data_dim))): data batch
+
+        Returns:
+            logits (torch.tensor((B, N, K)))
+        """
+
+        batch_size = inputs.size(0)
+        logits = torch.zeros((batch_size, self.size, self.output_size))
+        for member_ind, member in enumerate(self.members):
+            logits[:, member_ind, :] = member.forward(inputs)
+
+        return logits
+
+    def transform_logits(self, logits, transformation=None):
+        """Ensemble predictions from logits
+        Returns the predictions of all individual ensemble members,
+        by applying the logits 'transformation' to the logits.
+        B = batch size, K = num output params, N = ensemble size
+
+        Args:
+            logits (torch.tensor((B, N, K))): data batch
+            transformation (funcion): maps logits to output space
+
+        Returns:
+            predictions (torch.tensor((B, N, K)))
+        """
+
+        batch_size = logits.size(0)
+        logits = torch.zeros((batch_size, self.size, self.output_size))
+        for member_ind, member in enumerate(self.members):
+            if transformation:
+                logits[:, member_ind, :] = transformation(logits)
+            else:
+                logits[:, member_ind, :] = member.transform_logits(logits)
+
+        return logits
+
+    def predict(self, inputs, t=1):
         """Ensemble prediction
         Returns the predictions of all individual ensemble members.
         The return is actually a tuple with (pred_mean, all_predictions)
@@ -61,16 +104,20 @@ class Ensemble():
         distilled model chose what to do with the output
 
         Args:
-            input_ (torch.tensor((B, data_dim))): data batch
+            inputs (torch.tensor((B, data_dim))): data batch
 
         Returns:
             predictions (torch.tensor((B, N, K)))
         """
 
-        batch_size = input_.size(0)
+        batch_size = inputs.size(0)
         predictions = torch.zeros((batch_size, self.size, self.output_size))
         for member_ind, member in enumerate(self.members):
-            predictions[:, member_ind, :] = member.predict(input_, t)
+            if t is None:
+                predictions[:, member_ind, :] = member.predict(inputs)
+            else:
+                predictions[:, member_ind, :] = member.predict(inputs, t)
+
         return predictions
 
     def save_ensemble(self, filepath):
@@ -107,8 +154,10 @@ class EnsembleMember(nn.Module, ABC):
         self.optimizer = None
         self._log.info("Moving model to device: {}".format(device))
         self.device = device
-        if self.loss is None or not issubclass(type(self.loss),
-                                               nn.modules.loss._Loss):
+
+        if self.loss is None:  # or not issubclass(type(self.loss),
+            #                nn.modules.loss._Loss): THIS DOES NOT WORK OUT
+
             raise ValueError("Must assign proper loss function to child.loss.")
 
     def train(self, train_loader, num_epochs, metrics=list()):
@@ -138,12 +187,14 @@ class EnsembleMember(nn.Module, ABC):
 
             inputs, labels = inputs.to(self.device), labels.to(self.device)
 
-            outputs = self.forward(inputs)
+            logits = self.forward(inputs)
+            outputs = self.transform_logits(logits)
             loss = self.calculate_loss(outputs, labels)
             loss.backward()
             self.optimizer.step()
             running_loss += loss.item()
             self._update_metrics(outputs, labels)
+
         return running_loss
 
     def _add_metric(self, metric):
@@ -172,8 +223,23 @@ class EnsembleMember(nn.Module, ABC):
 
     @abstractmethod
     def forward(self, inputs):
-        pass
+        """Forward method only produces logits.
+        I.e. no softmax or other det. transformation.
+        That is instead handled by transform_logits
+        This is for flexibility when using the ensemble as teacher.
+        """
+
+    @abstractmethod
+    def transform_logits(self, logits):
+        """Transforms the networks logits
+        (produced by the forward method)
+        to a suitable output value, i.e. a softmax
+        to generate a probability distr.
+
+        Default impl. is not given to avoid this transf.
+        being implicitly included in the forward method.
+        """
 
     @abstractmethod
     def calculate_loss(self, outputs, labels):
-        pass
+        """Calculates loss"""
