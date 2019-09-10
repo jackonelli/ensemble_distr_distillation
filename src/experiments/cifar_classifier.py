@@ -3,12 +3,12 @@ import logging
 from pathlib import Path
 from datetime import datetime
 import torch
-from distilled import dirichlet_CNN
-from ensemble import ensemble
-from ensemble import convolutional_classifier
+from src.distilled import dirichlet_CNN
+from src.ensemble import ensemble
+from src.ensemble import convolutional_classifier
 import metrics
 import utils
-from dataloaders import cifar10
+from src.dataloaders import cifar10
 
 LOGGER = logging.getLogger(__name__)
 

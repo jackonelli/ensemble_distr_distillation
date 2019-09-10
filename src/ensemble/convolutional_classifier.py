@@ -1,7 +1,7 @@
 import torch
 import torch.optim as torch_optim
 import torch.nn as nn
-from ensemble import ensemble
+from src.ensemble import ensemble
 
 
 class ConvolutionalClassifier(ensemble.EnsembleMember):

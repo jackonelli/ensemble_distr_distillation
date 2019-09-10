@@ -3,6 +3,7 @@ import torch.optim as torch_optim
 import torch.nn as nn
 from src.ensemble import ensemble
 
+
 class SimpleClassifier(ensemble.EnsembleMember):
     def __init__(self,
                  input_size,
