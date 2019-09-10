@@ -1,3 +1,4 @@
+"""Data loader for CIFAR data"""
 import logging
 import torch
 import torchvision
@@ -26,16 +27,19 @@ class Cifar10Data:
             transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         ])
-        self.set = torchvision.datasets.CIFAR10(root='./data',
-                                                train=True,
+        self.set = torchvision.datasets.CIFAR10(root=root,
+                                                train=train,
                                                 download=True,
                                                 transform=transform)
 
-        self.classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog',
-                        'horse', 'ship', 'truck')
+        self.input_size = None
+        self.classes = ("plane", "car", "bird", "cat", "deer", "dog", "frog",
+                        "horse", "ship", "truck")
+        self.num_classes = len(self.classes)
 
 
 def main():
+    """Entry point for debug visualisation"""
     # get some random training images
     data = Cifar10Data()
     loader = torch.utils.data.DataLoader(data.set,
@@ -52,6 +56,10 @@ def main():
 
 
 def imshow(img):
+    """Imshow helper
+    TODO: Move to utils
+    """
+
     img = img / 2 + 0.5  # unnormalize
     npimg = img.numpy()
     plt.imshow(np.transpose(npimg, (1, 2, 0)))

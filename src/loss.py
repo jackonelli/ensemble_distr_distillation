@@ -1,6 +1,5 @@
 """Loss module"""
 import torch
-import torch.nn as nn
 
 
 def scalar_loss(inputs, soft_targets):

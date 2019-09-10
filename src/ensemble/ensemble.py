@@ -77,9 +77,10 @@ class Ensemble():
 
         members_dict = {}
         for i, member in enumerate(self.members):
-            members_dict["ensemble_member_{}".format(
-                i
-            )] = member  # To save memory one should save model.state_dict, but then we also need to save class-type etc., so I will keep it like this for now
+            members_dict["ensemble_member_{}".format(i)] = member
+            # To save memory one should save model.state_dict,
+            # but then we also need to save class-type etc.,
+            # so I will keep it like this for now
 
         torch.save(members_dict, filepath)
 
@@ -89,7 +90,9 @@ class Ensemble():
 
         for key in check_point:
             member = check_point[key]
-            # member.eval(), should be called if we have dropout or batch-norm in our layers, to make sure that self.train = False, just that it doesn't work for now
+            # member.eval(), should be called if we have dropout or batch-norm
+            # in our layers, to make sure that self.train = False,
+            # just that it doesn't work for now
             self.add_member(member)
 
 

@@ -29,18 +29,24 @@ def create_distilled_model(
     hidden_size_2 = 32
     output_size = 10
 
-    distilled_model = class_type(input_size, hidden_size_1, hidden_size_2, output_size, ensemble,
-                                 learning_rate=args.lr*10)
+    distilled_model = class_type(input_size,
+                                 hidden_size_1,
+                                 hidden_size_2,
+                                 output_size,
+                                 ensemble,
+                                 learning_rate=args.lr * 10)
 
     distilled_model.train(train_loader, args.num_epochs, t=1)
-    LOGGER.info("Distilled model accuracy on test data: {}".format(get_accuracy_iter(distilled_model, test_loader)))
+    LOGGER.info("Distilled model accuracy on test data: {}".format(
+        get_accuracy_iter(distilled_model, test_loader)))
 
     torch.save(distilled_model, filepath)
 
     return distilled_model
 
 
-def create_ensemble(train_loader, test_loader, args, num_ensemble_members, filepath):
+def create_ensemble(train_loader, test_loader, args, num_ensemble_members,
+                    filepath):
     """Create an ensemble model"""
 
     input_size = 784
@@ -94,8 +100,7 @@ def entropy_comparison_rotation(prob_ensemble, distilled_model, test_sample):
         get_entropy(distilled_model, rotated_data_set)
 
     LOGGER.info("True label is: {}".format(test_label))
-    LOGGER.info("Ensemble prediction: {}".format(
-        ensemble_rotation_prediction))
+    LOGGER.info("Ensemble prediction: {}".format(ensemble_rotation_prediction))
     LOGGER.info("Ensemble member prediction: {}".format(
         ensemble_member_rotation_prediction))
     LOGGER.info("Distilled model predictions: {}".format(
@@ -116,17 +121,21 @@ def dirichlet_test(train_loader, test_loader, args, ensemble):
 
     filepath = Path("models/distilled_model_dirichlet_best_yet_test_t1")
     #distilled_model_dirichlet = create_distilled_model(
-     #   train_loader, test_loader, args, ensemble, filepath,
-      #  distilled_network.DirichletProbabilityDistribution)
+    #   train_loader, test_loader, args, ensemble, filepath,
+    #  distilled_network.DirichletProbabilityDistribution)
 
     distilled_model_dirichlet = torch.load(filepath)
 
-    distilled_model_dirichlet.train(train_loader, args.num_epochs*2, t=1)
-    torch.save(distilled_model_dirichlet, Path("models/distilled_model_dirichlet_best_yet_test_t1_more_training"))
+    distilled_model_dirichlet.train(train_loader, args.num_epochs * 2, t=1)
+    torch.save(
+        distilled_model_dirichlet,
+        Path(
+            "models/distilled_model_dirichlet_best_yet_test_t1_more_training"))
 
-    LOGGER.info("Distilled model accuracy on train data: {}".format(get_accuracy_iter(distilled_model_dirichlet,
-                                                                                      train_loader)))
-    LOGGER.info("Accuracy on test data: {}".format(get_accuracy_iter(distilled_model_dirichlet, test_loader)))
+    LOGGER.info("Distilled model accuracy on train data: {}".format(
+        get_accuracy_iter(distilled_model_dirichlet, train_loader)))
+    LOGGER.info("Accuracy on test data: {}".format(
+        get_accuracy_iter(distilled_model_dirichlet, test_loader)))
 
 
 def generate_rotated_data_set(img, angles):
@@ -277,13 +286,25 @@ def effect_of_ensemble_size(full_ensemble, train_loader, test_loader, args):
     ensemble_size = len(full_ensemble.members)
     ensemble_member = full_ensemble.members[0]
 
-    ensemble_error = torch.zeros([ensemble_size, ])
-    ensemble_member_error = torch.zeros([ensemble_size, ])
-    distilled_model_error = torch.zeros([ensemble_size, ])
+    ensemble_error = torch.zeros([
+        ensemble_size,
+    ])
+    ensemble_member_error = torch.zeros([
+        ensemble_size,
+    ])
+    distilled_model_error = torch.zeros([
+        ensemble_size,
+    ])
 
-    ensemble_nll = torch.zeros([ensemble_size, ])
-    ensemble_member_nll = torch.zeros([ensemble_size, ])
-    distilled_model_nll = torch.zeros([ensemble_size, ])
+    ensemble_nll = torch.zeros([
+        ensemble_size,
+    ])
+    ensemble_member_nll = torch.zeros([
+        ensemble_size,
+    ])
+    distilled_model_nll = torch.zeros([
+        ensemble_size,
+    ])
 
     concat_ensemble = ensemble.Ensemble()
     for i in range(ensemble_size):
@@ -330,7 +351,8 @@ def entropy_histogram(ensemble, model, test_loader):
     ensemble_member = ensemble.members[0]
 
     ensemble_entropy = get_entropy_iter(ensemble, test_loader).data.numpy()
-    ensemble_member_entropy = get_entropy_iter(ensemble_member, test_loader).data.numpy()
+    ensemble_member_entropy = get_entropy_iter(ensemble_member,
+                                               test_loader).data.numpy()
     distilled_model_entropy = get_entropy_iter(model, test_loader).data.numpy()
 
     num_bins = 100
@@ -383,7 +405,6 @@ def main():
     ensemble_filepath = Path("models/mnist_ensemble_2")
     distilled_model_filepath = Path("models/distilled_model_dirichlet_test")
 
-
     #prob_ensemble = create_ensemble(train_loader, test_loader, args, num_ensemble_members, ensemble_filepath)
 
     prob_ensemble = ensemble.Ensemble()
@@ -392,7 +413,9 @@ def main():
         get_accuracy_iter(prob_ensemble, test_loader)))
 
     class_type = distilled_network.DirichletProbabilityDistribution
-    distilled_model = create_distilled_model(train_loader, test_loader, args, prob_ensemble, distilled_model_filepath,
+    distilled_model = create_distilled_model(train_loader, test_loader, args,
+                                             prob_ensemble,
+                                             distilled_model_filepath,
                                              class_type)
 
     #distilled_model = torch.load(distilled_model_filepath)
@@ -403,6 +426,7 @@ def main():
     test_sample = next(iter(test_loader))
     entropy_comparison_rotation(prob_ensemble, distilled_model, test_sample)
     #noise_effect_on_entropy(distilled_model, prob_ensemble, test_loader)
+
 
 if __name__ == "__main__":
     main()

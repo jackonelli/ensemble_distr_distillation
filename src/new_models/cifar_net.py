@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import ensemble
+from ensemble import ensemble
+from distilled import distilled_network
 import loss as custom_loss
 import numpy as np
 
@@ -35,7 +36,7 @@ class EnsembleNet(ensemble.EnsembleMember):
         return self.loss(outputs, labels)
 
 
-class DistilledNet(ensemble.DistilledNet):
+class DistilledNet(distilled_network.DistilledNet):
     """Not necessarily an ensemble member but can be used as one"""
 
     def __init__(self,

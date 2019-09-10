@@ -1,3 +1,4 @@
+"""Distilled net base module"""
 import logging
 from abc import ABC, abstractmethod
 import torch

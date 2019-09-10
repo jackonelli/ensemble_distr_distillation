@@ -4,9 +4,7 @@ import logging
 import torch
 from dataloaders import cifar10
 import utils
-import models
-import distilled_network
-import ensemble
+from ensemble import ensemble
 from new_models import cifar_net
 
 LOGGER = logging.getLogger(__name__)

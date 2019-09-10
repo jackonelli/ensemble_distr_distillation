@@ -6,8 +6,7 @@ import numpy as np
 import torch
 from dataloaders import gaussian
 import utils
-import models
-from distilled import dirichlet_probability_distribution
+from distilled import dirichlet_probability_distribution as dirichlet
 from ensemble import ensemble
 from ensemble import simple_classifier
 import metrics
@@ -34,11 +33,11 @@ def main():
     # TODO: Automated dims
     input_size = 2
     output_size = 2
-
     train_loader = torch.utils.data.DataLoader(data,
                                                batch_size=4,
                                                shuffle=True,
                                                num_workers=1)
+
     prob_ensemble = ensemble.Ensemble(output_size)
     for _ in range(args.num_ensemble_members):
         model = simple_classifier.SimpleClassifier(input_size,
@@ -52,7 +51,7 @@ def main():
     prob_ensemble.add_metrics([acc_metric])
     prob_ensemble.train(train_loader, args.num_epochs)
 
-    distilled_model = dirichlet_probability_distribution.DirichletProbabilityDistribution(
+    distilled_model = dirichlet.DirichletProbabilityDistribution(
         input_size,
         3,
         3,
