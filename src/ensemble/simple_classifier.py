@@ -13,7 +13,7 @@ class SimpleClassifier(ensemble.EnsembleMember):
                  device=torch.device("cpu"),
                  learning_rate=0.001):
 
-        super().__init__(loss_function=nn.CrossEntropyLoss(), device=device)
+        super().__init__(loss_function=nn.NLLLoss(), device=device)
         self.input_size = input_size
         self.hidden_size_1 = hidden_size_1  # Or make a list or something
         self.hidden_size_2 = hidden_size_2
@@ -36,6 +36,10 @@ class SimpleClassifier(ensemble.EnsembleMember):
         x = self.fc3(x)
 
         return x
+
+    def transform_logits(self, logits):
+        """Should this be log softmax?"""
+        return (nn.LogSoftmax(dim=-1))(logits)
 
     @staticmethod
     def temperature_softmax(x, t=1):
