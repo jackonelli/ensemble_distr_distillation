@@ -151,8 +151,3 @@ def squared_error(targets, predictions):
         number_of_elements = 1
 
     return ((targets - predictions[0])**2).sum().item() / number_of_elements
-    number_of_elements = targets.size()
-    if number_of_elements == 0:
-        number_of_elements = 1
-
-    return ((targets - predictions[:targets.size()])**2).sum().item() / number_of_elements

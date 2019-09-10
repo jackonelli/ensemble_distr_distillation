@@ -11,12 +11,12 @@ from src import metrics
 class TestMetrics(unittest.TestCase):
     def test_entropy(self):
         predictions = torch.tensor([0.3, 0.7])
-        entropy = metrics.entropy(None, predictions)
+        entropy = metrics.entropy(predictions)
         self.assertAlmostEqual(entropy.item(), 0.61086430205)
 
     def test_entropy_batch(self):
         predictions = torch.tensor([[0.3, 0.7], [0.7, 0.3]])
-        entropy = metrics.entropy(None, predictions)
+        entropy = metrics.entropy(predictions)
         tt.assert_almost_equal(entropy,
                                torch.tensor([0.61086430205, 0.61086430205]))
 
@@ -48,6 +48,12 @@ class TestMetrics(unittest.TestCase):
                                     [0.1, 0.2, 0.7], [0.25, 0.5, 0.25]])
         acc = metrics.accuracy(true_label, predictions)
         self.assertAlmostEqual(acc, 0.5)
+
+    def test_squared_error(self):
+        targets = torch.tensor([1, 2, 1.5])
+        predictions = torch.tensor([0.9, 2.1, 1.7])
+        squared_error = metrics.squared_error(targets, (predictions,))
+        self.assertAlmostEqual(squared_error, 0.02)
 
 
 if __name__ == '__main__':
