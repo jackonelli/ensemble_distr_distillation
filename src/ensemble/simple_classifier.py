@@ -39,15 +39,12 @@ class SimpleClassifier(ensemble.EnsembleMember):
 
     def transform_logits(self, logits):
         """Should this be log softmax?"""
-        return (nn.LogSoftmax(dim=-1))(logits)
-
-    @staticmethod
-    def temperature_softmax(x, t=1):
-        return nn.functional.softmax(x / t, dim=-1)
+        return (nn.Softmax(dim=-1))(logits)
 
     def calculate_loss(self, outputs, labels):
+        log_outputs = torch.log(outputs)
 
-        return self.loss(outputs, labels.type(torch.LongTensor))
+        return self.loss(log_outputs, labels.type(torch.LongTensor))
 
     def predict(self, x, t=1):
         x = self.forward(x)

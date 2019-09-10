@@ -88,9 +88,11 @@ class Ensemble():
         logits = torch.zeros((batch_size, self.size, self.output_size))
         for member_ind, member in enumerate(self.members):
             if transformation:
-                logits[:, member_ind, :] = transformation(logits)
+                logits[:, member_ind, :] = transformation(
+                    logits[:, member_ind, :])
             else:
-                logits[:, member_ind, :] = member.transform_logits(logits)
+                logits[:, member_ind, :] = member.transform_logits(
+                    logits[:, member_ind, :])
 
         return logits
 
