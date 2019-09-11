@@ -89,7 +89,7 @@ def inverse_wishart_neg_log_likelihood(parameters, target):
     B = batch size, D = target dimension, N = ensemble size
 
     Args:
-        parameters (torch.tensor((B, 1, D)), torch.tensor((B, 1, D))):
+        parameters (torch.tensor((B, 1, D)), torch.tensor((B, 1, 1))):
             diagonal of psi and degrees-of-freedom, nu > D - 1, of the
             inverse-Wishart distribution for every x in batch.
         target (torch.tensor((B, N, D))): variance (diagonal of covariance matrix)
@@ -105,18 +105,17 @@ def inverse_wishart_neg_log_likelihood(parameters, target):
         # CAN I DO ANYTHING ABOUT THIS UGLY LIST THING?
         cov_mat = [torch.diag(target[b, i, :]) for b in np.arange(target.size(0))]
         cov_mat_det = torch.unsqueeze(torch.stack([torch.det(cov_mat_i) for cov_mat_i in cov_mat],
-                                                                  dim=0), dim=1)
+                                                  dim=0), dim=1)
         psi_mat = [torch.diag(psi[b, 0, :]) for b in np.arange(target.size(0))]
         psi_mat_det = torch.unsqueeze(torch.stack([torch.det(psi_mat_i) for psi_mat_i in psi_mat], dim=0), dim=1)
 
-        normalizer += (- (nu / 2) * torch.log(psi_mat_det) + (nu * target.size(-1) / 2) * \
-                      torch.log(torch.tensor(2, dtype=torch.float32)) + torch.lgamma(nu/2)\
-            + ((nu + target.size(-1) + 1) / 2) * cov_mat_det) / target.size(1)
-        ll += torch.stack([0.5 * torch.trace(psi_mat_i * torch.inverse(cov_mat_i)) for psi_mat_i, cov_mat_i
+        normalizer += (- (nu / 2) * torch.log(psi_mat_det) + (nu * target.size(-1) / 2) *
+                       torch.log(torch.tensor(2, dtype=torch.float32)) + torch.lgamma(nu/2)
+                       + ((nu - target.size(-1) - 1) / 2) * torch.log(cov_mat_det)) / target.size(1)  # Mean over ensemble
+        ll += torch.stack([0.5 * torch.trace(torch.inverse(psi_mat_i) * cov_mat_i) for psi_mat_i, cov_mat_i
                            in zip(psi_mat, cov_mat)], dim=0) / target.size(1)
 
-    # TODO: DUBBLE CHECK THIS WHEN WE HAVE D > 1 (CREATE A UNIT TEST)
-    return torch.mean(torch.sum(normalizer, dim=1) + ll)  # Sum over dimensions, mean over batch
+    return torch.mean(normalizer + ll)  # Mean over batch
 
 
 def gaussian_inv_wishart_neg_log_likelihood(parameters, targets, true_targets=None):
