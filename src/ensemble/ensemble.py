@@ -42,14 +42,14 @@ class Ensemble():
 
     def add_metrics(self, metrics_list):
         for metric in metrics_list:
-            if issubclass(type(metric), metrics.Metric):
+            if isinstance(metric, metrics.Metric):
                 for member in self.members:
                     member.metrics[metric.name] = metric
                     self._log.info("Adding metric: {}".format(metric.name))
             else:
                 self._log.error(
                     "Metric {} does not inherit from metric.Metric.".format(
-                        metric))
+                        metric.name))
 
     def get_logits(self, inputs):
         """Ensemble logits
