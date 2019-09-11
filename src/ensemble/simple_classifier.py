@@ -3,6 +3,7 @@ import torch.optim as torch_optim
 import torch.nn as nn
 from src.ensemble import ensemble
 
+
 class SimpleClassifier(ensemble.EnsembleMember):
     def __init__(self,
                  input_size,
@@ -12,7 +13,7 @@ class SimpleClassifier(ensemble.EnsembleMember):
                  device=torch.device("cpu"),
                  learning_rate=0.001):
 
-        super().__init__(loss_function=nn.CrossEntropyLoss(), device=device)
+        super().__init__(loss_function=nn.NLLLoss(), device=device)
         self.input_size = input_size
         self.hidden_size_1 = hidden_size_1  # Or make a list or something
         self.hidden_size_2 = hidden_size_2
@@ -36,13 +37,14 @@ class SimpleClassifier(ensemble.EnsembleMember):
 
         return x
 
-    @staticmethod
-    def temperature_softmax(x, t=1):
-        return nn.functional.softmax(x / t, dim=-1)
+    def transform_logits(self, logits):
+        """Should this be log softmax?"""
+        return (nn.Softmax(dim=-1))(logits)
 
     def calculate_loss(self, outputs, labels):
+        log_outputs = torch.log(outputs)
 
-        return self.loss(outputs, labels.type(torch.LongTensor))
+        return self.loss(log_outputs, labels.type(torch.LongTensor))
 
     def predict(self, x, t=1):
         x = self.forward(x)

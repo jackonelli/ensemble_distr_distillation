@@ -106,8 +106,11 @@ def inverse_wishart_neg_log_likelihood(parameters, target):
         cov_mat = [torch.diag(target[b, i, :]) for b in np.arange(target.size(0))]
         cov_mat_det = torch.unsqueeze(torch.stack([torch.det(cov_mat_i) for cov_mat_i in cov_mat],
                                                   dim=0), dim=1)
+
         psi_mat = [torch.diag(psi[b, 0, :]) for b in np.arange(target.size(0))]
-        psi_mat_det = torch.unsqueeze(torch.stack([torch.det(psi_mat_i) for psi_mat_i in psi_mat], dim=0), dim=1)
+        psi_mat_det = torch.unsqueeze(torch.stack(
+            [torch.det(psi_mat_i) for psi_mat_i in psi_mat], dim=0),
+                                      dim=1)
 
         normalizer += (- (nu / 2) * torch.log(psi_mat_det) + (nu * target.size(-1) / 2) *
                        torch.log(torch.tensor(2, dtype=torch.float32)) + torch.lgamma(nu/2)
@@ -118,7 +121,10 @@ def inverse_wishart_neg_log_likelihood(parameters, target):
     return torch.mean(normalizer + ll)  # Mean over batch
 
 
-def gaussian_inv_wishart_neg_log_likelihood(parameters, targets, true_targets=None):
+
+def gaussian_inv_wishart_neg_log_likelihood(parameters,
+                                            targets,
+                                            true_targets=None):
     """Negative log likelihood loss for the Gaussian inverse-Wishart distribution
         B = batch size, D = target dimension, N = ensemble size
 
@@ -131,8 +137,10 @@ def gaussian_inv_wishart_neg_log_likelihood(parameters, targets, true_targets=No
         true_targets (torch.tensor(B, D)): true output of the training data
         """
 
-    nll_gaussian = gaussian_neg_log_likelihood((parameters[0], targets[1]),  targets[0], parameters[1])
-    nll_inverse_wishart = inverse_wishart_neg_log_likelihood(parameters[2:4], targets[1])
+    nll_gaussian = gaussian_neg_log_likelihood((parameters[0], targets[1]),
+                                               targets[0], parameters[1])
+    nll_inverse_wishart = inverse_wishart_neg_log_likelihood(
+        parameters[2:4], targets[1])
 
     return nll_gaussian + nll_inverse_wishart
 
