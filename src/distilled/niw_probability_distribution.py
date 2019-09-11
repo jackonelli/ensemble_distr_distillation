@@ -49,11 +49,11 @@ class NiwProbabilityDistribution(distilled_network.DistilledNet):
         x = nn.functional.relu(self.fc2(x))
         x = self.fc3(x)
 
-        mu = x[:, :, :self.target_dim]
-        scale = torch.exp(x[:, :, self.target_dim:(self.target_dim+1)])
-        psi = torch.exp(x[:, :, (self.target_dim+1):(2*self.target_dim+1)])
+        mu = x[:, :self.target_dim]
+        scale = torch.exp(x[:, self.target_dim:(self.target_dim+1)])
+        psi = torch.exp(x[:, (self.target_dim+1):(2*self.target_dim+1)])
         # Degrees of freedom should be at least D - 1
-        nu = nn.functional.relu(x[:, :, (2*self.target_dim+1):]) + (self.target_dim - 1)
+        nu = nn.functional.relu(x[:, (2*self.target_dim+1):]) + (self.target_dim - 1)
 
         return mu, scale, psi, nu
 

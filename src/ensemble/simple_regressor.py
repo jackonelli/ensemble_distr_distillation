@@ -40,16 +40,20 @@ class SimpleRegressor(ensemble.EnsembleMember):
         x = nn.functional.relu(self.fc2(x))
         x = self.fc3(x)
 
-        mean = x[:, :, :int((self.output_size / 2))]
-        var = torch.exp(x[:, :, int((self.output_size / 2)):])
+        return x
 
-        return mean, var
+    def transform_logits(self, logits):
+        mean = logits[:, :int((self.output_size / 2))]
+        var = torch.exp(logits[:, int((self.output_size / 2)):])
+
+        return torch.cat((mean, var), dim=-1)
 
     def calculate_loss(self, outputs, targets):
-        return self.loss(outputs, targets)
+        return self.loss((outputs[:, :targets.size(-1)], outputs[:, targets.size(-1):]), targets)
 
     def predict(self, x):
-        x = torch.cat(self.forward(x), dim=-1)
+        logits = self.forward(x)
+        x = self.transform_logits(logits)
 
-        return torch.squeeze(x)
+        return x
 

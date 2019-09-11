@@ -40,8 +40,7 @@ class SyntheticRegressionData(torch.utils.data.Dataset):
         targets = sample[-1]
 
         return (np.array(inputs,
-                         dtype=np.float32)[np.newaxis], np.array(targets, dtype=np.float32)[np.newaxis])
-
+                         dtype=np.float32), np.array([targets], dtype=np.float32))
 
     def sample_new_data(self):
         self.file.parent.mkdir(parents=True, exist_ok=True)
@@ -56,7 +55,6 @@ class SyntheticRegressionData(torch.utils.data.Dataset):
             all_x = np.linspace(-5, 5, self.n_samples)[:, np.newaxis]
 
         all_y = all_x + 0.5 * np.abs(all_x) * np.random.normal(size=[self.n_samples, 1])
-
 
         combined_data = np.column_stack((all_x, all_y))
         np.random.shuffle(combined_data)

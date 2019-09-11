@@ -52,6 +52,18 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
 
         return mean, var
 
+    def _generate_teacher_predictions(self, inputs):
+        """Generate teacher predictions
+        The intention is to get the logits of the ensemble members
+        and then apply some transformation to get the desired predictions.
+        Default implementation is to recreate the exact ensemble member output.
+        Override this method if another logit transformation is desired,
+        e.g. unit transformation if desired predictions
+        are the logits themselves
+        """
+
+        return self.teacher.get_logits(inputs)
+
     def predict(self, input_):
         """Predict parameters
         Wrapper function for the forward function.

@@ -19,7 +19,7 @@ LOGGER = logging.getLogger(__name__)
 
 def plot_predictions(prob_ensemble):
 
-    data = one_dim_regression.SyntheticRegressionData(n_samples=500, train=False,
+    data = one_dim_regression.SyntheticRegressionData(n_samples=400, train=False,
                                                       store_file=Path("data/one_dim_reg_500"))
 
     test_loader = torch.utils.data.DataLoader(data,
@@ -27,16 +27,28 @@ def plot_predictions(prob_ensemble):
                                               shuffle=True,
                                               num_workers=0)
 
-    x_batch, y_batch = next(iter(test_loader))
+    predictions = np.zeros((data.n_samples, prob_ensemble.size, prob_ensemble.output_size))
+    all_x = np.zeros((data.n_samples, 1))
+    all_y = np.zeros((data.n_samples, 1))
 
-    predictions = prob_ensemble.predict(x_batch, t=None)
+    idx = 0
+    for batch in test_loader:
+        inputs, targets = batch
 
-    plt.scatter(np.squeeze(x_batch), y_batch, label="Data")
+        predictions[idx*test_loader.batch_size:(idx + 1)*test_loader.batch_size, :, :] = \
+            prob_ensemble.predict(inputs, t=None).data.numpy()
+
+        all_x[idx * test_loader.batch_size:(idx + 1) * test_loader.batch_size, :] = inputs
+        all_y[idx * test_loader.batch_size:(idx + 1) * test_loader.batch_size, :] = targets
+
+        idx += 1
+
+    plt.scatter(np.squeeze(all_x), np.squeeze(all_y), label="Data", marker='.')
 
     for i in np.arange(prob_ensemble.size):
-        plt.errorbar(np.squeeze(x_batch), predictions[:, i, 0].data.numpy(),
-                     predictions[:, i, 1].data.numpy(),
-                     label="Ensemble member predictions " + str(i), marker='.')
+        plt.errorbar(np.squeeze(all_x), predictions[:, i, 0],
+                     np.sqrt(predictions[:, i, 1]),
+                     label="Ensemble member " + str(i+1) + " predictions", marker='.', ls='none')
 
     plt.legend()
     plt.show()
@@ -65,11 +77,13 @@ def main():
                                                num_workers=0)
 
     prob_ensemble = ensemble.Ensemble(ensemble_output_size)
+    ensemble_filepath = Path("models/simple_reg_ensemble")
+    #
     # for _ in range(args.num_ensemble_members):
     #     model = simple_regressor.SimpleRegressor(input_size,
     #                                              hidden_size,
     #                                              hidden_size,
-    #                                              output_size,
+    #                                              ensemble_output_size,
     #                                              device=device,
     #                                              learning_rate=args.lr)
     #     prob_ensemble.add_member(model)
@@ -77,13 +91,12 @@ def main():
     # err_metric = metrics.Metric(name="Err", function=metrics.squared_error)
     # prob_ensemble.add_metrics([err_metric])
     # prob_ensemble.train(train_loader, args.num_epochs)
+    #
+    # prob_ensemble.save_ensemble(ensemble_filepath)
 
-    ensemble_filepath = Path("models/simple_reg_ensemble")
     prob_ensemble.load_ensemble(ensemble_filepath)
 
-    # plot_predictions(prob_ensemble)
-
-    #prob_ensemble.save_ensemble(ensemble_filepath)
+    plot_predictions(prob_ensemble)
 
     distilled_output_size = 4
 

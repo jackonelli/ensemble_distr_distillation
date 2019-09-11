@@ -52,33 +52,36 @@ def gaussian_neg_log_likelihood(parameters, target, scale=None):
     B = batch size, D = dimension of target (num classes), N = ensemble size
 
     Args:
-        parameters (torch.tensor((B, 1, D)), torch.tensor((B, 1, D))):
+        parameters (torch.tensor((B, D)), torch.tensor((B, D))):
             mean values and variances of y|x for every x in
             batch (and for every ensemble member).
         target (torch.tensor((B, N, D))): sample from the normal
             distribution, if not an ensemble prediction N=1.
-        scale (torch.tensor(B, 1, 1)): scaling parameter for the variance
+        scale (torch.tensor(B, 1)): scaling parameter for the variance
             (/covariance matrix) for every x in batch.
     """
 
     mean = parameters[0]
     var = parameters[1]
 
+    if target.ndim == 2:  # This should only happen when we only have one target (i.e. N=1)
+        target = torch.unsqueeze(target, dim=1)
+
     if scale is None:
-        scale = torch.ones([target.size(0), 1, 1])
+        scale = torch.ones([target.size(0), 1])
 
     normalizer = 0
     ll = 0
     for i in np.arange(target.size(1)):
-        cov_mat = [torch.diag(var[b, 0, :]) for b in np.arange(target.size(0))]
+        cov_mat = [torch.diag(var[b, :]) for b in np.arange(target.size(0))]
 
         normalizer += torch.stack([0.5 * (target.size(-1) * torch.log(torch.tensor(2 * np.pi))
                                           + torch.log(torch.det(cov_mat_i)))
                                   for cov_mat_i in cov_mat], dim=0) / target.size(1)
 
-        ll += torch.stack([0.5 * torch.matmul(torch.matmul((target[b, i, :] - mean[b, 0, :]),
-                                                           (1 / scale[b, 0, 0]) * torch.inverse(cov_mat_i)),
-                                              torch.transpose((target[b, i, :] - mean[b, 0, :]), 0, -1))
+        ll += torch.stack([0.5 * torch.matmul(torch.matmul((target[b, i, :] - mean[b, :]),
+                                                           (1 / scale[b]) * torch.inverse(cov_mat_i)),
+                                              torch.transpose((target[b, i, :] - mean[b, :]), 0, -1))
                            for b, cov_mat_i in enumerate(cov_mat)], dim=0) / target.size(1)  # Mean over ensemble members
 
     return torch.mean(normalizer + ll)  # Mean over batch
@@ -89,15 +92,18 @@ def inverse_wishart_neg_log_likelihood(parameters, target):
     B = batch size, D = target dimension, N = ensemble size
 
     Args:
-        parameters (torch.tensor((B, 1, D)), torch.tensor((B, 1, 1))):
+        parameters (torch.tensor((B, D)), torch.tensor((B, 1))):
             diagonal of psi and degrees-of-freedom, nu > D - 1, of the
             inverse-Wishart distribution for every x in batch.
         target (torch.tensor((B, N, D))): variance (diagonal of covariance matrix)
             as output by N ensemble members.
             """
 
+    if target.ndim == 2:  # This should only happen when we only have one target (i.e. N=1)
+        target = torch.unsqueeze(target, dim=1)
+
     psi = parameters[0]
-    nu = torch.squeeze(parameters[1], dim=1)
+    nu = parameters[1]
 
     normalizer = 0
     ll = 0
@@ -107,7 +113,7 @@ def inverse_wishart_neg_log_likelihood(parameters, target):
         cov_mat_det = torch.unsqueeze(torch.stack([torch.det(cov_mat_i) for cov_mat_i in cov_mat],
                                                   dim=0), dim=1)
 
-        psi_mat = [torch.diag(psi[b, 0, :]) for b in np.arange(target.size(0))]
+        psi_mat = [torch.diag(psi[b, :]) for b in np.arange(target.size(0))]
         psi_mat_det = torch.unsqueeze(torch.stack(
             [torch.det(psi_mat_i) for psi_mat_i in psi_mat], dim=0),
                                       dim=1)
@@ -121,7 +127,6 @@ def inverse_wishart_neg_log_likelihood(parameters, target):
     return torch.mean(normalizer + ll)  # Mean over batch
 
 
-
 def gaussian_inv_wishart_neg_log_likelihood(parameters,
                                             targets,
                                             true_targets=None):
@@ -129,10 +134,10 @@ def gaussian_inv_wishart_neg_log_likelihood(parameters,
         B = batch size, D = target dimension, N = ensemble size
 
         Args:
-        parameters (torch.tensor((B, 1, D)), torch.tensor((B, 1, D)),
-             torch.tensor((B, 1, D)), torch.tensor((B, 1, D)): parameters of the normal distribution (mu_0, scale)
+        parameters (torch.tensor((B, D)), torch.tensor((B, D)),
+             torch.tensor((B, D)), torch.tensor((B, D)): parameters of the normal distribution (mu_0, scale)
              and of the inverse-Wishart distribution (psi, nu)
-        targets (torch.tensor((B, N, 2*D))): mean and variance (diagonal of covariance
+        targets (torch.tensor((B, N, D)), torch.tensor((B, N, D))): mean and variance (diagonal of covariance
              matrix) as output by N ensemble members.
         true_targets (torch.tensor(B, D)): true output of the training data
         """
