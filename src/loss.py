@@ -64,7 +64,8 @@ def gaussian_neg_log_likelihood(parameters, target, scale=None):
     mean = parameters[0]
     var = parameters[1]
 
-    if target.ndim == 2:  # This should only happen when we only have one target (i.e. N=1)
+    # This should only happen when we only have one target (i.e. N=1)
+    if target.dim() == 2:
         target = torch.unsqueeze(target, dim=1)
 
     if scale is None:
@@ -75,14 +76,20 @@ def gaussian_neg_log_likelihood(parameters, target, scale=None):
     for i in np.arange(target.size(1)):
         cov_mat = [torch.diag(var[b, :]) for b in np.arange(target.size(0))]
 
-        normalizer += torch.stack([0.5 * (target.size(-1) * torch.log(torch.tensor(2 * np.pi))
-                                          + torch.log(torch.det(cov_mat_i)))
-                                  for cov_mat_i in cov_mat], dim=0) / target.size(1)
+        normalizer += torch.stack([
+            0.5 * (target.size(-1) * torch.log(torch.tensor(2 * np.pi)) +
+                   torch.log(torch.det(cov_mat_i))) for cov_mat_i in cov_mat
+        ],
+                                  dim=0) / target.size(1)
 
-        ll += torch.stack([0.5 * torch.matmul(torch.matmul((target[b, i, :] - mean[b, :]),
-                                                           (1 / scale[b]) * torch.inverse(cov_mat_i)),
-                                              torch.transpose((target[b, i, :] - mean[b, :]), 0, -1))
-                           for b, cov_mat_i in enumerate(cov_mat)], dim=0) / target.size(1)  # Mean over ensemble members
+        ll += torch.stack([
+            0.5 * torch.matmul(
+                torch.matmul((target[b, i, :] - mean[b, :]),
+                             (1 / scale[b]) * torch.inverse(cov_mat_i)),
+                torch.transpose((target[b, i, :] - mean[b, :]), 0, -1))
+            for b, cov_mat_i in enumerate(cov_mat)
+        ],
+                          dim=0) / target.size(1)  # Mean over ensemble members
 
     return torch.mean(normalizer + ll)  # Mean over batch
 
@@ -99,7 +106,8 @@ def inverse_wishart_neg_log_likelihood(parameters, target):
             as output by N ensemble members.
             """
 
-    if target.ndim == 2:  # This should only happen when we only have one target (i.e. N=1)
+    # This should only happen when we only have one target (i.e. N=1)
+    if target.dim() == 2:
         target = torch.unsqueeze(target, dim=1)
 
     psi = parameters[0]
@@ -109,20 +117,30 @@ def inverse_wishart_neg_log_likelihood(parameters, target):
     ll = 0
     for i in np.arange(target.size(1)):
         # CAN I DO ANYTHING ABOUT THIS UGLY LIST THING?
-        cov_mat = [torch.diag(target[b, i, :]) for b in np.arange(target.size(0))]
-        cov_mat_det = torch.unsqueeze(torch.stack([torch.det(cov_mat_i) for cov_mat_i in cov_mat],
-                                                  dim=0), dim=1)
+        cov_mat = [
+            torch.diag(target[b, i, :]) for b in np.arange(target.size(0))
+        ]
+        cov_mat_det = torch.unsqueeze(torch.stack(
+            [torch.det(cov_mat_i) for cov_mat_i in cov_mat], dim=0),
+                                      dim=1)
 
         psi_mat = [torch.diag(psi[b, :]) for b in np.arange(target.size(0))]
         psi_mat_det = torch.unsqueeze(torch.stack(
             [torch.det(psi_mat_i) for psi_mat_i in psi_mat], dim=0),
                                       dim=1)
 
-        normalizer += (- (nu / 2) * torch.log(psi_mat_det) + (nu * target.size(-1) / 2) *
-                       torch.log(torch.tensor(2, dtype=torch.float32)) + torch.lgamma(nu/2)
-                       + ((nu - target.size(-1) - 1) / 2) * torch.log(cov_mat_det)) / target.size(1)  # Mean over ensemble
-        ll += torch.stack([0.5 * torch.trace(torch.inverse(psi_mat_i) * cov_mat_i) for psi_mat_i, cov_mat_i
-                           in zip(psi_mat, cov_mat)], dim=0) / target.size(1)
+        normalizer += (-(nu / 2) * torch.log(psi_mat_det) +
+                       (nu * target.size(-1) / 2) *
+                       torch.log(torch.tensor(2, dtype=torch.float32)) +
+                       torch.lgamma(nu / 2) +
+                       ((nu - target.size(-1) - 1) / 2) *
+                       torch.log(cov_mat_det)) / target.size(
+                           1)  # Mean over ensemble
+        ll += torch.stack([
+            0.5 * torch.trace(torch.inverse(psi_mat_i) * cov_mat_i)
+            for psi_mat_i, cov_mat_i in zip(psi_mat, cov_mat)
+        ],
+                          dim=0) / target.size(1)
 
     return torch.mean(normalizer + ll)  # Mean over batch
 
