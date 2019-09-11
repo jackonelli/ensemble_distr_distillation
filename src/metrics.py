@@ -36,13 +36,15 @@ class Metric:
         self.counter = 0
 
 
-def entropy(predicted_distribution):
+def entropy(true_labels, predicted_distribution):
     """Entropy
 
     B = batch size, C = num classes
     Labels as one hot vectors
     Note: if a batch with B samples is given,
     then the output is a tensor with B values
+    The true labels argument is simply there for conformity
+    so that the entropy metric functions like any metric.
 
     Args:
         NOT USED true_labels: torch.tensor((B, C))
@@ -151,3 +153,4 @@ def squared_error(targets, predictions):
         number_of_elements = 1
 
     return ((targets - predictions[0])**2).sum().item() / number_of_elements
+
