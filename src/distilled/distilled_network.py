@@ -1,3 +1,4 @@
+"""Distilled net base module"""
 import logging
 from abc import ABC, abstractmethod
 import torch
@@ -74,7 +75,7 @@ class DistilledNet(nn.Module, ABC):
         """
 
         logits = self.teacher.get_logits(inputs)
-        return self.teach.transform_logits(logits)
+        return self.teacher.transform_logits(logits)
 
     def _add_metric(self, metric):
         self.metrics[metric.name] = metric
