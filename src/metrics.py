@@ -36,7 +36,7 @@ class Metric:
         self.counter = 0
 
 
-def entropy(true_labels, predicted_distribution):
+def entropy(predicted_distribution):
     """Entropy
 
     B = batch size, C = num classes
