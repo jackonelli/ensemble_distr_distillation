@@ -52,7 +52,7 @@ def gaussian_neg_log_likelihood(parameters, target, scale=None):
     B = batch size, D = dimension of target (num classes), N = ensemble size
 
     Args:
-        parameters (torch.tensor((B, D)), torch.tensor((B, D))):
+        parameters (torch.tensor((B, D)), torch.tensor((B, N, D))):
             mean values and variances of y|x for every x in
             batch (and for every ensemble member).
         target (torch.tensor((B, N, D))): sample from the normal
@@ -67,6 +67,7 @@ def gaussian_neg_log_likelihood(parameters, target, scale=None):
     # This should only happen when we only have one target (i.e. N=1)
     if target.dim() == 2:
         target = torch.unsqueeze(target, dim=1)
+        var = torch.unsqueeze(var, dim=1)
 
     if scale is None:
         scale = torch.ones([target.size(0), 1])
@@ -74,7 +75,7 @@ def gaussian_neg_log_likelihood(parameters, target, scale=None):
     normalizer = 0
     ll = 0
     for i in np.arange(target.size(1)):
-        cov_mat = [torch.diag(var[b, :]) for b in np.arange(target.size(0))]
+        cov_mat = [torch.diag(var[b, i, :]) for b in np.arange(target.size(0))]
 
         normalizer += torch.stack([
             0.5 * (target.size(-1) * torch.log(torch.tensor(2 * np.pi)) +
@@ -160,10 +161,15 @@ def gaussian_inv_wishart_neg_log_likelihood(parameters,
         true_targets (torch.tensor(B, D)): true output of the training data
         """
 
-    nll_gaussian = gaussian_neg_log_likelihood((parameters[0], targets[1]),
-                                               targets[0], parameters[1])
-    nll_inverse_wishart = inverse_wishart_neg_log_likelihood(
-        parameters[2:4], targets[1])
+    mu_0 = parameters[0]
+    scale = parameters[1]
+    psi = parameters[2]
+    nu = parameters[3]
+    mu = targets[0]
+    var = targets[1]
+
+    nll_gaussian = gaussian_neg_log_likelihood((mu_0, var), mu, scale)
+    nll_inverse_wishart = inverse_wishart_neg_log_likelihood((psi, nu), var)
 
     return nll_gaussian + nll_inverse_wishart
 
