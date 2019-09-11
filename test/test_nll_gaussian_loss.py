@@ -25,7 +25,7 @@ class TestGaussianLoss(unittest.TestCase):
     def test_gaussian_nll_two_ensemble_members(self):
         target = torch.unsqueeze(torch.tensor([[1.0, 0.75]], dtype=torch.float), dim=-1)
         mean = torch.tensor([[0.5]], dtype=torch.float)
-        var = torch.tensor([[10.0]], dtype=torch.float)
+        var = torch.unsqueeze(torch.tensor([[10.0, 10.0]], dtype=torch.float), dim=-1)
 
         gauss_nll = loss.gaussian_neg_log_likelihood((mean, var), target)
         self.assertAlmostEqual(gauss_nll.item(), 0.25 * math.log(4 * math.pi**2 * 10**2) + (0.015625 / 2), places=5)
