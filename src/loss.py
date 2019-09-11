@@ -70,7 +70,7 @@ def gaussian_neg_log_likelihood(parameters, target, scale=None):
     normalizer = 0
     ll = 0
     for i in np.arange(target.size(1)):
-        cov_mat = [torch.diag(var[b, i, :]) for b in np.arange(target.size(0))]
+        cov_mat = [torch.diag(var[b, 0, :]) for b in np.arange(target.size(0))]
 
         normalizer += torch.stack([
             0.5 * (target.size(-1) * torch.log(torch.tensor(2 * np.pi)) +
@@ -78,18 +78,16 @@ def gaussian_neg_log_likelihood(parameters, target, scale=None):
         ],
                                   dim=0) / target.size(1)
 
-        ll += torch.sum(torch.stack([
-            0.5 * (target[b, i, :] - mean[b, 0, :]) *
-            (1 / scale[b, 0, 0]) * torch.inverse(cov_mat_i) * torch.transpose(
-                (target[b, i, :] - mean[b, 0, :]), 0, -1)
+        ll += torch.stack([
+            0.5 * torch.matmul(
+                torch.matmul((target[b, i, :] - mean[b, 0, :]),
+                             (1 / scale[b, 0, 0]) * torch.inverse(cov_mat_i)),
+                torch.transpose((target[b, i, :] - mean[b, 0, :]), 0, -1))
             for b, cov_mat_i in enumerate(cov_mat)
         ],
-                                    dim=0),
-                        dim=1) / target.size(1)  # Mean over ensembles
+                          dim=0) / target.size(1)  # Mean over ensemble members
 
-    return torch.mean(
-        normalizer +
-        torch.sum(ll, dim=-1))  # Sum over dimensions, mean over batch
+    return torch.mean(normalizer + ll)  # Mean over batch
 
 
 def inverse_wishart_neg_log_likelihood(parameters, target):
@@ -131,7 +129,7 @@ def inverse_wishart_neg_log_likelihood(parameters, target):
         ],
                           dim=0) / target.size(1)
 
-    # TODO: DUBBLE CHECK THIS WHEN WE HAVE D > 1
+    # TODO: DUBBLE CHECK THIS WHEN WE HAVE D > 1 (CREATE A UNIT TEST)
     return torch.mean(torch.sum(normalizer, dim=1) +
                       ll)  # Sum over dimensions, mean over batch
 

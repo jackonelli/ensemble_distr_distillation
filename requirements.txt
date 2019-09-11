@@ -1,4 +1,6 @@
 numpy
 torch
+torchvision
+torch_testing
 matplotlib
 matplot2tikz

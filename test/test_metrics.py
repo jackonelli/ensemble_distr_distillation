@@ -49,6 +49,12 @@ class TestMetrics(unittest.TestCase):
         acc = metrics.accuracy(true_label, predictions)
         self.assertAlmostEqual(acc, 0.5)
 
+    def test_squared_error(self):
+        targets = torch.tensor([1, 2, 1.5])
+        predictions = torch.tensor([0.9, 2.1, 1.7])
+        squared_error = metrics.squared_error(targets, (predictions, ))
+        self.assertAlmostEqual(squared_error, 0.02)
+
 
 if __name__ == '__main__':
     unittest.main()
