@@ -5,7 +5,7 @@ import logging
 import numpy as np
 import torch
 
-from dataloaders import gaussian
+from src.dataloaders import gaussian
 from src import utils
 from src.distilled import dirichlet_probability_distribution as dirichlet
 from src.ensemble import ensemble

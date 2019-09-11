@@ -6,8 +6,8 @@ import torch
 from src.distilled import dirichlet_CNN
 from src.ensemble import ensemble
 from src.ensemble import convolutional_classifier
-import metrics
-import utils
+from src import metrics
+from src import utils
 from src.dataloaders import cifar10
 
 LOGGER = logging.getLogger(__name__)
