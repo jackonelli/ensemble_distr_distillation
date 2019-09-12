@@ -64,12 +64,14 @@ def main():
     device = utils.torch_settings(args.seed, args.gpu)
     LOGGER.info("Creating dataloader")
 
+    # NOTE: MAYBE SHOULD NOT RESAMPLE DATA
     data = one_dim_regression.SyntheticRegressionData(
             store_file=Path("data/one_dim_reg_1000"))
 
     input_size = 1
     hidden_size = 5
     ensemble_output_size = 2
+
 
     train_loader = torch.utils.data.DataLoader(data,
                                                batch_size=16,
