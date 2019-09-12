@@ -1,7 +1,4 @@
 import unittest
-from pathlib import Path
-import sys
-sys.path.append(str(Path.cwd() / "src"))
 import torch
 import torch_testing as tt
 from src import utils

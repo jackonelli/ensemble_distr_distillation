@@ -5,12 +5,12 @@ import logging
 import numpy as np
 import torch
 
-from dataloaders import gaussian
-import utils
+from src.dataloaders import gaussian
+from src import utils
 from src.distilled import dirichlet_probability_distribution as dirichlet
 from src.ensemble import ensemble
 from src.ensemble import simple_classifier
-import metrics
+from src import metrics
 
 LOGGER = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ def main():
     LOGGER.info("Creating dataloader")
     data = gaussian.SyntheticGaussianData(
         mean_0=[0, 0],
-        mean_1=[-3, -3],
+        mean_1=[-1, -1],
         cov_0=np.eye(2),
         cov_1=np.eye(2),
         store_file=Path("data/2d_gaussian_1000"))
