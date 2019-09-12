@@ -58,6 +58,7 @@ class DistilledNet(nn.Module, ABC):
             outputs = self.forward(inputs)
 
             loss = self.calculate_loss(outputs, teacher_predictions, labels)
+
             loss.backward()
             self.optimizer.step()
             running_loss += loss.item()
@@ -75,7 +76,6 @@ class DistilledNet(nn.Module, ABC):
         """
 
         logits = self.teacher.get_logits(inputs)
-        t = self.teacher.transform_logits(logits)
         return self.teacher.transform_logits(logits)
 
     def _add_metric(self, metric):

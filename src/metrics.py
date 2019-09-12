@@ -112,7 +112,7 @@ def accuracy(true_labels, predicted_distribution):
     number_of_elements = np.prod(true_labels.size())
     if number_of_elements == 0:
         number_of_elements = 1
-    return (true_labels == predicted_labels).sum().item() / number_of_elements
+    return (true_labels == predicted_labels.int()).sum().item() / number_of_elements
 
 
 def error(true_labels, predicted_distribution):

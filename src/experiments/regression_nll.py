@@ -18,6 +18,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 def plot_predictions(prob_ensemble):
+    """Visualise ensemble predictions on test data"""
 
     data = one_dim_regression.SyntheticRegressionData(n_samples=400, train=False,
                                                       store_file=Path("data/one_dim_reg_500"))
@@ -71,7 +72,6 @@ def main():
     input_size = 1
     hidden_size = 5
     ensemble_output_size = 2
-
 
     train_loader = torch.utils.data.DataLoader(data,
                                                batch_size=16,

@@ -67,7 +67,6 @@ def gaussian_neg_log_likelihood(parameters, target, scale=None):
     # This should only happen when we only have one target (i.e. N=1)
     if target.dim() == 2:
         target = torch.unsqueeze(target, dim=1)
-        var = torch.unsqueeze(var, dim=1)
 
     if scale is None:
         scale = torch.ones([target.size(0), 1])
@@ -75,7 +74,11 @@ def gaussian_neg_log_likelihood(parameters, target, scale=None):
     normalizer = 0
     ll = 0
     for i in np.arange(target.size(1)):
-        cov_mat = [torch.diag(var[b, i, :]) for b in np.arange(target.size(0))]
+
+        if var.dim() == 2:
+            cov_mat = [torch.diag(var[b, :]) for b in np.arange(target.size(0))]
+        else:
+            cov_mat = [torch.diag(var[b, i, :]) for b in np.arange(target.size(0))]
 
         normalizer += torch.stack([
             0.5 * (target.size(-1) * torch.log(torch.tensor(2 * np.pi)) +

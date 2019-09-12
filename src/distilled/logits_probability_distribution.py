@@ -4,7 +4,6 @@ import torch.optim as torch_optim
 import src.loss as custom_loss
 import src.distilled.distilled_network as distilled_network
 
-
 class LogitsProbabilityDistribution(distilled_network.DistilledNet):
     def __init__(self,
                  input_size,
@@ -47,8 +46,8 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
         x = nn.functional.relu(self.fc2(x))
         x = self.fc3(x)
 
-        mean = x[:, :, :int((self.output_size / 2))]
-        var = torch.exp(x[:, :, int((self.output_size / 2)):])
+        mean = x[:, :int((self.output_size / 2))]
+        var = torch.exp(x[:, int((self.output_size / 2)):])
 
         return mean, var
 
