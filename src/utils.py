@@ -52,6 +52,10 @@ def parse_args():
                         type=Path,
                         default="./models",
                         help="Model directory")
+    parser.add_argument("--saved_model",
+                        type=_saved_model_path_arg,
+                        default=None,
+                        help="Path to saved model")
     parser.add_argument("--log_dir",
                         type=Path,
                         default="./logs",
@@ -84,8 +88,17 @@ def _log_level_arg(arg_string):
     elif arg_string == "CRITICAL":
         log_level = logging.WARNING
     else:
-        raise ValueError("Invalid log level.")
+        raise argparse.ArgumentTypeError(
+            "Invalid log level: {}".format(arg_string))
     return log_level
+
+
+def _saved_model_path_arg(arg_string):
+    model_path = Path(arg_string)
+    if not model_path.exists():
+        raise argparse.ArgumentTypeError(
+            "Saved model does not exist: {}".format(model_path))
+    return model_path
 
 
 LOG_FORMAT = "%(asctime)-15s %(levelname)-5s %(name)-15s - %(message)s"
