@@ -77,7 +77,7 @@ class Ensemble():
         B = batch size, K = num output params, N = ensemble size
 
         Args:
-            logits (torch.tensor((B, N, K))): data batch
+            transformed_logits (torch.tensor((B, N, K))): data batch
             transformation (funcion): maps logits to output space
 
         Returns:
@@ -85,16 +85,16 @@ class Ensemble():
         """
 
         batch_size = logits.size(0)
-        logits = torch.zeros((batch_size, self.size, self.output_size))
+        transformed_logits = torch.zeros((batch_size, self.size, self.output_size))
         for member_ind, member in enumerate(self.members):
             if transformation:
-                logits[:, member_ind, :] = transformation(
+                transformed_logits[:, member_ind, :] = transformation(
                     logits[:, member_ind, :])
             else:
-                logits[:, member_ind, :] = member.transform_logits(
+                transformed_logits[:, member_ind, :] = member.transform_logits(
                     logits[:, member_ind, :])
 
-        return logits
+        return transformed_logits
 
     def predict(self, inputs, t=1):
         """Ensemble prediction
