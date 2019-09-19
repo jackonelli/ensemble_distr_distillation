@@ -33,12 +33,12 @@ class Ensemble():
         for _ in range(number_of):
             self.add_member(constructor())
 
-    def train(self, train_loader, num_epochs):
+    def train(self, train_loader, num_epochs, valid_loader=None):
         """Multithreaded?"""
         self._log.info("Training ensemble")
         for ind, member in enumerate(self.members):
             self._log.info("Training member {}/{}".format(ind + 1, self.size))
-            member.train(train_loader, num_epochs)
+            member.train(train_loader, num_epochs, valid_loader)
 
     def add_metrics(self, metrics_list):
         for metric in metrics_list:
@@ -162,21 +162,21 @@ class EnsembleMember(nn.Module, ABC):
 
             raise ValueError("Must assign proper loss function to child.loss.")
 
-    def train(self, train_loader, num_epochs, metrics=list()):
+    def train(self, train_loader, num_epochs, validation_loader=None, metrics=list()):
         """Common train method for all ensemble member classes
         Should NOT be overridden!
         """
 
         scheduler = torch_optim.lr_scheduler.StepLR(self.optimizer,
-                                                    step_size=5,
+                                                    step_size=10,
                                                     gamma=0.1)
         for epoch_number in range(1, num_epochs + 1):
-            loss = self._train_epoch(train_loader)
+            loss = self._train_epoch(train_loader, validation_loader)
             self._print_epoch(epoch_number, loss)
             if self._learning_rate_condition(epoch_number):
                 scheduler.step()
 
-    def _train_epoch(self, train_loader, metrics=list()):
+    def _train_epoch(self, train_loader, validation_loader=None, metrics=list()):
         """Common train epoch method for all ensemble member classes
         Should NOT be overridden!
         """
@@ -195,7 +195,17 @@ class EnsembleMember(nn.Module, ABC):
             loss.backward()
             self.optimizer.step()
             running_loss += loss.item()
-            self._update_metrics(outputs, labels)
+
+            if validation_loader is None:
+                self._update_metrics(outputs, labels)
+
+        if validation_loader is not None:
+            for valid_batch in validation_loader:
+                valid_inputs, valid_labels = valid_batch
+                valid_logits = self.forward(valid_inputs)
+                valid_outputs = self.transform_logits(valid_logits)
+
+                self._update_metrics(valid_outputs, valid_labels)
 
         return running_loss
 

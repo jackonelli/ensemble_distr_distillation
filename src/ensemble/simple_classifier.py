@@ -38,11 +38,12 @@ class SimpleClassifier(ensemble.EnsembleMember):
         return x
 
     def transform_logits(self, logits):
-        """Should this be log softmax?"""
+        """Should this be log softmax?""" # Men vi har lagt det i calculate_loss istället
         return (nn.Softmax(dim=-1))(logits)
 
     def calculate_loss(self, outputs, labels):
         log_outputs = torch.log(outputs)
+        # Removing this since it gives nan loss
 
         return self.loss(log_outputs, labels.type(torch.LongTensor))
 
