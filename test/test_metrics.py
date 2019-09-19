@@ -52,6 +52,15 @@ class TestMetrics(unittest.TestCase):
         squared_error = metrics.squared_error(targets, predictions)
         self.assertAlmostEqual(squared_error, 0.02)
 
+    def test_uncertainty_separation_entropy(self):
+        predictions = torch.tensor([[[0.8, 0.2], [0.6, 0.4]]])
+        pred_mean = torch.mean(predictions, dim=1)
+        self.assertAlmostEqual(torch.sum(pred_mean), 1.0)
+        tot_unc, ep_unc, al_unc = metrics.uncertainty_separation_entropy(predictions, None)
+        self.assertAlmostEqual(tot_unc.item(), 0.8813, places=4)
+        self.assertAlmostEqual(ep_unc.item(), 0.0349, places=4)
+        self.assertAlmostEqual(al_unc.item(), 0.8464, places=4)
+
 
 if __name__ == '__main__':
     unittest.main()

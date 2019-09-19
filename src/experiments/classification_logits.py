@@ -79,17 +79,17 @@ def main():
                                                num_workers=0)
 
     prob_ensemble = ensemble.Ensemble(ensemble_output_size)
-    # for _ in range(args.num_ensemble_members):
-    #     model = simple_classifier.SimpleClassifier(input_size,
-    #                                                hidden_size,
-    #                                                hidden_size,
-    #                                                output_size,
-    #                                                device=device,
-    #                                                learning_rate=args.lr)
-    #     prob_ensemble.add_member(model)
-    # acc_metric = metrics.Metric(name="Acc", function=metrics.accuracy)
-    # prob_ensemble.add_metrics([acc_metric])
-    # prob_ensemble.train(train_loader, args.num_epochs)
+    for _ in range(args.num_ensemble_members):
+        model = simple_classifier.SimpleClassifier(input_size,
+                                                   hidden_size,
+                                                   hidden_size,
+                                                   ensemble_output_size,
+                                                   device=device,
+                                                   learning_rate=args.lr)
+        prob_ensemble.add_member(model)
+    acc_metric = metrics.Metric(name="Acc", function=metrics.accuracy)
+    prob_ensemble.add_metrics([acc_metric])
+    prob_ensemble.train(train_loader, args.num_epochs)
 
     ensemble_filepath = Path("models/simple_class_logits_ensemble")
 

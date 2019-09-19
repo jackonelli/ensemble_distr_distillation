@@ -10,6 +10,8 @@ from src.ensemble import ensemble
 import src.metrics as metrics
 import src.utils as utils
 from src.dataloaders import mnist
+from src.ensemble import simple_classifier
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -53,20 +55,21 @@ def create_ensemble(train_loader, test_loader, args, num_ensemble_members,
     hidden_size_2 = 32
     output_size = 10
 
-    prob_ensemble = ensemble.Ensemble()
+    prob_ensemble = ensemble.Ensemble(output_size)
 
     for i in range(num_ensemble_members):
         LOGGER.info("Training ensemble member number {}".format(i + 1))
-        model = models.NeuralNet(input_size,
-                                 hidden_size_1,
-                                 hidden_size_2,
-                                 output_size,
-                                 learning_rate=args.lr)
-        model.train(train_loader, args.num_epochs)
-        LOGGER.info("Accuracy on test data: {}".format(
-            get_accuracy(model, test_loader)))
-        prob_ensemble.add_member(model)
+        member = simple_classifier.SimpleClassifier(input_size,
+                                                           hidden_size_1,
+                                                           hidden_size_2,
+                                                           output_size,
+                                                           learning_rate=args.lr)
 
+        prob_ensemble.add_member(member)
+
+    acc_metric = metrics.Metric(name="Acc", function=metrics.accuracy)
+    prob_ensemble.add_metrics([acc_metric])
+    prob_ensemble.train(train_loader, args.num_epochs)
     LOGGER.info("Ensemble accuracy on test data: {}".format(
         get_accuracy(prob_ensemble, test_loader)))
 
