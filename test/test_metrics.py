@@ -34,13 +34,13 @@ class TestMetrics(unittest.TestCase):
         tt.assert_almost_equal(nll, 0.69314718 * torch.ones((2)))
 
     def test_accuracy(self):
-        true_label = torch.tensor(0)
+        true_label = torch.tensor(0).int()
         predictions = torch.tensor([0.9, 0.1])
         acc = metrics.accuracy(true_label, predictions)
         self.assertAlmostEqual(acc, 1)
 
     def test_accuracy_batch(self):
-        true_label = torch.tensor([1, 0, 2, 0])
+        true_label = torch.tensor([1, 0, 2, 0]).int()
         predictions = torch.tensor([[0.05, 0.09, 0.05], [0.1, 0.8, 0.1],
                                     [0.1, 0.2, 0.7], [0.25, 0.5, 0.25]])
         acc = metrics.accuracy(true_label, predictions)
@@ -56,7 +56,8 @@ class TestMetrics(unittest.TestCase):
         predictions = torch.tensor([[[0.8, 0.2], [0.6, 0.4]]])
         pred_mean = torch.mean(predictions, dim=1)
         self.assertAlmostEqual(torch.sum(pred_mean), 1.0)
-        tot_unc, ep_unc, al_unc = metrics.uncertainty_separation_entropy(predictions, None)
+        tot_unc, ep_unc, al_unc = metrics.uncertainty_separation_entropy(
+            predictions, None)
         self.assertAlmostEqual(tot_unc.item(), 0.8813, places=4)
         self.assertAlmostEqual(ep_unc.item(), 0.0349, places=4)
         self.assertAlmostEqual(al_unc.item(), 0.8464, places=4)
