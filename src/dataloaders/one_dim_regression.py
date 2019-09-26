@@ -39,22 +39,27 @@ class SyntheticRegressionData(torch.utils.data.Dataset):
         inputs = sample[:-1]
         targets = sample[-1]
 
-        return (np.array(inputs,
-                         dtype=np.float32), np.array([targets], dtype=np.float32))
+        return (np.array(inputs, dtype=np.float32),
+                np.array([targets], dtype=np.float32))
 
     def sample_new_data(self):
         self.file.parent.mkdir(parents=True, exist_ok=True)
 
         if self.train:
-            x_1 = np.random.normal(-4, 2 / 5, [int(np.ceil(self.n_samples / 3)), 1])
-            x_2 = np.random.normal(0, 0.9, [int(np.ceil(self.n_samples / 3)), 1])
-            x_3 = np.random.normal(4, 2 / 5, [self.n_samples - 2 * int(np.ceil(self.n_samples / 3)), 1])
+            x_1 = np.random.normal(-4, 2 / 5,
+                                   [int(np.ceil(self.n_samples / 3)), 1])
+            x_2 = np.random.normal(0, 0.9,
+                                   [int(np.ceil(self.n_samples / 3)), 1])
+            x_3 = np.random.normal(
+                4, 2 / 5,
+                [self.n_samples - 2 * int(np.ceil(self.n_samples / 3)), 1])
             all_x = np.row_stack([x_1, x_2, x_3])
 
         else:
             all_x = np.linspace(-5, 5, self.n_samples)[:, np.newaxis]
 
-        all_y = all_x + 0.5 * np.abs(all_x) * np.random.normal(size=[self.n_samples, 1])
+        all_y = all_x + 0.5 * np.abs(all_x) * np.random.normal(
+            size=[self.n_samples, 1])
 
         combined_data = np.column_stack((all_x, all_y))
         np.random.shuffle(combined_data)
