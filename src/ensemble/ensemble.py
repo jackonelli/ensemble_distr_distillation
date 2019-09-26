@@ -51,6 +51,11 @@ class Ensemble():
                     "Metric {} does not inherit from metric.Metric.".format(
                         metric.name))
 
+    def calc_metrics(self, data_loader):
+        for member in self.members:
+            member.calc_metrics(data_loader)
+
+
     def get_logits(self, inputs):
         """Ensemble logits
         Returns the logits of all individual ensemble members.
@@ -208,6 +213,20 @@ class EnsembleMember(nn.Module, ABC):
                 self._update_metrics(valid_outputs, valid_labels)
 
         return running_loss
+
+    def calc_metrics(self, data_loader):
+        self._reset_metrics()
+
+        for batch in data_loader:
+            inputs, targets = batch
+            logits = self.forward(inputs)
+            outputs = self.transform_logits(logits)
+            self._update_metrics(outputs, targets)
+
+        metric_string = ""
+        for metric in self.metrics.values():
+            metric_string += " {}".format(metric)
+        self._log.info(metric_string)
 
     def _add_metric(self, metric):
         self.metrics[metric.name] = metric

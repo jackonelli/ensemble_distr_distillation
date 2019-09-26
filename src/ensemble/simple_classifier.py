@@ -49,6 +49,6 @@ class SimpleClassifier(ensemble.EnsembleMember):
 
     def predict(self, x, t=1):
         x = self.forward(x)
-        x = self.temperature_softmax(x, t)
+        x = self.transform_logits(x)
 
         return x

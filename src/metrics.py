@@ -58,6 +58,40 @@ def entropy(predicted_distribution):
         predicted_distribution * torch.log(predicted_distribution), dim=-1)
 
 
+def uncertainty_separation_entropy(predicted_distribution, true_labels):
+    """Total, epistemic and aleatoric uncertainty based on an entropy measure
+
+    B = batch size, C = num classes, N = num predictions
+    Labels as one hot vectors
+    Note: if a batch with B samples is given,
+    then the output is a tensor with B values
+    The true labels argument is simply there for conformity
+    so that the entropy metric functions like any metric.
+    # TODO: Remove true_labels, because we never call this metric in the same context as the other metrices?
+
+    Args:
+        NOT USED true_labels: torch.tensor((B, C))
+        predicted_distribution: torch.tensor((B, N, C))
+
+    Returns:
+        Tuple of uncertainties (relative the maximum uncertainty):
+        Total uncertainty: torch.tensor(B,)
+        Epistemic uncertainty: torch.tensor(B,)
+        Aleatoric uncertainty: torch.tensor(B,)
+    """
+
+    # We calculate the uncertainties relative the maximum possible uncertainty (log(C))
+    max_entropy = torch.log(torch.tensor(predicted_distribution.size(-1), dtype=float))
+
+    mean_predictions = torch.mean(predicted_distribution, dim=1)
+    total_uncertainty = - torch.sum(mean_predictions * torch.log(mean_predictions), dim=-1) / max_entropy
+    aleatoric_uncertainty = - torch.sum(predicted_distribution * torch.log(predicted_distribution), dim=[1, 2]) \
+        / (max_entropy * predicted_distribution.size(1))
+    epistemic_uncertainty = total_uncertainty - aleatoric_uncertainty
+
+    return total_uncertainty, epistemic_uncertainty, aleatoric_uncertainty
+
+
 def nll(true_labels, predicted_distribution):
     """Negative log likelihood
 
@@ -110,9 +144,10 @@ def accuracy(true_labels, predicted_distribution):
     """
     predicted_labels, _ = utils.tensor_argmax(predicted_distribution)
     number_of_elements = np.prod(true_labels.size())
+
     if number_of_elements == 0:
         number_of_elements = 1
-    return (true_labels == predicted_labels.int()).sum().item() / number_of_elements
+    return (true_labels == predicted_labels.type(torch.IntTensor)).sum().item() / number_of_elements
 
 
 def error(true_labels, predicted_distribution):

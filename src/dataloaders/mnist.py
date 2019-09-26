@@ -22,6 +22,7 @@ class MnistData():
 
         self.transform = torchvision.transforms.Compose([
             torchvision.transforms.ToTensor(),
+            utils.ScaleTransform(255),
             #torchvision.transforms.Normalize((0.1307,), (0.3081,)),
             utils.ReshapeTransform((-1,))
         ])
@@ -47,10 +48,12 @@ class MnistData():
         return self.n_samples
 
     def __getitem__(self, index):
-
         x = self.data[index]
-        x = self.transform(np.array(x, dtype=np.float32))/255
+        x = self.transform(np.array(x, dtype=np.float32))
         y = np.array(self.targets[index], dtype=np.long)
 
         return x, y
+
+    def get_sample(self, index):
+        return self.__getitem__(index)
 

@@ -39,27 +39,28 @@ def create_ensemble(train_loader, valid_loader, test_loader, args, num_ensemble_
 
     acc_metric = metrics.Metric(name="Acc", function=metrics.accuracy)
     prob_ensemble.add_metrics([acc_metric])
-    prob_ensemble.train(train_loader, args.num_epochs, valid_loader)
-    LOGGER.info("Ensemble accuracy on test data: {}".format(
-        get_accuracy(prob_ensemble, test_loader)))
-
+    prob_ensemble.train(train_loader, int(args.num_epochs * 1.5), valid_loader)
+    prob_ensemble.calc_metrics(test_loader)
     prob_ensemble.save_ensemble(filepath)
 
     return prob_ensemble
 
 
-def uncertainty_rotation(model, test_sample, ax):
+def uncertainty_rotation(model, test_sample):
     """Get uncertainty separation for model on rotated data set"""
 
-    test_img = test_sample[0][0].view(28, 28)
-    test_label = test_sample[1][0]
+    test_img = test_sample[0].view(28, 28)
+    test_label = test_sample[1]
 
-    num_points = 10
+    num_points = 100
     max_val = 90
     angles = torch.arange(-max_val, max_val, max_val * 2 / num_points)
 
     rotated_data_set = generate_rotated_data_set(test_img, angles)
-    plot_data_set(rotated_data_set)
+
+    angle_samples = torch.arange(-max_val, max_val, max_val * 2 / 10)
+    small_rotated_data_set = generate_rotated_data_set(test_img, angle_samples)
+    plot_data_set(small_rotated_data_set)
 
     rotated_data_set = torch.stack(
         [data_point.view(28 * 28) for data_point in rotated_data_set])
@@ -68,16 +69,16 @@ def uncertainty_rotation(model, test_sample, ax):
     tot_unc, ep_unc, al_unc = metrics.uncertainty_separation_entropy(predicted_distribution, None)
 
     LOGGER.info("True label is: {}".format(test_label))
-    LOGGER.info("Model prediction: {}".format(np.argmax(predicted_distribution, axis=-1)))
+    LOGGER.info("Model prediction: {}".format(np.argmax(predicted_distribution.detach().numpy(), axis=-1)))
 
     angles = angles.data.numpy()
-    ax.plot(angles, tot_unc.data.numpy(), 'o--')
-    ax.plot(angles, ep_unc.data.numpy(), 'o--')
-    ax.plot(angles, al_unc.data.numpy(), 'o--')
-    ax.set_xlabel('Rotation angle')
-    ax.set_ylabel('Uncertainty')
-    ax.legend(["Total", "Epistemic", "Aleatoric"])
-
+    plt.plot(angles, tot_unc.data.numpy(), 'o--')
+    plt.plot(angles, ep_unc.data.numpy(), 'o--')
+    plt.plot(angles, al_unc.data.numpy(), 'o--')
+    plt.xlabel('Rotation angle')
+    plt.ylabel('Uncertainty')
+    plt.legend(["Total", "Epistemic", "Aleatoric"])
+    plt.show()
 
 def generate_rotated_data_set(img, angles):
     """Generate a set of rotated images from a single image
@@ -95,20 +96,6 @@ def generate_rotated_data_set(img, angles):
     return data_set
 
 
-def get_accuracy(model, data_loader):
-    """Calculate accuracy of model on data in dataloader"""
-
-    accuracy = 0
-    num_batches = 0
-    for batch in data_loader:
-        inputs, labels = batch
-        predicted_distribution = model.predict(inputs)
-        accuracy += metrics.accuracy(labels, predicted_distribution)
-        num_batches += 1
-
-    return accuracy / num_batches
-
-
 def plot_data_set(data_set):
     """Plot of image data set
     Args:
@@ -117,6 +104,7 @@ def plot_data_set(data_set):
 
     # TODO: Make loop instead
     fig, axes = plt.subplots(2, 5)
+
     axes[0, 0].imshow(data_set[0])
     axes[0, 1].imshow(data_set[1])
     axes[0, 2].imshow(data_set[2])
@@ -160,24 +148,21 @@ def main():
                                               shuffle=True,
                                               num_workers=0)
 
-    num_ensemble_members = 5
+    num_ensemble_members = 20
 
-    ensemble_filepath = Path("models/mnist_ensemble_5")
+    ensemble_filepath = Path("models/mnist_ensemble_20")
+    output_size = 10
+    prob_ensemble = ensemble.Ensemble(output_size)
+    #prob_ensemble.load_ensemble(ensemble_filepath)
 
     prob_ensemble = create_ensemble(train_loader, valid_loader, test_loader,
                                     args, num_ensemble_members, ensemble_filepath)
 
     # prob_ensemble = ensemble.Ensemble()
     # prob_ensemble.load_ensemble(ensemble_filepath)
-    # LOGGER.info("Ensemble accuracy on test data: {}".format(
-    #     get_accuracy(prob_ensemble, test_loader)))
 
-    # TODO: get specific sample
-    test_sample = next(iter(test_loader))
-    fig, ax = plt.subplots(1,2)
-    uncertainty_rotation(prob_ensemble, test_sample, ax[0])
-    uncertainty_rotation(prob_ensemble.members[0], test_sample, ax[1])
-    plt.show()
+    test_sample = test_set.get_sample(5)
+    uncertainty_rotation(prob_ensemble, test_sample)
 
 
 if __name__ == "__main__":

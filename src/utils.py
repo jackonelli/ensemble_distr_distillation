@@ -15,6 +15,14 @@ class ReshapeTransform:
         return torch.reshape(img, self.new_size)
 
 
+class ScaleTransform:
+    def __init__(self, scaling_factor):
+        self.scaling_factor = scaling_factor
+
+    def __call__(self, img):
+        return img / self.scaling_factor
+
+
 def to_one_hot(labels, number_of_classes):
     """Labels is a tensor of class indices"""
     return nn.functional.one_hot(labels, number_of_classes)
