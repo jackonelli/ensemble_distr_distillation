@@ -6,8 +6,9 @@ import src.loss as custom_loss
 
 
 class SimpleRegressor(ensemble.EnsembleMember):
-    """Regression network that predicts the parameters of a normal distribution"""
-    # ELLER KAN KANSKE ANVÄnDA DENNA FÖR NIW OCKSÅ, MEN FÅR FIXA HUR JAG HANTERAR OUTPUTEN
+    """SimpleRegressor
+    Network that predicts the parameters of a normal distribution
+    """
 
     def __init__(self,
                  input_size,
@@ -17,7 +18,8 @@ class SimpleRegressor(ensemble.EnsembleMember):
                  device=torch.device("cpu"),
                  learning_rate=0.001):
 
-        super().__init__(loss_function=custom_loss.gaussian_neg_log_likelihood, device=device)
+        super().__init__(loss_function=custom_loss.gaussian_neg_log_likelihood,
+                         device=device)
 
         self.input_size = input_size
         self.hidden_size_1 = hidden_size_1  # Or make a list or something
@@ -49,11 +51,12 @@ class SimpleRegressor(ensemble.EnsembleMember):
         return torch.cat((mean, var), dim=-1)
 
     def calculate_loss(self, outputs, targets):
-        return self.loss((outputs[:, :targets.size(-1)], outputs[:, targets.size(-1):]), targets)
+        return self.loss(
+            (outputs[:, :targets.size(-1)], outputs[:, targets.size(-1):]),
+            targets)
 
     def predict(self, x):
         logits = self.forward(x)
         x = self.transform_logits(logits)
 
         return x
-
