@@ -101,7 +101,7 @@ class Ensemble():
 
         return transformed_logits
 
-    def predict(self, inputs, t=1):
+    def predict(self, inputs, t=None):
         """Ensemble prediction
         Returns the predictions of all individual ensemble members.
         The return is actually a tuple with (pred_mean, all_predictions)
@@ -116,7 +116,6 @@ class Ensemble():
         Returns:
             predictions (torch.tensor((B, N, K)))
         """
-
         batch_size = inputs.size(0)
         predictions = torch.zeros((batch_size, self.size, self.output_size))
         for member_ind, member in enumerate(self.members):

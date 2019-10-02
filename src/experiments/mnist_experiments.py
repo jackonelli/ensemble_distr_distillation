@@ -60,10 +60,10 @@ def create_ensemble(train_loader, test_loader, args, num_ensemble_members,
     for i in range(num_ensemble_members):
         LOGGER.info("Training ensemble member number {}".format(i + 1))
         member = simple_classifier.SimpleClassifier(input_size,
-                                                           hidden_size_1,
-                                                           hidden_size_2,
-                                                           output_size,
-                                                           learning_rate=args.lr)
+                                                    hidden_size_1,
+                                                    hidden_size_2,
+                                                    output_size,
+                                                    learning_rate=args.lr)
 
         prob_ensemble.add_member(member)
 

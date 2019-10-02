@@ -58,6 +58,34 @@ def entropy(predicted_distribution):
         predicted_distribution * torch.log(predicted_distribution), dim=-1)
 
 
+def uncertainty_separation_variance(predicted_distribution, true_labels):
+    """Total, epistemic and aleatoric uncertainty based on a variance measure
+
+    B = batch size, N = num predictions
+    Labels as one hot vectors
+    Note: if a batch with B samples is given,
+    then the output is a tensor with B values
+    The true labels argument is simply there for conformity
+    so that the entropy metric functions like any metric.
+
+    Args:
+        NOT USED true_labels: torch.tensor((B, 1))
+        predicted_distribution: torch.tensor((B, N, 2))
+
+    Returns:
+        Tuple of uncertainties (relative the maximum uncertainty):
+        Total uncertainty: torch.tensor(B,)
+        Epistemic uncertainty: torch.tensor(B,)
+        Aleatoric uncertainty: torch.tensor(B,)
+    """
+
+    total_uncertainty = np.var(predicted_distribution[:, :, 0], axis=-1)
+    aleatoric_uncertainty = np.mean(predicted_distribution[:, :, 1], axis=-1)
+    epistemic_uncertainty = total_uncertainty - aleatoric_uncertainty
+
+    return total_uncertainty, epistemic_uncertainty, aleatoric_uncertainty
+
+
 def uncertainty_separation_entropy(predicted_distribution, true_labels):
     """Total, epistemic and aleatoric uncertainty based on an entropy measure
 

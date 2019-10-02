@@ -80,6 +80,7 @@ def uncertainty_rotation(model, test_sample):
     plt.legend(["Total", "Epistemic", "Aleatoric"])
     plt.show()
 
+
 def generate_rotated_data_set(img, angles):
     """Generate a set of rotated images from a single image
     Args:
