@@ -1,3 +1,5 @@
+"""Test of mnist ensemble uncertainty"""
+
 import numpy as np
 import torch
 import torchvision
@@ -39,7 +41,7 @@ def create_ensemble(train_loader, valid_loader, test_loader, args, num_ensemble_
 
     acc_metric = metrics.Metric(name="Acc", function=metrics.accuracy)
     prob_ensemble.add_metrics([acc_metric])
-    prob_ensemble.train(train_loader, int(args.num_epochs * 1.5), valid_loader)
+    prob_ensemble.train(train_loader, int(args.num_epochs), valid_loader)
     prob_ensemble.calc_metrics(test_loader)
     prob_ensemble.save_ensemble(filepath)
 
@@ -80,6 +82,7 @@ def uncertainty_rotation(model, test_sample):
     plt.legend(["Total", "Epistemic", "Aleatoric"])
     plt.show()
 
+
 def generate_rotated_data_set(img, angles):
     """Generate a set of rotated images from a single image
     Args:
@@ -102,19 +105,9 @@ def plot_data_set(data_set):
         data_set (list(len=10)): list of ten images/2D ndarrays
     """
 
-    # TODO: Make loop instead
     fig, axes = plt.subplots(2, 5)
-
-    axes[0, 0].imshow(data_set[0])
-    axes[0, 1].imshow(data_set[1])
-    axes[0, 2].imshow(data_set[2])
-    axes[0, 3].imshow(data_set[3])
-    axes[0, 4].imshow(data_set[4])
-    axes[1, 0].imshow(data_set[5])
-    axes[1, 1].imshow(data_set[6])
-    axes[1, 2].imshow(data_set[7])
-    axes[1, 3].imshow(data_set[8])
-    axes[1, 4].imshow(data_set[9])
+    for i, ax in enumerate(axes.reshape(-1)):
+        ax.imshow(data_set[i])
 
     plt.setp(plt.gcf().get_axes(), xticks=[], yticks=[])
     plt.show()
@@ -148,18 +141,17 @@ def main():
                                               shuffle=True,
                                               num_workers=0)
 
-    num_ensemble_members = 20
+    num_ensemble_members = 10
 
-    ensemble_filepath = Path("models/mnist_ensemble_20")
+    ensemble_filepath = Path("models/mnist_ensemble_10")
     output_size = 10
     prob_ensemble = ensemble.Ensemble(output_size)
     #prob_ensemble.load_ensemble(ensemble_filepath)
 
-    prob_ensemble = create_ensemble(train_loader, valid_loader, test_loader,
-                                    args, num_ensemble_members, ensemble_filepath)
+    #rob_ensemble = create_ensemble(train_loader, valid_loader, test_loader,
+    #                                args, num_ensemble_members, ensemble_filepath)
 
-    # prob_ensemble = ensemble.Ensemble()
-    # prob_ensemble.load_ensemble(ensemble_filepath)
+    prob_ensemble.load_ensemble(ensemble_filepath)
 
     test_sample = test_set.get_sample(5)
     uncertainty_rotation(prob_ensemble, test_sample)

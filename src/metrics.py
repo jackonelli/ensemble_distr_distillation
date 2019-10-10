@@ -20,7 +20,7 @@ class Metric:
         return "{}: {}".format(self.name, self.mean())
 
     def update(self, labels, outputs):
-        self.running_value += self.function(labels, outputs)
+        self.running_value += self.function(outputs, labels)
         self.counter += 1
 
     def mean(self):
@@ -36,7 +36,7 @@ class Metric:
         self.counter = 0
 
 
-def entropy(predicted_distribution):
+def entropy(predicted_distribution, true_labels):
     """Entropy
 
     B = batch size, C = num classes
@@ -56,6 +56,34 @@ def entropy(predicted_distribution):
 
     return -torch.sum(
         predicted_distribution * torch.log(predicted_distribution), dim=-1)
+
+
+def uncertainty_separation_variance(predicted_distribution, true_labels):
+    """Total, epistemic and aleatoric uncertainty based on a variance measure
+
+    B = batch size, N = num predictions
+    Labels as one hot vectors
+    Note: if a batch with B samples is given,
+    then the output is a tensor with B values
+    The true labels argument is simply there for conformity
+    so that the entropy metric functions like any metric.
+
+    Args:
+        NOT USED true_labels: torch.tensor((B, 1))
+        predicted_distribution: torch.tensor((B, N, 2))
+
+    Returns:
+        Tuple of uncertainties (relative the maximum uncertainty):
+        Total uncertainty: torch.tensor(B,)
+        Epistemic uncertainty: torch.tensor(B,)
+        Aleatoric uncertainty: torch.tensor(B,)
+    """
+
+    total_uncertainty = np.var(predicted_distribution[:, :, 0], axis=-1)
+    aleatoric_uncertainty = np.mean(predicted_distribution[:, :, 1], axis=-1)
+    epistemic_uncertainty = total_uncertainty - aleatoric_uncertainty
+
+    return total_uncertainty, epistemic_uncertainty, aleatoric_uncertainty
 
 
 def uncertainty_separation_entropy(predicted_distribution, true_labels):
@@ -95,7 +123,7 @@ def uncertainty_separation_entropy(predicted_distribution, true_labels):
     return total_uncertainty, epistemic_uncertainty, aleatoric_uncertainty
 
 
-def nll(true_labels, predicted_distribution):
+def nll(predicted_distribution, true_labels):
     """Negative log likelihood
 
     B = batch size, C = num classes
@@ -116,7 +144,7 @@ def nll(true_labels, predicted_distribution):
                       dim=-1)
 
 
-def brier_score(true_labels, predicted_distribution):
+def brier_score(predicted_distribution, true_labels):
     """Brier score
 
     B = batch size, C = num classes
@@ -134,7 +162,7 @@ def brier_score(true_labels, predicted_distribution):
     true_labels_float = true_labels.float()
 
 
-def accuracy(true_labels, predicted_distribution):
+def accuracy(predicted_distribution, true_labels):
     """ Accuracy
     B = batch size
 
@@ -154,7 +182,7 @@ def accuracy(true_labels, predicted_distribution):
             ).sum().item() / number_of_elements
 
 
-def error(true_labels, predicted_distribution):
+def error(predicted_distribution, true_labels):
     """ Error
     B = batch size
 
@@ -173,7 +201,7 @@ def error(true_labels, predicted_distribution):
     return (true_labels != predicted_labels).sum().item() / number_of_elements
 
 
-def squared_error(targets, predictions):
+def squared_error(predictions, targets):
     """ Error
     B = batch size
     D = output dimension

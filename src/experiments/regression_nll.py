@@ -1,3 +1,5 @@
+"""Regression experiment with NIW nll loss for distilled model"""
+
 from pathlib import Path
 from datetime import datetime
 import logging

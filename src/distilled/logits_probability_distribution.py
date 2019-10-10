@@ -4,6 +4,7 @@ import torch.optim as torch_optim
 import src.loss as custom_loss
 import src.distilled.distilled_network as distilled_network
 
+
 class LogitsProbabilityDistribution(distilled_network.DistilledNet):
     def __init__(self,
                  input_size,
@@ -47,7 +48,7 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
         x = self.fc3(x)
 
         mean = x[:, :int((self.output_size / 2))]
-        var = torch.exp(x[:, int((self.output_size / 2)):])
+        var = torch.exp(-x[:, int((self.output_size / 2)):])
 
         return mean, var
 
@@ -61,13 +62,29 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
         are the logits themselves
         """
 
-        return self.teacher.get_logits(inputs)
+        logits = self.teacher.get_logits(inputs)
 
-    def predict(self, input_):
+        scaled_logits = logits - torch.stack([logits[:, :, -1]], axis=-1)
+
+        return scaled_logits[:, :, 0:-1]  # ???
+
+    def predict(self, input_, num_samples=None):
         """Predict parameters
         Wrapper function for the forward function.
         """
-        return torch.cat(self.forward(input_), dim=-1)
+
+        if num_samples is None:
+            num_samples = len(self.teacher.members)
+
+        mean, var = self.forward(input_)
+
+        samples = torch.zeros([input_.size(0), num_samples, int(self.output_size / 2)])
+        for i in range(input_.size(0)):
+            rv = torch.distributions.multivariate_normal.MultivariateNormal(loc=mean[i, :],
+                                                                            covariance_matrix=torch.diag(var[i, :]))
+            samples[i, :, :] = rv.rsample([num_samples])
+
+        return torch.nn.Softmax(dim=-1)(samples)
 
     def calculate_loss(self, outputs, teacher_predictions, labels=None):
         """Calculate loss function
