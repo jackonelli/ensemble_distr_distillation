@@ -18,8 +18,9 @@ class SimpleRegressor(ensemble.EnsembleMember):
                  device=torch.device("cpu"),
                  learning_rate=0.001):
 
-        super().__init__(loss_function=custom_loss.gaussian_neg_log_likelihood,
-                         device=device)
+        super().__init__(
+            loss_function=custom_loss.gaussian_neg_log_likelihood_1d,
+            device=device)
 
         self.input_size = input_size
         self.hidden_size_1 = hidden_size_1  # Or make a list or something
@@ -41,19 +42,21 @@ class SimpleRegressor(ensemble.EnsembleMember):
         x = nn.functional.relu(self.fc1(x))
         x = nn.functional.relu(self.fc2(x))
         x = self.fc3(x)
+        # Add normalise here?
 
         return x
 
     def transform_logits(self, logits):
-        mean = logits[:, :int((self.output_size / 2))]
-        var = torch.exp(logits[:, int((self.output_size / 2)):])
+        # mean = logits[:, :int((self.output_size / 2))]
+        # var = torch.exp(logits[:, int((self.output_size / 2)):])
 
-        return torch.cat((mean, var), dim=-1)
+        outputs = logits
+        outputs[:, 1] = torch.exp(outputs[:, 1])
+
+        return outputs
 
     def calculate_loss(self, outputs, targets):
-        return self.loss(
-            (outputs[:, :targets.size(-1)], outputs[:, targets.size(-1):]),
-            targets)
+        return self.loss(outputs, targets)
 
     def predict(self, x):
         logits = self.forward(x)

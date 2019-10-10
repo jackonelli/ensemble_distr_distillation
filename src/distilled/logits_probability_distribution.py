@@ -15,10 +15,9 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
                  device=torch.device('cpu'),
                  use_hard_labels=False,
                  learning_rate=0.001):
-        super().__init__(
-            teacher=teacher,
-            loss_function=custom_loss.gaussian_neg_log_likelihood,
-            device=device)
+        super().__init__(teacher=teacher,
+                         loss_function=custom_loss.gaussian_neg_log_likelihood,
+                         device=device)
 
         self.input_size = input_size
         self.hidden_size_1 = hidden_size_1  # Or make a list or something
@@ -64,7 +63,7 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
 
         logits = self.teacher.get_logits(inputs)
 
-        scaled_logits = logits - torch.stack([logits[:, :, -1]], axis=-1)
+        scaled_logits = logits  # - torch.stack([logits[:, :, -1]], axis=-1)
 
         return scaled_logits[:, :, 0:-1]  # ???
 
@@ -78,10 +77,12 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
 
         mean, var = self.forward(input_)
 
-        samples = torch.zeros([input_.size(0), num_samples, int(self.output_size / 2)])
+        samples = torch.zeros(
+            [input_.size(0), num_samples,
+             int(self.output_size / 2)])
         for i in range(input_.size(0)):
-            rv = torch.distributions.multivariate_normal.MultivariateNormal(loc=mean[i, :],
-                                                                            covariance_matrix=torch.diag(var[i, :]))
+            rv = torch.distributions.multivariate_normal.MultivariateNormal(
+                loc=mean[i, :], covariance_matrix=torch.diag(var[i, :]))
             samples[i, :, :] = rv.rsample([num_samples])
 
         return torch.nn.Softmax(dim=-1)(samples)

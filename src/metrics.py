@@ -58,11 +58,32 @@ def entropy(predicted_distribution, true_labels):
         predicted_distribution * torch.log(predicted_distribution), dim=-1)
 
 
+def uncertainty_separation_parametric(mu, var):
+    """Total, epistemic and aleatoric uncertainty
+
+    based on a parametric (normal) variance measure
+
+    M = length of input data x, N = number of distributions
+
+    Args:
+        mu: torch.tensor((M, N)): E(y|x) for M x and N distr.
+        var: torch.tensor((M, N)): var(y|x) for M x and N distr.
+
+    Returns:
+        aleatoric_uncertainty: torch.tensor((M)):
+            E_theta[var(y|x, theta)] for M x and N distr.
+        epistemic_uncertainty: torch.tensor((M)):
+            var_theta[E(y|x, theta)] for M x and N distr.
+    """
+    epistemic_uncertainty = torch.var(mu, dim=1)
+    aleatoric_uncertainty = torch.mean(var, dim=1)
+    return aleatoric_uncertainty, epistemic_uncertainty
+
+
 def uncertainty_separation_variance(predicted_distribution, true_labels):
     """Total, epistemic and aleatoric uncertainty based on a variance measure
 
     B = batch size, N = num predictions
-    Labels as one hot vectors
     Note: if a batch with B samples is given,
     then the output is a tensor with B values
     The true labels argument is simply there for conformity

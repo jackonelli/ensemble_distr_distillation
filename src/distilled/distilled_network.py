@@ -17,7 +17,8 @@ class DistilledNet(nn.Module, ABC):
         self.metrics = dict()
         if self.loss is None or not issubclass(type(self.loss),
                                                nn.modules.loss._Loss):
-            # raise ValueError("Must assign proper loss function to child.loss.")
+            # raise ValueError(
+            #   "Must assign proper loss function to child.loss.")
             self._log.warning(
                 "Must assign proper loss function to child.loss.")
         self.optimizer = None
@@ -64,14 +65,15 @@ class DistilledNet(nn.Module, ABC):
             running_loss += loss.item()
 
             if validation_loader is None:
-                self._update_metrics(outputs, labels)  # Did I (Amanda) add this, because it seems now that it does not make sense?
+                self._update_metrics(outputs, labels)
 
         if validation_loader is not None:
             # We will compare here with the teacher predictions
             for valid_batch in validation_loader:
                 valid_inputs, valid_labels = valid_batch
                 valid_outputs = self.forward(valid_inputs)
-                teacher_predictions = self._generate_teacher_predictions(inputs)
+                teacher_predictions = self._generate_teacher_predictions(
+                    inputs)
                 self._update_metrics(valid_outputs, teacher_predictions)
 
         return running_loss

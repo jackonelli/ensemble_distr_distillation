@@ -47,6 +47,27 @@ def _dirichlet_sufficient_statistics(target_distribution):
     return torch.mean(torch.log(target_distribution), 1)
 
 
+def gaussian_neg_log_likelihood_1d(parameters, target):
+    """Negative log likelihood loss for 1D Gaussian distribution
+    B = batch size, 2
+
+    Args:
+        parameters (torch.tensor((B, 2)), torch.tensor((B, 1))):
+            mean values and variances of y|x for every x in
+            batch.
+        target (torch.tensor((B, 1))): sample from the normal
+            distribution, if not an ensemble prediction N=1.
+    """
+
+    mean = parameters[:, 0]
+    var = parameters[:, 1]
+    # print("mean", mean.shape)
+    # print("target", target.shape)
+    neg_log_prob = 1 / (2 * var) * (target[:, 0] -
+                                    mean)**2 + 0.5 * torch.log(var)
+    return torch.mean(neg_log_prob)
+
+
 def gaussian_neg_log_likelihood(parameters, target, scale=None):
     """Negative log likelihood loss for the Gaussian distribution
     B = batch size, D = dimension of target (num classes), N = ensemble size
@@ -76,14 +97,19 @@ def gaussian_neg_log_likelihood(parameters, target, scale=None):
     for i in np.arange(target.size(1)):
 
         if var.dim() == 2:
-            cov_mat = [torch.diag(var[b, :]) for b in np.arange(target.size(0))]
+            cov_mat = [
+                torch.diag(var[b, :]) for b in np.arange(target.size(0))
+            ]
         else:
-            cov_mat = [torch.diag(var[b, i, :]) for b in np.arange(target.size(0))]
+            cov_mat = [
+                torch.diag(var[b, i, :]) for b in np.arange(target.size(0))
+            ]
 
         normalizer += torch.stack([
             0.5 * (target.size(-1) * torch.log(torch.tensor(2 * np.pi)) +
                    torch.log(torch.det(cov_mat_i))) for cov_mat_i in cov_mat
-        ], dim=0) / target.size(1)
+        ],
+                                  dim=0) / target.size(1)
 
         ll += torch.stack([
             0.5 * torch.matmul(
@@ -91,7 +117,8 @@ def gaussian_neg_log_likelihood(parameters, target, scale=None):
                              (1 / scale[b]) * torch.inverse(cov_mat_i)),
                 torch.transpose((target[b, i, :] - mean[b, :]), 0, -1))
             for b, cov_mat_i in enumerate(cov_mat)
-        ], dim=0) / target.size(1)  # Mean over ensemble members
+        ],
+                          dim=0) / target.size(1)  # Mean over ensemble members
 
     t = torch.mean(normalizer + ll)
     return torch.mean(normalizer + ll)  # Mean over batch
