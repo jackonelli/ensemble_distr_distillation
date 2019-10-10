@@ -83,8 +83,7 @@ def gaussian_neg_log_likelihood(parameters, target, scale=None):
         normalizer += torch.stack([
             0.5 * (target.size(-1) * torch.log(torch.tensor(2 * np.pi)) +
                    torch.log(torch.det(cov_mat_i))) for cov_mat_i in cov_mat
-        ],
-                                  dim=0) / target.size(1)
+        ], dim=0) / target.size(1)
 
         ll += torch.stack([
             0.5 * torch.matmul(
@@ -92,9 +91,9 @@ def gaussian_neg_log_likelihood(parameters, target, scale=None):
                              (1 / scale[b]) * torch.inverse(cov_mat_i)),
                 torch.transpose((target[b, i, :] - mean[b, :]), 0, -1))
             for b, cov_mat_i in enumerate(cov_mat)
-        ],
-                          dim=0) / target.size(1)  # Mean over ensemble members
+        ], dim=0) / target.size(1)  # Mean over ensemble members
 
+    t = torch.mean(normalizer + ll)
     return torch.mean(normalizer + ll)  # Mean over batch
 
 

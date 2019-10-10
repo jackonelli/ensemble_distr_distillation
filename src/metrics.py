@@ -20,7 +20,7 @@ class Metric:
         return "{}: {}".format(self.name, self.mean())
 
     def update(self, labels, outputs):
-        self.running_value += self.function(labels, outputs)
+        self.running_value += self.function(outputs, labels)
         self.counter += 1
 
     def mean(self):
@@ -36,7 +36,7 @@ class Metric:
         self.counter = 0
 
 
-def entropy(predicted_distribution):
+def entropy(predicted_distribution, true_labels):
     """Entropy
 
     B = batch size, C = num classes
@@ -123,7 +123,7 @@ def uncertainty_separation_entropy(predicted_distribution, true_labels):
     return total_uncertainty, epistemic_uncertainty, aleatoric_uncertainty
 
 
-def nll(true_labels, predicted_distribution):
+def nll(predicted_distribution, true_labels):
     """Negative log likelihood
 
     B = batch size, C = num classes
@@ -144,7 +144,7 @@ def nll(true_labels, predicted_distribution):
                       dim=-1)
 
 
-def brier_score(true_labels, predicted_distribution):
+def brier_score(predicted_distribution, true_labels):
     """Brier score
 
     B = batch size, C = num classes
@@ -162,7 +162,7 @@ def brier_score(true_labels, predicted_distribution):
     true_labels_float = true_labels.float()
 
 
-def accuracy(true_labels, predicted_distribution):
+def accuracy(predicted_distribution, true_labels):
     """ Accuracy
     B = batch size
 
@@ -182,7 +182,7 @@ def accuracy(true_labels, predicted_distribution):
             ).sum().item() / number_of_elements
 
 
-def error(true_labels, predicted_distribution):
+def error(predicted_distribution, true_labels):
     """ Error
     B = batch size
 
@@ -201,7 +201,7 @@ def error(true_labels, predicted_distribution):
     return (true_labels != predicted_labels).sum().item() / number_of_elements
 
 
-def squared_error(targets, predictions):
+def squared_error(predictions, targets):
     """ Error
     B = batch size
     D = output dimension

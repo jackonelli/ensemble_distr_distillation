@@ -1,3 +1,5 @@
+"""Test of mnist ensemble and distilled model"""
+
 import numpy as np
 import torch
 import torchvision
@@ -11,7 +13,7 @@ import src.metrics as metrics
 import src.utils as utils
 from src.dataloaders import mnist
 from src.ensemble import simple_classifier
-
+from src.distilled import logits_probability_distribution
 
 LOGGER = logging.getLogger(__name__)
 
@@ -28,20 +30,20 @@ def create_distilled_model(train_loader,
     input_size = 784
     hidden_size_1 = 54
     hidden_size_2 = 32
-    output_size = 10
+    output_size = 18
 
     distilled_model = class_type(input_size,
                                  hidden_size_1,
                                  hidden_size_2,
                                  output_size,
                                  prob_ensemble,
-                                 learning_rate=args.lr * 10)
+                                 learning_rate=args.lr * 0.1)
 
-    distilled_model.train(train_loader, args.num_epochs, t=1)
+    distilled_model.train(train_loader, args.num_epochs)
+    torch.save(distilled_model, filepath)
+
     LOGGER.info("Distilled model accuracy on test data: {}".format(
         get_accuracy(distilled_model, test_loader)))
-
-    torch.save(distilled_model, filepath)
 
     return distilled_model
 
@@ -116,28 +118,6 @@ def entropy_comparison_rotation(prob_ensemble, distilled_model, test_sample):
     plt.ylabel('Entropy')
     plt.legend(["Ensemble", "Ensemble member", "Distilled model"])
     plt.show()
-
-
-def dirichlet_test(train_loader, test_loader, args, ensemble):
-    """Train a distilled network that uses a Dirichlet distribution for prediction"""
-
-    filepath = Path("models/distilled_model_dirichlet_best_yet_test_t1")
-    #distilled_model_dirichlet = create_distilled_model(
-    #   train_loader, test_loader, args, ensemble, filepath,
-    #  distilled_network.DirichletProbabilityDistribution)
-
-    distilled_model_dirichlet = torch.load(filepath)
-
-    distilled_model_dirichlet.train(train_loader, args.num_epochs * 2, t=1)
-    torch.save(
-        distilled_model_dirichlet,
-        Path(
-            "models/distilled_model_dirichlet_best_yet_test_t1_more_training"))
-
-    LOGGER.info("Distilled model accuracy on train data: {}".format(
-        get_accuracy(distilled_model_dirichlet, train_loader)))
-    LOGGER.info("Accuracy on test data: {}".format(
-        get_accuracy(distilled_model_dirichlet, test_loader)))
 
 
 def generate_rotated_data_set(img, angles):
@@ -314,8 +294,6 @@ def entropy_histogram(ensemble, model, test_loader):
 
     plt.show()
 
-    # Detta verkar ge ganska lika resultat? Men för det enkla 2d-fallet observerade jag skillnad för en mindre ensemble-size
-
 
 def plot_data_set(data_set):
     """Plot of image data set
@@ -324,16 +302,9 @@ def plot_data_set(data_set):
     """
 
     fig, axes = plt.subplots(2, 5)
-    axes[0, 0].imshow(data_set[0])
-    axes[0, 1].imshow(data_set[1])
-    axes[0, 2].imshow(data_set[2])
-    axes[0, 3].imshow(data_set[3])
-    axes[0, 4].imshow(data_set[4])
-    axes[1, 0].imshow(data_set[5])
-    axes[1, 1].imshow(data_set[6])
-    axes[1, 2].imshow(data_set[7])
-    axes[1, 3].imshow(data_set[8])
-    axes[1, 4].imshow(data_set[9])
+
+    for i, ax in enumerate(axes.reshape(-1)):
+        ax.imshow(data_set[i])
 
     plt.setp(plt.gcf().get_axes(), xticks=[], yticks=[])
     plt.show()
@@ -354,26 +325,26 @@ def main():
     train_loader = torch.utils.data.DataLoader(train_set,
                                                batch_size=32,
                                                shuffle=True,
-                                               num_workers=1)
+                                               num_workers=0)
 
     test_loader = torch.utils.data.DataLoader(test_set,
                                               batch_size=4,
                                               shuffle=True,
-                                              num_workers=1)
+                                              num_workers=0)
 
     #num_ensemble_members = 10
 
-    ensemble_filepath = Path("models/mnist_ensemble_2")
-    distilled_model_filepath = Path("models/distilled_model_dirichlet_test")
+    ensemble_filepath = Path("models/mnist_ensemble_10")
+    distilled_model_filepath = Path("models/distilled_mnist_logits_model")
 
-    #prob_ensemble = create_ensemble(train_loader, test_loader, args, num_ensemble_members, ensemble_filepath)
-
-    prob_ensemble = ensemble.Ensemble()
+    prob_ensemble = ensemble.Ensemble(output_size=10)
     prob_ensemble.load_ensemble(ensemble_filepath)
-    LOGGER.info("Ensemble accuracy on test data: {}".format(
-        get_accuracy(prob_ensemble, test_loader)))
+    prob_ensemble.calc_metrics(test_loader)
 
-    class_type = dirichlet_probability_distribution.DirichletProbabilityDistribution
+    test_samples, y = next(iter(test_loader))
+    print(prob_ensemble.get_logits(test_samples))
+
+    class_type = logits_probability_distribution.LogitsProbabilityDistribution
     distilled_model = create_distilled_model(train_loader, test_loader, args,
                                              prob_ensemble,
                                              distilled_model_filepath,
@@ -381,10 +352,10 @@ def main():
 
     #distilled_model = torch.load(distilled_model_filepath)
 
-    #dirichlet_test(train_loader, test_loader, args, prob_ensemble)
     #effect_of_ensemble_size(prob_ensemble, train_loader, test_loader, args)
     entropy_histogram(prob_ensemble, distilled_model, test_loader)
-    test_sample = next(iter(test_loader))
+
+    test_sample = test_set.get_sample(5)
     entropy_comparison_rotation(prob_ensemble, distilled_model, test_sample)
     #noise_effect_on_entropy(distilled_model, prob_ensemble, test_loader)
 

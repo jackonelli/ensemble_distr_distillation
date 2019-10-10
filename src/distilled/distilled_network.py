@@ -24,7 +24,7 @@ class DistilledNet(nn.Module, ABC):
         self._log.info("Moving model to device: {}".format(device))
         self.device = device
 
-    def train(self, train_loader, num_epochs):
+    def train(self, train_loader, num_epochs, validation_loader=None):
         """ Common train method for all distilled networks
         Should NOT be overridden!
         """
@@ -36,12 +36,12 @@ class DistilledNet(nn.Module, ABC):
 
         self._log.info("Training distilled network.")
         for epoch_number in range(1, num_epochs + 1):
-            loss = self._train_epoch(train_loader)
+            loss = self._train_epoch(train_loader, validation_loader)
             self._print_epoch(epoch_number, loss)
             if self._learning_rate_condition(epoch_number):
                 scheduler.step()
 
-    def _train_epoch(self, train_loader):
+    def _train_epoch(self, train_loader, validation_loader=None):
         """Common train epoch method for all distilled networks
         Should NOT be overridden!
         TODO: Make sure train_loader returns None for labels,
@@ -62,7 +62,18 @@ class DistilledNet(nn.Module, ABC):
             loss.backward()
             self.optimizer.step()
             running_loss += loss.item()
-            self._update_metrics(outputs, labels)
+
+            if validation_loader is None:
+                self._update_metrics(outputs, labels)  # Did I (Amanda) add this, because it seems now that it does not make sense?
+
+        if validation_loader is not None:
+            # We will compare here with the teacher predictions
+            for valid_batch in validation_loader:
+                valid_inputs, valid_labels = valid_batch
+                valid_outputs = self.forward(valid_inputs)
+                teacher_predictions = self._generate_teacher_predictions(inputs)
+                self._update_metrics(valid_outputs, teacher_predictions)
+
         return running_loss
 
     def _generate_teacher_predictions(self, inputs):
@@ -78,7 +89,21 @@ class DistilledNet(nn.Module, ABC):
         logits = self.teacher.get_logits(inputs)
         return self.teacher.transform_logits(logits)
 
-    def _add_metric(self, metric):
+    def calc_metrics(self, data_loader):
+        self._reset_metrics()
+
+        for batch in data_loader:
+            inputs, targets = batch
+            logits = self.forward(inputs)
+            outputs = self.transform_logits(logits)
+            self._update_metrics(outputs, targets)
+
+        metric_string = ""
+        for metric in self.metrics.values():
+            metric_string += " {}".format(metric)
+        self._log.info(metric_string)
+
+    def add_metric(self, metric):
         self.metrics[metric.name] = metric
 
     def _update_metrics(self, outputs, labels):

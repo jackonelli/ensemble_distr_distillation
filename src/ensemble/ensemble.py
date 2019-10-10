@@ -7,6 +7,7 @@ import torch.optim as torch_optim
 import src.metrics as metrics
 
 
+# TODO: I added the option in the ensemble-members to be able to calculate metrics on new data, maybe we should have a similar ensemble-level option
 class Ensemble():
     def __init__(self, output_size):
         """The ensemble member needs to track the size
@@ -33,12 +34,12 @@ class Ensemble():
         for _ in range(number_of):
             self.add_member(constructor())
 
-    def train(self, train_loader, num_epochs, valid_loader=None):
+    def train(self, train_loader, num_epochs, validation_loader=None):
         """Multithreaded?"""
         self._log.info("Training ensemble")
         for ind, member in enumerate(self.members):
             self._log.info("Training member {}/{}".format(ind + 1, self.size))
-            member.train(train_loader, num_epochs, valid_loader)
+            member.train(train_loader, num_epochs, validation_loader)
 
     def add_metrics(self, metrics_list):
         for metric in metrics_list:
@@ -54,7 +55,6 @@ class Ensemble():
     def calc_metrics(self, data_loader):
         for member in self.members:
             member.calc_metrics(data_loader)
-
 
     def get_logits(self, inputs):
         """Ensemble logits
@@ -208,8 +208,9 @@ class EnsembleMember(nn.Module, ABC):
                 valid_inputs, valid_labels = valid_batch
                 valid_logits = self.forward(valid_inputs)
                 valid_outputs = self.transform_logits(valid_logits)
-
                 self._update_metrics(valid_outputs, valid_labels)
+
+                # Will automatically cal
 
         return running_loss
 
@@ -271,5 +272,5 @@ class EnsembleMember(nn.Module, ABC):
         """
 
     @abstractmethod
-    def calculate_loss(self, outputs, labels):
+    def calculate_loss(self, labels, outputs):
         """Calculates loss"""

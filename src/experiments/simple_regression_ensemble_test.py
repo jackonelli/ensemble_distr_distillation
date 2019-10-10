@@ -1,3 +1,5 @@
+"""Test of uncertainty in simple nll regression ensemble"""
+
 from pathlib import Path
 from datetime import datetime
 import logging
