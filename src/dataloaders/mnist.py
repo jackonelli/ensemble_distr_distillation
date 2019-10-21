@@ -3,6 +3,7 @@ import torchvision
 import src.utils as utils
 import numpy as np
 
+
 class MnistData():
     """MNIST data wrapper
     Create instance like this:
@@ -35,6 +36,7 @@ class MnistData():
         if train and data_set == 'train':
             self.data = self.set.data[:50000, :, :]
             self.targets = self.set.targets[:50000]
+
         elif train and data_set == 'validation':
             self.data = self.set.data[50000:, :, :]
             self.targets = self.set.targets[50000:]

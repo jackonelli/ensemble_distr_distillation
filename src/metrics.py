@@ -15,6 +15,7 @@ class Metric:
         self.function = function
         self.running_value = 0.0
         self.counter = 0
+        self.memory = []  # So that we can go back an look at the data, should not take to much storage room
 
     def __str__(self):
         return "{}: {}".format(self.name, self.mean())
@@ -32,6 +33,7 @@ class Metric:
         return mean
 
     def reset(self):
+        self.memory.append(self.mean())
         self.running_value = 0.0
         self.counter = 0
 
@@ -95,7 +97,6 @@ def uncertainty_separation_entropy(predicted_distribution, true_labels):
     then the output is a tensor with B values
     The true labels argument is simply there for conformity
     so that the entropy metric functions like any metric.
-    # TODO: Remove true_labels, because we never call this metric
     in the same context as the other metrices?
 
     Args:

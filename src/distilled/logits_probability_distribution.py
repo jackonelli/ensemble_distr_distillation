@@ -48,7 +48,7 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
         x = self.fc3(x)
 
         mean = x[:, :int((self.output_size / 2))]
-        var = torch.exp(-x[:, int((self.output_size / 2)):])
+        var = torch.exp(x[:, int((self.output_size / 2)):])
 
         return mean, var
 
@@ -66,7 +66,7 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
 
         scaled_logits = logits - torch.stack([logits[:, :, -1]], axis=-1)
 
-        return scaled_logits[:, :, 0:-1]  # ???
+        return scaled_logits[:, :, 0:-1]
 
     def predict(self, input_, num_samples=None):
         """Predict parameters
@@ -84,7 +84,9 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
                                                                             covariance_matrix=torch.diag(var[i, :]))
             samples[i, :, :] = rv.rsample([num_samples])
 
-        return torch.nn.Softmax(dim=-1)(samples)
+        softmax_samples = torch.exp(samples) / (torch.sum(torch.exp(samples), dim=-1, keepdim=True) + 1)
+
+        return softmax_samples
 
     def calculate_loss(self, outputs, teacher_predictions, labels=None):
         """Calculate loss function

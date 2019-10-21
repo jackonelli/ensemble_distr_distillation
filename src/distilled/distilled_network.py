@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 import torch
 import torch.nn as nn
 import torch.optim as torch_optim
+import math
 
 
 class DistilledNet(nn.Module, ABC):
@@ -48,7 +49,7 @@ class DistilledNet(nn.Module, ABC):
         if no labels are available.
         """
         running_loss = 0
-        self._reset_metrics()
+        #self._reset_metrics()
         for batch in train_loader:
             self.optimizer.zero_grad()
             inputs, labels = batch
@@ -63,15 +64,20 @@ class DistilledNet(nn.Module, ABC):
             self.optimizer.step()
             running_loss += loss.item()
 
+            if math.isnan(running_loss):
+                break;
+
             if validation_loader is None:
-                self._update_metrics(outputs, labels)  # Did I (Amanda) add this, because it seems now that it does not make sense?
+                self._reset_metrics()
+                self._update_metrics(outputs, teacher_predictions)  # BUT THIS DOES NOT WORK FOR EG ACCURACY
 
         if validation_loader is not None:
             # We will compare here with the teacher predictions
             for valid_batch in validation_loader:
+                self._reset_metrics()
                 valid_inputs, valid_labels = valid_batch
                 valid_outputs = self.forward(valid_inputs)
-                teacher_predictions = self._generate_teacher_predictions(inputs)
+                teacher_predictions = self._generate_teacher_predictions(valid_inputs)
                 self._update_metrics(valid_outputs, teacher_predictions)
 
         return running_loss

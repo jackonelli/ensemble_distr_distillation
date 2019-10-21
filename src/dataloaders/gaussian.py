@@ -15,6 +15,7 @@ class SyntheticGaussianData(torch.utils.data.Dataset):
                  store_file,
                  reuse_data=False,
                  n_samples=1000,
+                 sample=True,
                  ratio_0_to_1=0.5):
         super(SyntheticGaussianData).__init__()
         self._log = logging.getLogger(self.__class__.__name__)
@@ -23,6 +24,7 @@ class SyntheticGaussianData(torch.utils.data.Dataset):
         self.cov_0 = np.array(cov_0)
         self.cov_1 = np.array(cov_1)
         self.n_samples = n_samples
+        self.sample = sample
         self.ratio_0_to_1 = ratio_0_to_1
         self.file = Path(store_file)
         if self.file.exists() and reuse_data:
@@ -66,19 +68,34 @@ class SyntheticGaussianData(torch.utils.data.Dataset):
 
     def sample_new_data(self):
         self.file.parent.mkdir(parents=True, exist_ok=True)
-        size_0 = int(np.floor(self.n_samples * self.ratio_0_to_1))
-        size_1 = self.n_samples - size_0
-        sampled_x_0 = np.random.multivariate_normal(mean=self.mean_0,
-                                                    cov=self.cov_0,
-                                                    size=size_0)
-        y_0 = np.zeros((size_0, 1))
-        sampled_x_1 = np.random.multivariate_normal(mean=self.mean_1,
-                                                    cov=self.cov_1,
-                                                    size=size_1)
-        y_1 = np.ones((size_1, 1))
 
-        all_x = np.row_stack((sampled_x_0, sampled_x_1))
-        all_y = np.row_stack((y_0, y_1))
+        if self.sample:
+            size_0 = int(np.floor(self.n_samples * self.ratio_0_to_1))
+            size_1 = self.n_samples - size_0
+
+            sampled_x_0 = np.random.multivariate_normal(mean=self.mean_0,
+                                                        cov=self.cov_0,
+                                                        size=size_0)
+            y_0 = np.zeros((size_0, 1))
+            sampled_x_1 = np.random.multivariate_normal(mean=self.mean_1,
+                                                        cov=self.cov_1,
+                                                        size=size_1)
+            y_1 = np.ones((size_1, 1))
+
+            all_x = np.row_stack((sampled_x_0, sampled_x_1))
+            all_y = np.row_stack((y_0, y_1))
+
+        else:
+            x_min = -4
+            x_max = 3
+            num_points = 1000
+            x_0, x_1 = np.linspace(x_min, x_max, num_points), np.linspace(x_min, x_max, num_points)
+            x_0, x_1 = np.meshgrid(x_0, x_1)
+            all_x = torch.tensor(np.column_stack((x_0.reshape(num_points ** 2, 1), x_1.reshape(num_points ** 2, 1))),
+                                 dtype=torch.float32)
+            # Note: this is just a placeholder
+            all_y = np.zeros((num_points**2, 1))
+
         combined_data = np.column_stack((all_x, all_y))
         np.random.shuffle(combined_data)
         np.savetxt(self.file, combined_data, delimiter=",")
