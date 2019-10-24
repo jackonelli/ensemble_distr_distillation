@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 import torch.optim as torch_optim
 import math
+import src.loss as custom_loss
 
 
 class DistilledNet(nn.Module, ABC):
@@ -16,8 +17,7 @@ class DistilledNet(nn.Module, ABC):
         self.teacher = teacher
         self.loss = loss_function
         self.metrics = dict()
-        if self.loss is None or not issubclass(type(self.loss),
-                                               nn.modules.loss._Loss):
+        if self.loss is None or not issubclass(type(self.loss), nn.modules.loss._Loss):
             # raise ValueError("Must assign proper loss function to child.loss.")
             self._log.warning(
                 "Must assign proper loss function to child.loss.")
@@ -33,10 +33,12 @@ class DistilledNet(nn.Module, ABC):
         scheduler = torch_optim.lr_scheduler.StepLR(self.optimizer,
                                                     step_size=5,
                                                     gamma=0.1)
+
         self.use_hard_labels = False
 
         self._log.info("Training distilled network.")
         for epoch_number in range(1, num_epochs + 1):
+
             loss = self._train_epoch(train_loader, validation_loader)
             self._print_epoch(epoch_number, loss)
             if self._learning_rate_condition(epoch_number):
@@ -49,7 +51,7 @@ class DistilledNet(nn.Module, ABC):
         if no labels are available.
         """
         running_loss = 0
-        #self._reset_metrics()
+        self._reset_metrics()
         for batch in train_loader:
             self.optimizer.zero_grad()
             inputs, labels = batch
@@ -65,16 +67,19 @@ class DistilledNet(nn.Module, ABC):
             running_loss += loss.item()
 
             if math.isnan(running_loss):
-                break;
+                self._log.info("Warning: loss is nan.")
+                break
 
             if validation_loader is None:
-                self._reset_metrics()
+                # Uncomment if you want metric over batch:
+                # self._reset_metrics()
                 self._update_metrics(outputs, teacher_predictions)  # BUT THIS DOES NOT WORK FOR EG ACCURACY
 
         if validation_loader is not None:
             # We will compare here with the teacher predictions
             for valid_batch in validation_loader:
-                self._reset_metrics()
+                # Uncomment if you want metric over batch:
+                # self._reset_metrics()
                 valid_inputs, valid_labels = valid_batch
                 valid_outputs = self.forward(valid_inputs)
                 teacher_predictions = self._generate_teacher_predictions(valid_inputs)

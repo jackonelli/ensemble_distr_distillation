@@ -14,7 +14,10 @@ import src.utils as utils
 from src.dataloaders import mnist
 from src.ensemble import simple_classifier
 from src.distilled import logits_probability_distribution
+from src.distilled import dummy_logits_probability_distribution
 import src.loss as custom_loss
+import seaborn
+import pandas
 
 LOGGER = logging.getLogger(__name__)
 
@@ -39,16 +42,16 @@ def create_distilled_model(train_loader,
                                  hidden_size_2,
                                  output_size,
                                  prob_ensemble,
-                                 learning_rate=args.lr * 0.001)
+                                 learning_rate=args.lr * 0.1)
 
-    loss_metric = metrics.Metric(name="Mean val loss", function=distilled_model.calculate_loss)
-    loss_norm_metric = metrics.Metric(name="Loss normalizer", function=custom_loss.gaussian_neg_log_likelihood_normalizer)
-    loss_ll_metric = metrics.Metric(name="Loss ll", function=custom_loss.gaussian_neg_log_likelihood_ll)
-    distilled_model.add_metric(loss_metric)
-    distilled_model.add_metric(loss_norm_metric)
-    distilled_model.add_metric(loss_ll_metric)
+    # loss_metric = metrics.Metric(name="Mean val loss", function=distilled_model.calculate_loss)
+    # loss_norm_metric = metrics.Metric(name="Loss normalizer", function=custom_loss.gaussian_neg_log_likelihood_normalizer)
+    # loss_ll_metric = metrics.Metric(name="Loss ll", function=custom_loss.gaussian_neg_log_likelihood_ll)
+    # distilled_model.add_metric(loss_metric)
+    # distilled_model.add_metric(loss_norm_metric)
+    # distilled_model.add_metric(loss_ll_metric)
 
-    distilled_model.train(train_loader, num_epochs=1)  #args.num_epochs, validation_loader
+    distilled_model.train(train_loader, validation_loader=valid_loader, num_epochs=30)  #args.num_epochs, validation_loader
     torch.save(distilled_model, filepath)
 
     #LOGGER.info("Distilled model accuracy on test data: {}".format(
@@ -319,9 +322,7 @@ def plot_data_set(data_set):
     plt.show()
 
 
-def main():
-    """Main"""
-
+def distillation():
     args = utils.parse_args()
 
     log_file = Path("{}.log".format(datetime.now().strftime('%Y%m%d_%H%M%S')))
@@ -347,20 +348,21 @@ def main():
                                               shuffle=True,
                                               num_workers=0)
 
-    #num_ensemble_members = 10
+    # num_ensemble_members = 10
 
     ensemble_filepath = Path("models/mnist_ensemble_10")
     distilled_model_filepath = Path("models/distilled_mnist_logits_model")
 
     prob_ensemble = ensemble.Ensemble(output_size=10)
     prob_ensemble.load_ensemble(ensemble_filepath)
-    #prob_ensemble.calc_metrics(test_loader)
+    # prob_ensemble.calc_metrics(test_loader)
 
     ensemble_train_var = np.var(prob_ensemble.get_logits(
-        torch.tensor(train_set.data.reshape(train_set.data.shape[0], 28**2)/255, dtype=torch.float32)).detach().numpy(),
+        torch.tensor(train_set.data.reshape(train_set.data.shape[0], 28 ** 2) / 255,
+                     dtype=torch.float32)).detach().numpy(),
                                 axis=1)
-    LOGGER.info("Max ensemble variance: {}".format(ensemble_train_var.min()))
-    LOGGER.info("Min ensemble variance: {}".format(ensemble_train_var.max()))
+    LOGGER.info("Min ensemble variance: {}".format(ensemble_train_var.min()))
+    LOGGER.info("Max ensemble variance: {}".format(ensemble_train_var.max()))
 
     class_type = logits_probability_distribution.LogitsProbabilityDistribution
 
@@ -377,15 +379,97 @@ def main():
     plt.legend(['nll', 'nll - normalizing constant', 'nll - squared error'])
     plt.show()
 
-    #distilled_model = torch.load(distilled_model_filepath)
+    # distilled_model = torch.load(distilled_model_filepath)
 
-    #effect_of_ensemble_size(prob_ensemble, train_loader, test_loader, args)
-    #entropy_histogram(prob_ensemble, distilled_model, test_loader)
+    # effect_of_ensemble_size(prob_ensemble, train_loader, test_loader, args)
+    # entropy_histogram(prob_ensemble, distilled_model, test_loader)
 
-    #test_sample = test_set.get_sample(5)
-    #entropy_comparison_rotation(prob_ensemble, distilled_model, test_sample)
-    #noise_effect_on_entropy(distilled_model, prob_ensemble, test_loader)
+    # test_sample = test_set.get_sample(5)
+    # entropy_comparison_rotation(prob_ensemble, distilled_model, test_sample)
+    # noise_effect_on_entropy(distilled_model, prob_ensemble, test_loader)
 
+
+def dummy_distillation():
+    args = utils.parse_args()
+
+    log_file = Path("{}.log".format(datetime.now().strftime('%Y%m%d_%H%M%S')))
+    utils.setup_logger(log_path=Path.cwd() / args.log_dir / log_file,
+                       log_level=args.log_level)
+
+    train_set = mnist.MnistData()
+    valid_set = mnist.MnistData(data_set='validation')
+    test_set = mnist.MnistData(train=False)
+
+    train_loader = torch.utils.data.DataLoader(train_set,
+                                               batch_size=64,
+                                               shuffle=True,
+                                               num_workers=0)
+
+    valid_loader = torch.utils.data.DataLoader(valid_set,
+                                               batch_size=32,
+                                               shuffle=True,
+                                               num_workers=0)
+
+    test_loader = torch.utils.data.DataLoader(test_set,
+                                              batch_size=32,
+                                              shuffle=True,
+                                              num_workers=0)
+
+    # num_ensemble_members = 10
+
+    ensemble_filepath = Path("models/mnist_ensemble_10")
+    distilled_model_filepath = Path("models/distilled_mnist_logits_model")
+
+    prob_ensemble = ensemble.Ensemble(output_size=10)
+    prob_ensemble.load_ensemble(ensemble_filepath)
+    # prob_ensemble.calc_metrics(test_loader)
+
+    ensemble_train_logits = prob_ensemble.get_logits(
+        torch.tensor(train_set.data.reshape(train_set.data.shape[0], 28 ** 2) / 255,
+                     dtype=torch.float32)).detach().numpy()
+
+    # We view all logits as sample from a multivariate Gaussian
+    logits = ensemble_train_logits.reshape((ensemble_train_logits.shape[0] * ensemble_train_logits.shape[1], -1))
+    scaled_logits = logits - logits[:, -1][:, np.newaxis]
+    ensemble_train_mean = np.mean(scaled_logits, axis=0)
+    ensemble_train_var = np.var(scaled_logits, axis=0)
+
+    # hue = np.repeat(np.arange(10), ensemble_train_logits.shape[0]).astype(str)
+    # df = pandas.DataFrame({'Class 1': scaled_logits[:, 0], 'Class 2': scaled_logits[:, 1],
+    #                        'Class 3': scaled_logits[:, 2], 'Class 4': scaled_logits[:, 3],
+    #                        'Class 5': scaled_logits[:, 4], 'Class 6': scaled_logits[:, 5],
+    #                        'Class 7': scaled_logits[:, 6], 'Class 8': scaled_logits[:, 7],
+    #                        'Class 9': scaled_logits[:, 8], 'Class 10': scaled_logits[:, 9],
+    #                        'Hue': hue})
+    #
+    # seaborn.pairplot(df, vars=df.columns[:-1], hue='Hue')
+    # plt.show()
+
+    class_type = dummy_logits_probability_distribution.DummyLogitsProbabilityDistribution
+
+    distilled_model = create_distilled_model(train_loader, valid_loader, test_loader, args,
+                                             prob_ensemble,
+                                             distilled_model_filepath,
+                                             class_type)
+
+    distilled_model_mean, distilled_model_var = distilled_model.forward(torch.ones((1, 784)))
+    LOGGER.info("True mean {}".format(ensemble_train_mean))
+    LOGGER.info("True var {}".format(ensemble_train_var))
+    LOGGER.info("Estimated mean {}".format(distilled_model_mean))
+    LOGGER.info("Estimated var {}".format(distilled_model_var))
+
+    for metric in distilled_model.metrics.values():
+        metric_batch_mean = torch.stack(metric.memory[1:]).data.numpy()
+        plt.plot(np.arange(metric_batch_mean.shape[0]), metric_batch_mean)
+        print(metric_batch_mean)
+
+    plt.legend(['nll', 'nll - normalizing constant', 'nll - squared error'])
+    plt.show()
+
+
+def main():
+    """Main"""
+    dummy_distillation()
 
 if __name__ == "__main__":
     main()

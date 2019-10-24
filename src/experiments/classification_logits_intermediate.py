@@ -7,7 +7,7 @@ import torch
 import sys
 print(sys.path)
 
-from src.dataloaders import gaussian
+from src.dataloaders import gaussian_multiclass
 import src.utils as utils
 from src.distilled import logits_probability_distribution
 from src.ensemble import ensemble
@@ -17,7 +17,6 @@ import matplotlib.pyplot as plt
 import torch
 from scipy.stats import multivariate_normal as scipy_mvn
 from scipy.stats import norm as scipy_norm
-import scipy.interpolate
 from src.experiments.shifted_cmap import shifted_color_map
 import matplotlib
 import src.loss as custom_loss
@@ -162,33 +161,18 @@ def main():
     LOGGER.info("Args: {}".format(args))
     device = utils.torch_settings(args.seed, args.gpu)
     LOGGER.info("Creating dataloader")
-    data = gaussian.SyntheticGaussianData(
-        mean_0=[0, 0],
-        mean_1=[-2, -2],
-        cov_0=np.eye(2),
-        cov_1=np.eye(2),
-        store_file=Path("data/2d_gaussian_1000"))
 
-    full_data = gaussian.SyntheticGaussianData(
-        mean_0=[0, 0],
-        mean_1=[-2, -2],
-        cov_0=np.eye(2),
-        cov_1=np.eye(2),
-        sample=False,
-        store_file=Path("data/2d_gaussian_full"))
+    mean = np.array([[-2, 3], [0, -1], [3, 2]])
+    data = gaussian_multiclass.SyntheticMultiClassGaussianData(mean=mean,
+                                                               store_file=Path("data/2d_gaussian_multiclass_3000"))
 
-    val_data = gaussian.SyntheticGaussianData(
-            mean_0=[0, 0],
-            mean_1=[-2, -2],
-            cov_0=np.eye(2),
-            cov_1=np.eye(2),
-            n_samples=500,
-            store_file=Path("data/2d_gaussian_500"))
+    val_data = gaussian_multiclass.SyntheticMultiClassGaussianData(mean=mean, n_class_samples=500,
+                                                                   store_file=Path("data/2d_gaussian_multiclass_1500"))
 
     # TODO: Automated dims
     input_size = 2
-    hidden_size = 3
-    ensemble_output_size = 2
+    hidden_size = 5
+    ensemble_output_size = 3
 
     train_loader = torch.utils.data.DataLoader(data,
                                                batch_size=16,
@@ -201,31 +185,31 @@ def main():
 
     prob_ensemble = ensemble.Ensemble(ensemble_output_size)
 
-    # for _ in range(args.num_ensemble_members * 10):
-    #     model = simple_classifier.SimpleClassifier(input_size,
-    #                                                hidden_size,
-    #                                                hidden_size,
-    #                                                ensemble_output_size,
-    #                                                device=device,
-    #                                                learning_rate=args.lr)
-    #     prob_ensemble.add_member(model)
-    #
-    # acc_metric = metrics.Metric(name="Acc", function=metrics.accuracy)
-    # loss_metric = metrics.Metric(name="Mean val loss", function=model.calculate_loss)
-    # prob_ensemble.add_metrics([acc_metric, loss_metric])
-    # prob_ensemble.train(train_loader, args.num_epochs, validation_loader=validation_loader)
+    for _ in range(1):
+        model = simple_classifier.SimpleClassifier(input_size,
+                                                   hidden_size,
+                                                   hidden_size,
+                                                   ensemble_output_size,
+                                                   device=device,
+                                                   learning_rate=args.lr)
+        prob_ensemble.add_member(model)
 
-    ensemble_filepath = Path("models/simple_class_logits_ensemble_overlap_50")
-    #
-    #prob_ensemble.save_ensemble(ensemble_filepath)
-    prob_ensemble.load_ensemble(ensemble_filepath)
+    acc_metric = metrics.Metric(name="Acc", function=metrics.accuracy)
+    loss_metric = metrics.Metric(name="Mean val loss", function=model.calculate_loss)
+    prob_ensemble.add_metrics([acc_metric, loss_metric])
+    prob_ensemble.train(train_loader, args.num_epochs, validation_loader=validation_loader)
 
-    full_train_loader = torch.utils.data.DataLoader(full_data,
-                                                    batch_size=16,
+    ensemble_filepath = Path("models/simple_class_logits_ensemble_multiclass_10")
+    #
+    prob_ensemble.save_ensemble(ensemble_filepath)
+    #prob_ensemble.load_ensemble(ensemble_filepath)
+
+    full_train_loader = torch.utils.data.DataLoader(data,
+                                                    batch_size=10,
                                                     shuffle=True,
                                                     num_workers=0)
 
-    distilled_output_size = 2
+    distilled_output_size = 4
     distilled_model = logits_probability_distribution.LogitsProbabilityDistribution(
         input_size,
         hidden_size,
@@ -233,34 +217,35 @@ def main():
         distilled_output_size,
         teacher=prob_ensemble,
         device=device,
-        learning_rate=args.lr*0.1
-    )
+        learning_rate=args.lr)
 
-    #loss_metric = metrics.Metric(name="Mean loss", function=distilled_model.calculate_loss)
-    #loss_norm_metric = metrics.Metric(name="Loss normalizer",
-      #                                function=custom_loss.gaussian_neg_log_likelihood_normalizer)
-    #loss_ll_metric = metrics.Metric(name="Loss ll", function=custom_loss.gaussian_neg_log_likelihood_ll)
-    #distilled_model.add_metric(loss_metric)
-    #distilled_model.add_metric(loss_norm_metric)
-    #distilled_model.add_metric(loss_ll_metric)
+    loss_metric = metrics.Metric(name="Mean val loss", function=distilled_model.calculate_loss)
+    distilled_model.add_metric(loss_metric)
+    loss_metric = metrics.Metric(name="Mean val loss", function=distilled_model.calculate_loss)
+    loss_norm_metric = metrics.Metric(name="Loss normalizer",
+                                      function=custom_loss.gaussian_neg_log_likelihood_normalizer)
+    loss_ll_metric = metrics.Metric(name="Loss ll", function=custom_loss.gaussian_neg_log_likelihood_ll)
+    distilled_model.add_metric(loss_metric)
+    distilled_model.add_metric(loss_norm_metric)
+    distilled_model.add_metric(loss_ll_metric)
 
-    distilled_model.train(full_train_loader, num_epochs=80)
+    distilled_model.train(full_train_loader, num_epochs=10, validation_loader=validation_loader)
 
-    distilled_filepath = Path("models/simple_class_logits_distilled_overlap_full_training")
+    distilled_filepath = Path("models/simple_multiclass_logits_distilled_overlap_full_training")
     #distilled_filepath = Path("models/simple_class_logits_distilled_overlap")
     #
-    #torch.save(distilled_model, distilled_filepath)
+    torch.save(distilled_model, distilled_filepath)
     #distilled_model = torch.load(distilled_filepath)
     uncertainty_plots(distilled_model)
     # distribution_test(prob_ensemble, distilled_model)
 
-    #for metric in distilled_model.metrics.values():
-     #   metric_batch_mean = torch.stack(metric.memory[1:]).data.numpy()
-     #   plt.plot(np.arange(metric_batch_mean.shape[0]), metric_batch_mean)
-     #   print(metric_batch_mean)
+    for metric in distilled_model.metrics.values():
+        metric_batch_mean = torch.stack(metric.memory[1:]).data.numpy()
+        plt.plot(np.arange(metric_batch_mean.shape[0]), metric_batch_mean)
+        print(metric_batch_mean)
 
-   # plt.legend(['nll', 'nll - normalizing constant', 'nll - squared error'])
-   # plt.show()
+    plt.legend(['nll', 'nll - normalizing constant', 'nll - squared error'])
+    plt.show()
 
 
 if __name__ == "__main__":

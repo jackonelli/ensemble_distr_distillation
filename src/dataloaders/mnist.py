@@ -34,8 +34,8 @@ class MnistData():
                                               transform=self.transform)
 
         if train and data_set == 'train':
-            self.data = self.set.data[:50000, :, :]
-            self.targets = self.set.targets[:50000]
+            self.data = self.set.data[:20000, :, :]
+            self.targets = self.set.targets[:20000]
 
         elif train and data_set == 'validation':
             self.data = self.set.data[50000:, :, :]

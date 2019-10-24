@@ -5,7 +5,9 @@ import src.loss as custom_loss
 import src.distilled.distilled_network as distilled_network
 
 
-class LogitsProbabilityDistribution(distilled_network.DistilledNet):
+class DummyLogitsProbabilityDistribution(distilled_network.DistilledNet):
+    """We decouple the distribution parameters from x and find a distribution over all ensemble predictions"""
+
     def __init__(self,
                  input_size,
                  hidden_size_1,
@@ -43,6 +45,9 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
         """Estimate parameters of distribution
         """
 
+        # Let's se if this makes sense
+        x = torch.ones(x.size())
+
         x = nn.functional.relu(self.fc1(x))
         x = nn.functional.relu(self.fc2(x))
         x = self.fc3(x)
@@ -50,6 +55,7 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
         mean = x[:, :int((self.output_size / 2))]
         var = torch.exp(x[:, int((self.output_size / 2)):])
 
+        t = torch.max(var)
         return mean, var
 
     def _generate_teacher_predictions(self, inputs):
