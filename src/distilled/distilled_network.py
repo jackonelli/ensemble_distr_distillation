@@ -16,8 +16,7 @@ class DistilledNet(nn.Module, ABC):
         self.teacher = teacher
         self.loss = loss_function
         self.metrics = dict()
-        if self.loss is None or not issubclass(type(self.loss),
-                                               nn.modules.loss._Loss):
+        if self.loss is None or not issubclass(type(self.loss), nn.modules.loss._Loss):
             # raise ValueError("Must assign proper loss function to child.loss.")
             self._log.warning(
                 "Must assign proper loss function to child.loss.")
@@ -31,7 +30,7 @@ class DistilledNet(nn.Module, ABC):
         """
 
         scheduler = torch_optim.lr_scheduler.StepLR(self.optimizer,
-                                                    step_size=5,
+                                                    step_size=10,
                                                     gamma=0.1)
         self.use_hard_labels = False
 

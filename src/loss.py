@@ -80,9 +80,14 @@ def gaussian_neg_log_likelihood(parameters, target, scale=None):
         else:
             cov_mat = [torch.diag(var[b, i, :]) for b in np.arange(target.size(0))]
 
+        # normalizer += torch.stack([
+        #     0.5 * (target.size(-1) * torch.log(torch.tensor(2 * np.pi)) +
+        #            torch.log(torch.det(cov_mat_i))) for cov_mat_i in cov_mat
+        # ], dim=0) / target.size(1)
+
         normalizer += torch.stack([
             0.5 * (target.size(-1) * torch.log(torch.tensor(2 * np.pi)) +
-                   torch.log(torch.det(cov_mat_i))) for cov_mat_i in cov_mat
+                   torch.sum(torch.log(torch.diag(cov_mat_i)))) for cov_mat_i in cov_mat
         ], dim=0) / target.size(1)
 
         ll += torch.stack([

@@ -14,6 +14,8 @@ import src.utils as utils
 from src.dataloaders import mnist
 from src.ensemble import simple_classifier
 from src.distilled import logits_probability_distribution
+from src.distilled import dummy_logits_probability_distribution
+from src.distilled import logits_matching
 import src.loss as custom_loss
 
 LOGGER = logging.getLogger(__name__)
@@ -39,16 +41,17 @@ def create_distilled_model(train_loader,
                                  hidden_size_2,
                                  output_size,
                                  prob_ensemble,
-                                 learning_rate=args.lr * 0.001)
+                                 learning_rate=args.lr*10)
 
     loss_metric = metrics.Metric(name="Mean val loss", function=distilled_model.calculate_loss)
-    loss_norm_metric = metrics.Metric(name="Loss normalizer", function=custom_loss.gaussian_neg_log_likelihood_normalizer)
-    loss_ll_metric = metrics.Metric(name="Loss ll", function=custom_loss.gaussian_neg_log_likelihood_ll)
+    #loss_norm_metric = metrics.Metric(name="Loss normalizer", function=custom_loss.gaussian_neg_log_likelihood_normalizer)
+    #loss_ll_metric = metrics.Metric(name="Loss ll", function=custom_loss.gaussian_neg_log_likelihood_ll)
     distilled_model.add_metric(loss_metric)
-    distilled_model.add_metric(loss_norm_metric)
-    distilled_model.add_metric(loss_ll_metric)
+    #distilled_model.add_metric(loss_norm_metric)
+    #distilled_model.add_metric(loss_ll_metric)
 
-    distilled_model.train(train_loader, num_epochs=1)  #args.num_epochs, validation_loader
+    distilled_model = torch.load(filepath)
+    distilled_model.train(train_loader, validation_loader=valid_loader, num_epochs=300)  #args.num_epochs, validation_loader
     torch.save(distilled_model, filepath)
 
     #LOGGER.info("Distilled model accuracy on test data: {}".format(
@@ -319,9 +322,24 @@ def plot_data_set(data_set):
     plt.show()
 
 
-def main():
-    """Main"""
+def get_accuracy(distilled_model, test_loader):
 
+    prob_ensemble = distilled_model.teacher
+
+    test_inputs, test_labels = next(iter(test_loader))
+
+    teacher_test_predictions = prob_ensemble.predict(test_inputs)
+    teacher_predictions = torch.argmax(torch.mean(teacher_test_predictions, axis=1), axis=-1).data.numpy()
+    teacher_acc = np.mean(teacher_predictions == test_labels)
+    LOGGER.info("Ensemble accuracy on test data {}".format(teacher_acc))
+
+    student_test_predictions = distilled_model.predict(test_inputs)
+    student_predictions = torch.argmax(torch.mean(student_test_predictions, axis=1), axis=-1).data.numpy()
+    student_acc = np.mean(student_predictions == test_labels)
+    LOGGER.info("Ensemble accuracy on test data {}".format(student_acc))
+
+
+def distillation(class_type):
     args = utils.parse_args()
 
     log_file = Path("{}.log".format(datetime.now().strftime('%Y%m%d_%H%M%S')))
@@ -343,26 +361,25 @@ def main():
                                                num_workers=0)
 
     test_loader = torch.utils.data.DataLoader(test_set,
-                                              batch_size=32,
+                                              batch_size=10000,
                                               shuffle=True,
                                               num_workers=0)
 
-    #num_ensemble_members = 10
+    # num_ensemble_members = 10
 
     ensemble_filepath = Path("models/mnist_ensemble_10")
-    distilled_model_filepath = Path("models/distilled_mnist_logits_model")
+    distilled_model_filepath = Path("models/distilled_mnist_logits_model_one_member")
 
     prob_ensemble = ensemble.Ensemble(output_size=10)
-    prob_ensemble.load_ensemble(ensemble_filepath)
-    #prob_ensemble.calc_metrics(test_loader)
+    prob_ensemble.load_ensemble(ensemble_filepath, num_members=1)
+    # prob_ensemble.calc_metrics(test_loader)
 
     ensemble_train_var = np.var(prob_ensemble.get_logits(
-        torch.tensor(train_set.data.reshape(train_set.data.shape[0], 28**2)/255, dtype=torch.float32)).detach().numpy(),
+        torch.tensor(train_set.data.reshape(train_set.data.shape[0], 28 ** 2) / 255,
+                     dtype=torch.float32)).detach().numpy(),
                                 axis=1)
     LOGGER.info("Max ensemble variance: {}".format(ensemble_train_var.min()))
     LOGGER.info("Min ensemble variance: {}".format(ensemble_train_var.max()))
-
-    class_type = logits_probability_distribution.LogitsProbabilityDistribution
 
     distilled_model = create_distilled_model(train_loader, valid_loader, test_loader, args,
                                              prob_ensemble,
@@ -377,14 +394,30 @@ def main():
     plt.legend(['nll', 'nll - normalizing constant', 'nll - squared error'])
     plt.show()
 
-    #distilled_model = torch.load(distilled_model_filepath)
+    get_accuracy(distilled_model, test_loader)
 
-    #effect_of_ensemble_size(prob_ensemble, train_loader, test_loader, args)
-    #entropy_histogram(prob_ensemble, distilled_model, test_loader)
+    # distilled_model = torch.load(distilled_model_filepath)
 
-    #test_sample = test_set.get_sample(5)
-    #entropy_comparison_rotation(prob_ensemble, distilled_model, test_sample)
-    #noise_effect_on_entropy(distilled_model, prob_ensemble, test_loader)
+    # effect_of_ensemble_size(prob_ensemble, train_loader, test_loader, args)
+    # entropy_histogram(prob_ensemble, distilled_model, test_loader)
+
+    # test_sample = test_set.get_sample(5)
+    # entropy_comparison_rotation(prob_ensemble, distilled_model, test_sample)
+    # noise_effect_on_entropy(distilled_model, prob_ensemble, test_loader)
+
+def main():
+    """Main"""
+
+    # Distillation
+    #class_type = logits_probability_distribution.LogitsProbabilityDistribution
+
+    # Dummy distillation
+    #class_type = dummy_logits_probability_distribution.DummyLogitsProbabilityDistribution
+
+    # Logits matching
+    class_type = logits_matching.LogitsMatching
+
+    distillation(class_type)
 
 
 if __name__ == "__main__":

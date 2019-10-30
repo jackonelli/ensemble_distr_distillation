@@ -137,11 +137,15 @@ class Ensemble():
 
         torch.save(members_dict, filepath)
 
-    def load_ensemble(self, filepath):
+    def load_ensemble(self, filepath, num_members=None):
 
         check_point = torch.load(filepath)
 
-        for key in check_point:
+        for i, key in enumerate(check_point):
+
+            if num_members is not None and i == num_members:
+                break
+
             member = check_point[key]
             # member.eval(), should be called if we have dropout or batch-norm
             # in our layers, to make sure that self.train = False,
