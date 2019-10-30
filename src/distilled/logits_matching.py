@@ -77,7 +77,7 @@ class LogitsMatching(distilled_network.DistilledNet):
 
         mean, var = self.forward(input_)
 
-        return mean
+        return torch.exp(mean) / (torch.exp(mean) + 1)
 
     def calculate_loss(self, outputs, teacher_predictions, labels=None):
         """Calculate loss function

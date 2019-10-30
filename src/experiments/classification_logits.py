@@ -20,22 +20,43 @@ from scipy.stats import norm as scipy_norm
 import scipy.interpolate
 from src.experiments.shifted_cmap import shifted_color_map
 import matplotlib
+from src.distilled import logits_matching
+from src.distilled import dummy_logits_probability_distribution
 
 LOGGER = logging.getLogger(__name__)
 
 
+def get_accuracy(distilled_model):
+    prob_ensemble = distilled_model.teacher
+
+    # Check accuracy of student and teacher on test data
+    test_data = gaussian.SyntheticGaussianData(mean_0=[0, 0], mean_1=[-2, -2], cov_0=np.eye(2),
+                                               cov_1=np.eye(2), n_samples=1000,
+                                               store_file=Path("data/2d_gaussian_1000_test"))
+
+    test_loader = torch.utils.data.DataLoader(test_data,
+                                              batch_size=1000,
+                                              shuffle=True,
+                                              num_workers=0)
+
+    # Will also just check the loss on the test data
+    distilled_model.calc_metrics(test_loader)
+
+    test_inputs, test_labels = next(iter(test_loader))
+    test_labels = test_labels.data.numpy()
+
+    teacher_test_predictions = prob_ensemble.predict(test_inputs)
+    teacher_predictions = torch.argmax(torch.mean(teacher_test_predictions, axis=1), axis=-1).data.numpy()
+    teacher_acc = np.mean(teacher_predictions == test_labels)
+    LOGGER.info("Ensemble accuracy on test data {}".format(teacher_acc))
+
+    student_test_predictions = distilled_model.predict(test_inputs)
+    student_predictions = torch.argmax(torch.stack((student_test_predictions, 1-student_test_predictions), dim=1), axis=1).data.numpy()
+    student_acc = np.mean(np.transpose(student_predictions) == test_labels)
+    LOGGER.info("Distilled model accuracy on test data {}".format(student_acc))
+
+
 def uncertainty_plots(distilled_model):
-
-    # data = gaussian.SyntheticGaussianData(mean_0=[0, 0], mean_1=[-2, -2], cov_0=np.eye(2),
-    #                                       cov_1=np.eye(2), n_samples=10000,
-    #                                       store_file=Path("data/one_dim_reg_500"))
-    #
-    # test_loader = torch.utils.data.DataLoader(data,
-    #                                           batch_size=10000,
-    #                                           shuffle=True,
-    #                                           num_workers=0)
-
-    #prob_ensemble.calc_metrics(test_loader)
 
     x_min = -4
     x_max = 3
@@ -62,8 +83,6 @@ def uncertainty_plots(distilled_model):
     ensemble_predictions = torch.argmax(torch.mean(ensemble_predicted_distribution, axis=1), axis=-1).data.numpy()
     ensemble_logits = distilled_model._generate_teacher_predictions(inputs)
     ens_var = np.var(ensemble_logits.detach().numpy(), axis=1)
-    #acc = np.mean(ensemble_predictions == targets)
-    #LOGGER.info("Ensemble accuracy on test data {}".format(acc))
 
     #predicted_distribution_samples = torch.mean(distilled_model.predict(inputs), axis=1)
     #distilled_model_predictions = torch.argmax(torch.stack(
@@ -216,32 +235,36 @@ def main():
         mean_1=[-2, -2],
         cov_0=np.eye(2),
         cov_1=np.eye(2),
+        sample=False,
         store_file=Path("data/2d_gaussian_1000"))
 
-    full_train_loader = torch.utils.data.DataLoader(data,
+    full_train_loader = torch.utils.data.DataLoader(full_data,
                                                     batch_size=10,
                                                     shuffle=True,
                                                     num_workers=0)
 
-    # distilled_output_size = 2
-    # distilled_model = logits_probability_distribution.LogitsProbabilityDistribution(
-    #     input_size,
-    #     hidden_size,
-    #     hidden_size,
-    #     distilled_output_size,
-    #     teacher=prob_ensemble,
-    #     device=device,
-    #     learning_rate=args.lr * 0.1)
-    #
-    # loss_metric = metrics.Metric(name="Mean val loss", function=distilled_model.calculate_loss)
-    # distilled_model.add_metric(loss_metric)
-    # distilled_model.train(full_train_loader, args.num_epochs*8, validation_loader=validation_loader)
+    distilled_output_size = 2
+    #distilled_model = logits_probability_distribution.LogitsProbabilityDistribution(
+    distilled_model = logits_matching.LogitsMatching(
+        input_size,
+        hidden_size,
+        hidden_size,
+        distilled_output_size,
+        teacher=prob_ensemble,
+        device=device,
+        learning_rate=args.lr*0.1)
 
-    distilled_filepath = Path("models/simple_class_logits_distilled_overlap_full_training")
+    loss_metric = metrics.Metric(name="Mean val loss", function=distilled_model.calculate_loss)
+    distilled_model.add_metric(loss_metric)
+    distilled_model.train(full_train_loader, args.num_epochs*10, validation_loader=validation_loader)
+
+    distilled_model.calc_metrics(full_train_loader)
+    distilled_filepath = Path("models/simple_class_logits_distilled_matching_logits_one_ensemble_member")
     #distilled_filepath = Path("models/simple_class_logits_distilled_overlap")
     #
-    #torch.save(distilled_model, distilled_filepath)
+    torch.save(distilled_model, distilled_filepath)
     distilled_model = torch.load(distilled_filepath)
+    get_accuracy(distilled_model)
     uncertainty_plots(distilled_model)
     # distribution_test(prob_ensemble, distilled_model)
 

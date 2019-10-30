@@ -99,9 +99,9 @@ class DistilledNet(nn.Module, ABC):
 
         for batch in data_loader:
             inputs, targets = batch
-            logits = self.forward(inputs)
-            outputs = self.transform_logits(logits)
-            self._update_metrics(outputs, targets)
+            outputs = self.forward(inputs)
+            teacher_predictions = self._generate_teacher_predictions(inputs)
+            self._update_metrics(outputs, teacher_predictions)
 
         metric_string = ""
         for metric in self.metrics.values():
