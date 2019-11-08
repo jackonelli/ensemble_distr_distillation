@@ -122,9 +122,6 @@ def gaussian_neg_log_likelihood_normalizer(parameters, target, scale=None):
     if target.dim() == 2:
         target = torch.unsqueeze(target, dim=1)
 
-    if scale is None:
-        scale = torch.ones([target.size(0), 1])
-
     normalizer = 0
     for i in np.arange(target.size(1)):
 

@@ -51,7 +51,7 @@ def create_distilled_model(train_loader,
     #distilled_model.add_metric(loss_ll_metric)
 
     distilled_model = torch.load(filepath)
-    distilled_model.train(train_loader, validation_loader=valid_loader, num_epochs=300)  #args.num_epochs, validation_loader
+    distilled_model.train(train_loader, validation_loader=valid_loader, num_epochs=1000)  #args.num_epochs, validation_loader
     torch.save(distilled_model, filepath)
 
     #LOGGER.info("Distilled model accuracy on test data: {}".format(
@@ -327,6 +327,7 @@ def get_accuracy(distilled_model, test_loader):
     prob_ensemble = distilled_model.teacher
 
     test_inputs, test_labels = next(iter(test_loader))
+    test_labels = test_labels.data.numpy()
 
     teacher_test_predictions = prob_ensemble.predict(test_inputs)
     teacher_predictions = torch.argmax(torch.mean(teacher_test_predictions, axis=1), axis=-1).data.numpy()
@@ -334,9 +335,9 @@ def get_accuracy(distilled_model, test_loader):
     LOGGER.info("Ensemble accuracy on test data {}".format(teacher_acc))
 
     student_test_predictions = distilled_model.predict(test_inputs)
-    student_predictions = torch.argmax(torch.mean(student_test_predictions, axis=1), axis=-1).data.numpy()
-    student_acc = np.mean(student_predictions == test_labels)
-    LOGGER.info("Ensemble accuracy on test data {}".format(student_acc))
+    student_predictions = torch.argmax(torch.stack((student_test_predictions, 1-student_test_predictions), dim=1), axis=1).data.numpy()
+    student_acc = np.mean(np.transpose(student_predictions) == test_labels)
+    LOGGER.info("Distilled model accuracy on test data {}".format(student_acc))
 
 
 def distillation(class_type):
@@ -351,7 +352,7 @@ def distillation(class_type):
     test_set = mnist.MnistData(train=False)
 
     train_loader = torch.utils.data.DataLoader(train_set,
-                                               batch_size=64,
+                                               batch_size=32,
                                                shuffle=True,
                                                num_workers=0)
 
@@ -365,10 +366,15 @@ def distillation(class_type):
                                               shuffle=True,
                                               num_workers=0)
 
+    train_loader_full = torch.utils.data.DataLoader(train_set,
+                                                    batch_size=1000,
+                                                    shuffle=True,
+                                                    num_workers=0)
+
     # num_ensemble_members = 10
 
     ensemble_filepath = Path("models/mnist_ensemble_10")
-    distilled_model_filepath = Path("models/distilled_mnist_logits_model_one_member")
+    distilled_model_filepath = Path("models/distilled_mnist_logits_model_one_member_2")
 
     prob_ensemble = ensemble.Ensemble(output_size=10)
     prob_ensemble.load_ensemble(ensemble_filepath, num_members=1)
@@ -395,6 +401,8 @@ def distillation(class_type):
     plt.show()
 
     get_accuracy(distilled_model, test_loader)
+    get_accuracy(distilled_model, train_loader_full)
+
 
     # distilled_model = torch.load(distilled_model_filepath)
 
@@ -404,6 +412,7 @@ def distillation(class_type):
     # test_sample = test_set.get_sample(5)
     # entropy_comparison_rotation(prob_ensemble, distilled_model, test_sample)
     # noise_effect_on_entropy(distilled_model, prob_ensemble, test_loader)
+
 
 def main():
     """Main"""

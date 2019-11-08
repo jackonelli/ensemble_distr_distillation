@@ -33,7 +33,7 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
 
         self.layers = [self.fc1, self.fc2, self.fc3]
 
-        self.optimizer = torch_optim.Adam(self.parameters(),
+        self.optimizer = torch_optim.SGD(self.parameters(),
                                          lr=self.learning_rate,
                                          momentum=0.9)
 

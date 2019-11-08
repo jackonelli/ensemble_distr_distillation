@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.optim as torch_optim
 import math
-
+import src.utils as utils
 
 class DistilledNet(nn.Module, ABC):
     """Parent class for distilled net logic in one place"""
@@ -29,9 +29,17 @@ class DistilledNet(nn.Module, ABC):
         Should NOT be overridden!
         """
 
-        scheduler = torch_optim.lr_scheduler.StepLR(self.optimizer,
-                                                    step_size=10,
-                                                    gamma=0.1)
+        # scheduler = torch_optim.lr_scheduler.StepLR(self.optimizer,
+        #                                             step_size=100,
+        #                                             gamma=0.5)
+
+        step_size = 4 * len(train_loader)
+        factor = 100
+        end_lr = 0.01 # Skulle vilja sätta self.learning_rate
+        clr = utils.cyclical_lr(step_size, min_lr=end_lr / factor, max_lr=end_lr)
+        scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, [clr])
+
+        #scheduler = torch_optim.lr_scheduler.CyclicLR(self.optimizer, 1e-7, 0.1, step_size_up=100)
         self.use_hard_labels = False
 
         self._log.info("Training distilled network.")
@@ -64,7 +72,7 @@ class DistilledNet(nn.Module, ABC):
             running_loss += loss.item()
 
             if math.isnan(running_loss):
-                break;
+                break
 
             if validation_loader is None:
                 self._reset_metrics()
@@ -75,8 +83,10 @@ class DistilledNet(nn.Module, ABC):
             for valid_batch in validation_loader:
                 self._reset_metrics()
                 valid_inputs, valid_labels = valid_batch
+                valid_inputs, valid_labels = valid_inputs.to(self.device), valid_labels.to(self.device)
                 valid_outputs = self.forward(valid_inputs)
                 teacher_predictions = self._generate_teacher_predictions(valid_inputs)
+                teacher_predictions = teacher_predictions.to(self.device)
                 self._update_metrics(valid_outputs, teacher_predictions)
 
         return running_loss

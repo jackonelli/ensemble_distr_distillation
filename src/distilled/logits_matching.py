@@ -20,7 +20,7 @@ class LogitsMatching(distilled_network.DistilledNet):
             teacher=teacher,
             loss_function=custom_loss.gaussian_neg_log_likelihood_ll,
             device=device)
-
+        print(self.device)
         self.input_size = input_size
         self.hidden_size_1 = hidden_size_1  # Or make a list or something
         self.hidden_size_2 = hidden_size_2
@@ -34,13 +34,13 @@ class LogitsMatching(distilled_network.DistilledNet):
 
         self.layers = [self.fc1, self.fc2, self.fc3]
 
-        self.optimizer = torch_optim.SGD(self.parameters(),
-                                         lr=self.learning_rate,
-                                         momentum=0.9)
+        self.optimizer = torch_optim.Adam(self.parameters(),
+                                          lr=self.learning_rate)
 
         self.to(self.device)
 
     def forward(self, x):
+
         """Estimate parameters of distribution
         """
 
@@ -60,7 +60,7 @@ class LogitsMatching(distilled_network.DistilledNet):
         and then apply some transformation to get the desired predictions.
         Default implementation is to recreate the exact ensemble member output.
         Override this method if another logit transformation is desired,
-        e.g. unit transformation if desired predictions
+        e.g. unit transformatvim vim ion if desired predictions
         are the logits themselves
         """
 
@@ -84,3 +84,11 @@ class LogitsMatching(distilled_network.DistilledNet):
         Wrapper function for the loss function.
         """
         return self.loss(outputs, teacher_predictions)
+
+    def _learning_rate_condition(self, epoch):
+        """Evaluate condition for increasing learning rate
+        Defaults to never increasing. I.e. returns False
+        """
+
+        return True
+

@@ -236,7 +236,7 @@ def main():
         cov_0=np.eye(2),
         cov_1=np.eye(2),
         sample=False,
-        store_file=Path("data/2d_gaussian_1000"))
+        store_file=Path("data/2d_gaussian_full"))
 
     full_train_loader = torch.utils.data.DataLoader(full_data,
                                                     batch_size=10,
@@ -244,8 +244,9 @@ def main():
                                                     num_workers=0)
 
     distilled_output_size = 2
-    #distilled_model = logits_probability_distribution.LogitsProbabilityDistribution(
-    distilled_model = logits_matching.LogitsMatching(
+    #
+    #distilled_model = logits_matching.LogitsMatching(
+    distilled_model = logits_probability_distribution.LogitsProbabilityDistribution(
         input_size,
         hidden_size,
         hidden_size,
@@ -256,14 +257,19 @@ def main():
 
     loss_metric = metrics.Metric(name="Mean val loss", function=distilled_model.calculate_loss)
     distilled_model.add_metric(loss_metric)
-    distilled_model.train(full_train_loader, args.num_epochs*10, validation_loader=validation_loader)
+    distilled_filepath = Path("models/simple_class_logits_distilled_overlap_full_training")
+    distilled_model = torch.load(distilled_filepath)
+    #distilled_model.train(full_train_loader, args.num_epochs*10, validation_loader=validation_loader)
 
+    #distilled_filepath = Path("models/simple_class_logits_distilled_matching_logits_one_ensemble_member")
+    distilled_filepath = Path("models/simple_class_logits_distilled_overlap_full_training")
+    #distilled_model = torch.load(distilled_filepath)
     distilled_model.calc_metrics(full_train_loader)
-    distilled_filepath = Path("models/simple_class_logits_distilled_matching_logits_one_ensemble_member")
-    #distilled_filepath = Path("models/simple_class_logits_distilled_overlap")
+
+
     #
     torch.save(distilled_model, distilled_filepath)
-    distilled_model = torch.load(distilled_filepath)
+    #distilled_model = torch.load(distilled_filepath)
     get_accuracy(distilled_model)
     uncertainty_plots(distilled_model)
     # distribution_test(prob_ensemble, distilled_model)
