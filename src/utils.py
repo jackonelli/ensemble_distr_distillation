@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 import math
 
+
 class ReshapeTransform:
     def __init__(self, new_size):
         self.new_size = new_size

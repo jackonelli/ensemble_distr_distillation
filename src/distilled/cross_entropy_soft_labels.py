@@ -3,10 +3,12 @@ import torch.nn as nn
 import torch.optim as torch_optim
 import src.loss as custom_loss
 import src.distilled.distilled_network as distilled_network
+from src import utils
 
 
-class LogitsMatching(distilled_network.DistilledNet):
+class XCSoftLabels(distilled_network.DistilledNet):
     """We match only the mean of the logits"""
+
     def __init__(self,
                  input_size,
                  hidden_size_1,
@@ -15,19 +17,17 @@ class LogitsMatching(distilled_network.DistilledNet):
                  teacher,
                  device=torch.device('cpu'),
                  use_hard_labels=False,
-                 use_teacher_hard_labels=False,
                  learning_rate=0.001):
         super().__init__(
             teacher=teacher,
-            loss_function=custom_loss.rmse,
+            loss_function=custom_loss.cross_entropy_soft_targets,
             device=device)
         print(self.device)
         self.input_size = input_size
         self.hidden_size_1 = hidden_size_1  # Or make a list or something
         self.hidden_size_2 = hidden_size_2
         self.output_size = output_size
-        self.use_hard_labels = use_hard_labels
-        self.use_teacher_hard_labels = use_teacher_hard_labels
+        self.use_teacher_hard_labels = use_hard_labels
         self.learning_rate = learning_rate
 
         self.fc1 = nn.Linear(self.input_size, self.hidden_size_1)
@@ -50,46 +50,21 @@ class LogitsMatching(distilled_network.DistilledNet):
         x = nn.functional.relu(self.fc2(x))
         x = self.fc3(x)
 
-        mean = x
-        # Note: we actually don't learn the variance
-        #var = torch.ones(mean.size())
-
-        return mean#, var
-
-    def _generate_teacher_predictions(self, inputs):
-        """Generate teacher predictions
-        The intention is to get the logits of the ensemble members
-        and then apply some transformation to get the desired predictions.
-        Default implementation is to recreate the exact ensemble member output.
-        Override this method if another logit transformation is desired,
-        e.g. unit transformation if desired predictions
-        are the logits themselves
-        """
-
-        logits = self.teacher.get_logits(inputs)
-
-        if self.use_teacher_hard_labels:
-            pass
-        else:
-            scaled_logits = logits - torch.stack([logits[:, :, -1]], axis=-1)
-            teacher_pred = scaled_logits[:, :, 0:-1]
-
-        return teacher_pred
+        return (nn.Softmax(dim=-1))(x)
 
     def predict(self, input_, num_samples=None):
         """Predict parameters
         Wrapper function for the forward function.
         """
 
-        mean = self.forward(input_)
-
-        return torch.exp(mean) / (torch.exp(mean) + 1)
+        return self.forward(input_)
 
     def calculate_loss(self, outputs, teacher_predictions, labels=None):
         """Calculate loss function
         Wrapper function for the loss function.
         """
-        return self.loss(outputs, teacher_predictions)
+
+        return self.loss(outputs, teacher_predictions[:, 0, :])
 
     def _learning_rate_condition(self, epoch=None):
         """Evaluate condition for increasing learning rate

@@ -3,9 +3,10 @@ import torch.nn as nn
 import torch.optim as torch_optim
 import src.loss as custom_loss
 import src.distilled.distilled_network as distilled_network
+from src import utils
 
 
-class LogitsMatching(distilled_network.DistilledNet):
+class SoftmaxMatching(distilled_network.DistilledNet):
     """We match only the mean of the logits"""
     def __init__(self,
                  input_size,
@@ -51,10 +52,8 @@ class LogitsMatching(distilled_network.DistilledNet):
         x = self.fc3(x)
 
         mean = x
-        # Note: we actually don't learn the variance
-        #var = torch.ones(mean.size())
 
-        return mean#, var
+        return mean
 
     def _generate_teacher_predictions(self, inputs):
         """Generate teacher predictions
@@ -67,12 +66,11 @@ class LogitsMatching(distilled_network.DistilledNet):
         """
 
         logits = self.teacher.get_logits(inputs)
+        teacher_pred = self.teacher.transform_logits(logits)
 
         if self.use_teacher_hard_labels:
-            pass
-        else:
-            scaled_logits = logits - torch.stack([logits[:, :, -1]], axis=-1)
-            teacher_pred = scaled_logits[:, :, 0:-1]
+            teacher_pred = torch.argmax(teacher_pred, dim=1)
+            teacher_pred = utils.to_one_hot(teacher_pred, number_of_classes=self.output_size)
 
         return teacher_pred
 
@@ -83,7 +81,7 @@ class LogitsMatching(distilled_network.DistilledNet):
 
         mean = self.forward(input_)
 
-        return torch.exp(mean) / (torch.exp(mean) + 1)
+        return mean
 
     def calculate_loss(self, outputs, teacher_predictions, labels=None):
         """Calculate loss function

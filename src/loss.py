@@ -3,12 +3,11 @@ import torch
 import numpy as np
 
 
-def scalar_loss(inputs, soft_targets):
-    """I think it might be simpler to just use functions for custom loss
-    as long as we only use torch functions we should be ok.
+def cross_entropy_soft_targets(inputs, soft_targets):
+    """Cross entropy loss with soft targets.
     """
 
-    return torch.sum(-soft_targets * torch.log(inputs))
+    return torch.sum(- soft_targets * torch.log(inputs))
 
 
 def dirichlet_neg_log_likelihood(alphas, target_distribution):
@@ -115,7 +114,6 @@ def gaussian_neg_log_likelihood_normalizer(parameters, target, scale=None):
             (/covariance matrix) for every x in batch.
     """
 
-    mean = parameters[0]
     var = parameters[1]
 
     # This should only happen when we only have one target (i.e. N=1)
@@ -136,6 +134,33 @@ def gaussian_neg_log_likelihood_normalizer(parameters, target, scale=None):
         ], dim=0) / target.size(1)
 
     return torch.mean(normalizer)
+
+
+def rmse(mean, target):
+    """Negative log likelihood loss for the Gaussian distribution
+    B = batch size, D = dimension of target (num classes), N = ensemble size
+
+    Args:
+        parameters (torch.tensor((B, D))):
+            mean values of y|x for every x in
+            batch (and for every ensemble member).
+        target (torch.tensor((B, N, D))): sample from the normal
+            distribution, if not an ensemble prediction N=1.
+    """
+
+    var = torch.eye(target.size(-1))
+
+    # This should only happen when we only have one target (i.e. N=1)
+    if target.dim() == 2:
+        target = torch.unsqueeze(target, dim=1)
+
+    ll = 0
+    for i in np.arange(target.size(1)):
+        ll += torch.diag(0.5 * torch.matmul(
+                torch.matmul((target[:, i, :] - mean), var),
+                torch.transpose((target[:, i, :] - mean), 0, -1))) / target.size(1)  # Mean over ensemble members
+
+    return torch.mean(ll)
 
 
 def gaussian_neg_log_likelihood_ll(parameters, target, scale=None):

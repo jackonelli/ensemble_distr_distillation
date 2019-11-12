@@ -26,7 +26,7 @@ from src.distilled import dummy_logits_probability_distribution
 LOGGER = logging.getLogger(__name__)
 
 
-def get_accuracy(distilled_model):
+def get_accuracy_test(distilled_model):
     prob_ensemble = distilled_model.teacher
 
     # Check accuracy of student and teacher on test data
@@ -50,8 +50,8 @@ def get_accuracy(distilled_model):
     teacher_acc = np.mean(teacher_predictions == test_labels)
     LOGGER.info("Ensemble accuracy on test data {}".format(teacher_acc))
 
-    student_test_predictions = distilled_model.predict(test_inputs)
-    student_predictions = torch.argmax(torch.stack((student_test_predictions, 1-student_test_predictions), dim=1), axis=1).data.numpy()
+    student_test_predictions = torch.mean(distilled_model.predict(test_inputs), dim=1)  # !
+    student_predictions = torch.argmax(torch.cat((student_test_predictions, 1-student_test_predictions), dim=1), axis=1).data.numpy()
     student_acc = np.mean(np.transpose(student_predictions) == test_labels)
     LOGGER.info("Distilled model accuracy on test data {}".format(student_acc))
 
@@ -270,7 +270,7 @@ def main():
     #
     torch.save(distilled_model, distilled_filepath)
     #distilled_model = torch.load(distilled_filepath)
-    get_accuracy(distilled_model)
+    get_accuracy_test(distilled_model)
     uncertainty_plots(distilled_model)
     # distribution_test(prob_ensemble, distilled_model)
 
