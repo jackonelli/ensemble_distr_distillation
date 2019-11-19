@@ -4,6 +4,8 @@ from abc import ABC, abstractmethod
 import torch
 import torch.nn as nn
 import torch.optim as torch_optim
+import math
+import src.utils as utils
 
 
 class DistilledNet(nn.Module, ABC):
@@ -15,10 +17,8 @@ class DistilledNet(nn.Module, ABC):
         self.teacher = teacher
         self.loss = loss_function
         self.metrics = dict()
-        if self.loss is None or not issubclass(type(self.loss),
-                                               nn.modules.loss._Loss):
-            # raise ValueError(
-            #   "Must assign proper loss function to child.loss.")
+        if self.loss is None or not issubclass(type(self.loss), nn.modules.loss._Loss):
+            # raise ValueError("Must assign proper loss function to child.loss.")
             self._log.warning(
                 "Must assign proper loss function to child.loss.")
         self.optimizer = None
@@ -29,27 +29,28 @@ class DistilledNet(nn.Module, ABC):
         """ Common train method for all distilled networks
         Should NOT be overridden!
         """
+        scheduler = self.get_scheduler(step_size=4*len(train_loader), cyclical=True)
 
-        scheduler = torch_optim.lr_scheduler.StepLR(self.optimizer,
-                                                    step_size=5,
-                                                    gamma=0.1)
+        #scheduler = torch_optim.lr_scheduler.CyclicLR(self.optimizer, 1e-7, 0.1, step_size_up=100)
         self.use_hard_labels = False
 
         self._log.info("Training distilled network.")
         for epoch_number in range(1, num_epochs + 1):
-            loss = self._train_epoch(train_loader, validation_loader)
+            loss = self._train_epoch(train_loader, validation_loader=validation_loader, scheduler=scheduler)
             self._print_epoch(epoch_number, loss)
-            if self._learning_rate_condition(epoch_number):
-                scheduler.step()
+            #if self._learning_rate_condition(epoch_number):
+            #    scheduler.step()
 
-    def _train_epoch(self, train_loader, validation_loader=None):
+    def _train_epoch(self, train_loader, validation_loader=None, scheduler=None):
         """Common train epoch method for all distilled networks
         Should NOT be overridden!
         TODO: Make sure train_loader returns None for labels,
         if no labels are available.
         """
         running_loss = 0
-        self._reset_metrics()
+        #self._reset_metrics()
+        self._log.info(scheduler.get_lr())
+
         for batch in train_loader:
             self.optimizer.zero_grad()
             inputs, labels = batch
@@ -64,16 +65,25 @@ class DistilledNet(nn.Module, ABC):
             self.optimizer.step()
             running_loss += loss.item()
 
+            if math.isnan(running_loss):
+                break
+
             if validation_loader is None:
-                self._update_metrics(outputs, labels)
+                self._reset_metrics()
+                self._update_metrics(outputs, teacher_predictions)  # BUT THIS DOES NOT WORK FOR EG ACCURACY
+
+            if self._learning_rate_condition():
+                scheduler.step()
 
         if validation_loader is not None:
             # We will compare here with the teacher predictions
             for valid_batch in validation_loader:
+                self._reset_metrics()
                 valid_inputs, valid_labels = valid_batch
+                valid_inputs, valid_labels = valid_inputs.to(self.device), valid_labels.to(self.device)
                 valid_outputs = self.forward(valid_inputs)
-                teacher_predictions = self._generate_teacher_predictions(
-                    inputs)
+                teacher_predictions = self._generate_teacher_predictions(valid_inputs)
+                teacher_predictions = teacher_predictions.to(self.device)
                 self._update_metrics(valid_outputs, teacher_predictions)
 
         return running_loss
@@ -96,14 +106,27 @@ class DistilledNet(nn.Module, ABC):
 
         for batch in data_loader:
             inputs, targets = batch
-            logits = self.forward(inputs)
-            outputs = self.transform_logits(logits)
-            self._update_metrics(outputs, targets)
+            outputs = self.forward(inputs)
+            teacher_predictions = self._generate_teacher_predictions(inputs)
+            self._update_metrics(outputs, teacher_predictions)
 
         metric_string = ""
         for metric in self.metrics.values():
             metric_string += " {}".format(metric)
         self._log.info(metric_string)
+
+    def get_scheduler(self, step_size, factor=100, cyclical=False):
+
+        if cyclical:
+            end_lr = self.learning_rate
+            clr = utils.cyclical_lr(step_size, min_lr=end_lr / factor, max_lr=end_lr)
+            scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, [clr])
+        else:
+            scheduler = torch_optim.lr_scheduler.StepLR(self.optimizer,
+                                                        step_size=100,
+                                                        gamma=0.5)
+
+        return scheduler
 
     def add_metric(self, metric):
         self.metrics[metric.name] = metric
@@ -122,7 +145,7 @@ class DistilledNet(nn.Module, ABC):
             epoch_string += " {}".format(metric)
         self._log.info(epoch_string)
 
-    def _learning_rate_condition(self, epoch):
+    def _learning_rate_condition(self, epoch=None):
         """Evaluate condition for increasing learning rate
         Defaults to never increasing. I.e. returns False
         """
