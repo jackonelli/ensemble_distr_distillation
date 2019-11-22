@@ -9,7 +9,6 @@ class SimpleRegressor(ensemble.EnsembleMember):
     """SimpleRegressor
     Network that predicts the parameters of a normal distribution
     """
-
     def __init__(self,
                  input_size,
                  hidden_size_1,
@@ -31,6 +30,11 @@ class SimpleRegressor(ensemble.EnsembleMember):
         self.fc1 = nn.Linear(self.input_size, self.hidden_size_1)
         self.fc2 = nn.Linear(self.hidden_size_1, self.hidden_size_2)
         self.fc3 = nn.Linear(self.hidden_size_2, self.output_size)
+        # Ad-hoc fix zero variance.
+        self.variance_lower_bound = 0.0
+        if self.variance_lower_bound > 0.0:
+            self._log.warning("Non-zero variance lower bound set ({})".format(
+                self.variance_lower_bound))
 
         self.layers = [self.fc1, self.fc2, self.fc3]
         self.optimizer = torch_optim.SGD(self.parameters(),
@@ -51,7 +55,8 @@ class SimpleRegressor(ensemble.EnsembleMember):
         # var = torch.exp(logits[:, int((self.output_size / 2)):])
 
         outputs = logits
-        outputs[:, 1] = torch.exp(outputs[:, 1])
+        outputs[:, 1] = torch.log(
+            1 + torch.exp(outputs[:, 1])) + self.variance_lower_bound
 
         return outputs
 
