@@ -55,6 +55,10 @@ def get_accuracy_test(distilled_model):
     student_acc = np.mean(np.transpose(student_predictions) == test_labels)
     LOGGER.info("Distilled model accuracy on test data {}".format(student_acc))
 
+    # Find student predictions relative teacher predictions
+    student_acc_teacher = np.mean(np.transpose(student_predictions) == teacher_predictions)
+    LOGGER.info("Distilled model accuracy on data relative teacher {}".format(student_acc_teacher))
+
 
 def uncertainty_plots(distilled_model):
 

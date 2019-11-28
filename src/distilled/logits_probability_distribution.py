@@ -17,7 +17,7 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
                  learning_rate=0.001):
         super().__init__(
             teacher=teacher,
-            loss_function=custom_loss.gaussian_neg_log_likelihood,
+            loss_function=custom_loss.gaussian_neg_log_likelihood_2,
             device=device)
 
         self.input_size = input_size
@@ -87,6 +87,13 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
         softmax_samples = torch.exp(samples) / (torch.sum(torch.exp(samples), dim=-1, keepdim=True) + 1)
 
         return softmax_samples
+
+    def _learning_rate_condition(self, epoch=None):
+        """Evaluate condition for increasing learning rate
+        Defaults to never increasing. I.e. returns False
+        """
+
+        return True
 
     def calculate_loss(self, outputs, teacher_predictions, labels=None):
         """Calculate loss function

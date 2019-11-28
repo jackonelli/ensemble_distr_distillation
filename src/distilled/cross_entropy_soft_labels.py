@@ -17,6 +17,7 @@ class XCSoftLabels(distilled_network.DistilledNet):
                  teacher,
                  device=torch.device('cpu'),
                  use_hard_labels=False,
+                 use_teacher_hard_labels=True,
                  learning_rate=0.001):
         super().__init__(
             teacher=teacher,
@@ -27,7 +28,8 @@ class XCSoftLabels(distilled_network.DistilledNet):
         self.hidden_size_1 = hidden_size_1  # Or make a list or something
         self.hidden_size_2 = hidden_size_2
         self.output_size = output_size
-        self.use_teacher_hard_labels = use_hard_labels
+        self.use_hard_labels = use_hard_labels
+        self.use_teacher_hard_labels = use_teacher_hard_labels
         self.learning_rate = learning_rate
 
         self.fc1 = nn.Linear(self.input_size, self.hidden_size_1)
@@ -50,7 +52,30 @@ class XCSoftLabels(distilled_network.DistilledNet):
         x = nn.functional.relu(self.fc2(x))
         x = self.fc3(x)
 
-        return (nn.Softmax(dim=-1))(x)
+        x = torch.exp(x) / (torch.sum(torch.exp(x), dim=-1, keepdim=True) + 1)
+
+        return x
+
+    def _generate_teacher_predictions(self, inputs):
+        """Generate teacher predictions
+        The intention is to get the logits of the ensemble members
+        and then apply some transformation to get the desired predictions.
+        Default implementation is to recreate the exact ensemble member output.
+        Override this method if another logit transformation is desired,
+        e.g. unit transformation if desired predictions
+        are the logits themselves
+        """
+
+        logits = self.teacher.get_logits(inputs)
+        scaled_logits = logits - torch.cat([logits[:, :, -1]], axis=-1)
+        teacher_pred = self.teacher.transform_logits(scaled_logits)
+
+        if self.use_teacher_hard_labels:
+            teacher_pred = torch.argmax(teacher_pred, dim=-1)
+            teacher_pred = utils.to_one_hot(teacher_pred, number_of_classes=self.output_size + 1)\
+                .type(torch.FloatTensor)
+
+        return teacher_pred
 
     def predict(self, input_, num_samples=None):
         """Predict parameters
@@ -72,4 +97,16 @@ class XCSoftLabels(distilled_network.DistilledNet):
         """
 
         return True
+
+    def logits_rmse(self, outputs, teacher_predictions):
+        # This will not be the nicest solution, but well well
+        last_prob_target = 1 - torch.sum(teacher_predictions, dim=1, keepdim=True)
+        target_total = 1 / last_prob_target
+        target_logits = torch.log(teacher_predictions * target_total)
+
+        last_prob_predictions = 1 - torch.sum(outputs, dim=1, keepdim=True)
+        prediction_total = 1 / last_prob_predictions
+        prediction_logits = torch.log(outputs * prediction_total)
+
+        return custom_loss.rmse(prediction_logits, target_logits)
 
