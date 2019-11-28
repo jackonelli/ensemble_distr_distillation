@@ -166,10 +166,11 @@ def brier_score(predicted_distribution, true_labels):
 def accuracy(predicted_distribution, true_labels):
     """ Accuracy
     B = batch size
+    K = number of classes
 
     Args:
         true_labels: torch.tensor(B)
-        predicted_distribution: torch.tensor(B)
+        predicted_distribution: torch.tensor(B, K)
 
     Returns:
         Accuracy: float
@@ -180,6 +181,64 @@ def accuracy(predicted_distribution, true_labels):
     if number_of_elements == 0:
         number_of_elements = 1
     return (true_labels == predicted_labels.int()
+            ).sum().item() / number_of_elements
+
+
+def accuracy_soft_labels(predicted_distribution, target_distribution):
+    """ Accuracy
+    B = batch size
+    K = number of classes
+
+    Args:
+        target_distribution: torch.tensor(B, K-1)
+        predicted_distribution: torch.tensor(B, K-1)
+
+    Returns:
+        Accuracy: float
+    """
+
+    predicted_distribution = torch.cat((predicted_distribution, 1-torch.sum(predicted_distribution, dim=1,
+                                                                                            keepdim=True)), dim=1)
+    target_distribution = torch.cat((target_distribution, 1-torch.sum(target_distribution, dim=1,
+                                                                                            keepdim=True)), dim=1)
+
+    predicted_labels, _ = utils.tensor_argmax(predicted_distribution)
+    target_labels, _ = utils.tensor_argmax(target_distribution)
+    number_of_elements = np.prod(target_labels.size(0))
+
+    if number_of_elements == 0:
+        number_of_elements = 1
+    return (target_labels.int() == predicted_labels.int()
+            ).sum().item() / number_of_elements
+
+
+def accuracy_logits(predicted_logits, target_logits):
+    """ Accuracy given that the inputs are logits assumed to be scaled relative the last class K
+    B = batch size
+    K = number of classes
+    N = number of ensemble member
+
+    Args:
+        target_logits: torch.tensor(B, N, K-1)
+        predicted_logits: torch.tensor(B, K-1)
+
+    Returns:
+        Accuracy: float
+    """
+    number_of_elements = np.prod(predicted_logits.size(0))
+    predicted_distribution = (torch.nn.Softmax(dim=-1))(torch.cat((predicted_logits,
+                                                                   torch.zeros(number_of_elements, 1)), dim=-1))
+    target_distribution = (torch.nn.Softmax(dim=-1))(torch.cat((target_logits,
+                                                                torch.zeros(number_of_elements,
+                                                                             target_logits.size(1), 1)),
+                                                               dim=-1))
+
+    predicted_labels, _ = utils.tensor_argmax(predicted_distribution)
+    target_labels, _ = utils.tensor_argmax(torch.mean(target_distribution, dim=1))
+
+    if number_of_elements == 0:
+        number_of_elements = 1
+    return (target_labels.int() == predicted_labels.int()
             ).sum().item() / number_of_elements
 
 
