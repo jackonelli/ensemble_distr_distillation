@@ -15,10 +15,9 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
                  device=torch.device('cpu'),
                  use_hard_labels=False,
                  learning_rate=0.001):
-        super().__init__(
-            teacher=teacher,
-            loss_function=custom_loss.gaussian_neg_log_likelihood_2,
-            device=device)
+        super().__init__(teacher=teacher,
+                         loss_function=custom_loss.gaussian_neg_log_likelihood,
+                         device=device)
 
         self.input_size = input_size
         self.hidden_size_1 = hidden_size_1  # Or make a list or something

@@ -58,7 +58,6 @@ class DistilledNet(nn.Module, ABC):
         """
         running_loss = 0
         self._reset_metrics()
-        self._log.info(scheduler.get_lr())
 
         for batch in train_loader:
             self.optimizer.zero_grad()
