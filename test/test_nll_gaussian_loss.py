@@ -36,8 +36,7 @@ class TestGaussianLoss(unittest.TestCase):
                                               dtype=torch.float),
                                  dim=-1).reshape(B, N, D)
         mean = torch.tensor([[0.5]], dtype=torch.float)
-        var = torch.unsqueeze(torch.tensor([[10.0, 10.0]], dtype=torch.float),
-                              dim=-1)
+        var = torch.unsqueeze(torch.tensor([10.0], dtype=torch.float), dim=-1)
 
         gauss_nll = loss.gaussian_neg_log_likelihood((mean, var), target)
         self.assertAlmostEqual(gauss_nll.item(),
@@ -57,6 +56,17 @@ class TestGaussianLoss(unittest.TestCase):
     #                           0.25 * math.log(4 * math.pi**2 * 10 * 5) +
     #                           0.01875,
     #                           places=NUM_DECIMALS)
+
+    def test_gaussian_nll_unopt(self):
+        target = torch.tensor([[[1.0], [0.75]]], dtype=torch.float)
+        mean = torch.tensor([[0.5], [0.25]], dtype=torch.float)
+        var = torch.tensor([[10.0], [5.0]], dtype=torch.float)
+
+        gauss_nll = loss.gaussian_neg_log_likelihood_unopt((mean, var), target)
+        self.assertAlmostEqual(gauss_nll.item(),
+                               0.25 * math.log(4 * math.pi**2 * 10 * 5) +
+                               0.01875,
+                               places=5)
 
 
 if __name__ == '__main__':

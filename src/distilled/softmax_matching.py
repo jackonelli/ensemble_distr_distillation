@@ -51,9 +51,9 @@ class SoftmaxMatching(distilled_network.DistilledNet):
         x = nn.functional.relu(self.fc2(x))
         x = self.fc3(x)
 
-        mean = x
+        x = torch.exp(x) / (torch.sum(torch.exp(x), dim=-1, keepdim=True) + 1)
 
-        return mean
+        return x
 
     def _generate_teacher_predictions(self, inputs):
         """Generate teacher predictions
@@ -66,11 +66,12 @@ class SoftmaxMatching(distilled_network.DistilledNet):
         """
 
         logits = self.teacher.get_logits(inputs)
-        teacher_pred = self.teacher.transform_logits(logits)
+        scaled_logits = logits - torch.stack([logits[:, :, -1]], axis=-1)
+        teacher_pred = self.teacher.transform_logits(scaled_logits)[:, :, 0:-1]
 
         if self.use_teacher_hard_labels:
-            teacher_pred = torch.argmax(teacher_pred, dim=1)
-            teacher_pred = utils.to_one_hot(teacher_pred, number_of_classes=self.output_size)
+            teacher_pred = torch.argmax(teacher_pred, dim=-1)
+            teacher_pred = utils.to_one_hot(teacher_pred, number_of_classes=self.output_size).type(torch.FloatTensor)
 
         return teacher_pred
 
@@ -79,9 +80,9 @@ class SoftmaxMatching(distilled_network.DistilledNet):
         Wrapper function for the forward function.
         """
 
-        mean = self.forward(input_)
+        x = self.forward(input_)
 
-        return mean
+        return x
 
     def calculate_loss(self, outputs, teacher_predictions, labels=None):
         """Calculate loss function
@@ -95,4 +96,18 @@ class SoftmaxMatching(distilled_network.DistilledNet):
         """
 
         return True
+
+    def logits_rmse(self, outputs, teacher_predictions):
+        # This will not be the nicest solution, but well well
+        last_prob_target = 1 - torch.sum(teacher_predictions, dim=1, keepdim=True)
+        target_total = 1 / last_prob_target
+        target_logits = torch.log(teacher_predictions * target_total)
+
+        last_prob_predictions = 1 - torch.sum(outputs, dim=1, keepdim=True)
+        prediction_total = 1 / last_prob_predictions
+        prediction_logits = torch.log(outputs * prediction_total)
+
+        return custom_loss.rmse(prediction_logits, target_logits)
+
+
 

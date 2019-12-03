@@ -83,7 +83,7 @@ class LogitsMatching(distilled_network.DistilledNet):
 
         mean = self.forward(input_)
 
-        return torch.exp(mean) / (torch.exp(mean) + 1)
+        return torch.exp(mean) / (torch.sum(torch.exp(mean), dim=1, keepdim=True) + 1)
 
     def calculate_loss(self, outputs, teacher_predictions, labels=None):
         """Calculate loss function
@@ -98,3 +98,19 @@ class LogitsMatching(distilled_network.DistilledNet):
 
         return True
 
+    def softmax_rmse(self, outputs, teacher_predictions):
+        # We will convert this to the softmax output so that we can calculate metrics on them
+        teacher_distribution = torch.exp(teacher_predictions) / (torch.sum(torch.exp(teacher_predictions), dim=-1,
+                                                                           keepdim=True) + 1)
+        predicted_distribution = torch.exp(outputs) / (torch.sum(torch.exp(outputs), dim=-1, keepdim=True) + 1)
+
+        return custom_loss.rmse(predicted_distribution, teacher_distribution)
+
+    def softmax_xentropy(self, outputs, teacher_predictions):
+        # We will convert this to the softmax output so that we can calculate metrics on them
+        # NOTE: this function is only defined for one ensemble member
+        teacher_distribution = torch.exp(teacher_predictions[:, 0, :]) / (torch.sum(torch.exp(teacher_predictions[:, 0, :]),
+                                                                                    dim=-1, keepdim=True) + 1)
+        predicted_distribution = torch.exp(outputs) / (torch.sum(torch.exp(outputs), dim=-1, keepdim=True) + 1)
+
+        return custom_loss.cross_entropy_soft_targets(predicted_distribution, teacher_distribution)

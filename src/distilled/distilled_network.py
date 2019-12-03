@@ -32,7 +32,7 @@ class DistilledNet(nn.Module, ABC):
         """ Common train method for all distilled networks
         Should NOT be overridden!
         """
-        scheduler = self.get_scheduler(step_size=4 * len(train_loader),
+        scheduler = self.get_scheduler(step_size=10 * len(train_loader),
                                        cyclical=True)
 
         # scheduler = torch_optim.lr_scheduler.CyclicLR(
@@ -57,7 +57,8 @@ class DistilledNet(nn.Module, ABC):
         if no labels are available.
         """
         running_loss = 0
-        # self._reset_metrics()
+        self._reset_metrics()
+        self._log.info(scheduler.get_lr())
 
         for batch in train_loader:
             self.optimizer.zero_grad()
@@ -78,10 +79,11 @@ class DistilledNet(nn.Module, ABC):
                 break
 
             if validation_loader is None:
-                self._reset_metrics()
+                #self._reset_metrics()
                 self._update_metrics(
                     outputs, teacher_predictions
                 )  # BUT THIS DOES NOT WORK FOR EG ACCURACY
+                # USE EITHER METRICS.ACCURACY_SOFT_LABELS OR METRICS.ACCURACY_LOGITS
 
             if self._learning_rate_condition():
                 scheduler.step()
@@ -89,7 +91,7 @@ class DistilledNet(nn.Module, ABC):
         if validation_loader is not None:
             # We will compare here with the teacher predictions
             for valid_batch in validation_loader:
-                self._reset_metrics()
+                #self._reset_metrics()
                 valid_inputs, valid_labels = valid_batch
                 valid_inputs, valid_labels = valid_inputs.to(
                     self.device), valid_labels.to(self.device)
@@ -128,7 +130,7 @@ class DistilledNet(nn.Module, ABC):
             metric_string += " {}".format(metric)
         self._log.info(metric_string)
 
-    def get_scheduler(self, step_size, factor=100, cyclical=False):
+    def get_scheduler(self, step_size, factor=100000, cyclical=False):
 
         if cyclical:
             end_lr = self.learning_rate

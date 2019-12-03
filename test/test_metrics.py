@@ -39,6 +39,18 @@ class TestMetrics(unittest.TestCase):
         acc = metrics.accuracy(predictions, true_label)
         self.assertAlmostEqual(acc, 1)
 
+    def test_accuracy_logits(self):
+        logits = torch.tensor([[3, 4]]).float()
+        target_logits = torch.tensor([[[2, 5]]]).float()
+        acc = metrics.accuracy_logits(logits, target_logits)
+        self.assertAlmostEqual(acc, 1)
+
+    def test_accuracy_soft_labels(self):
+        predicted_distribution = torch.tensor([[0.3, 0.6]])
+        target_distribution = torch.tensor([[0.2, 0.7]])
+        acc = metrics.accuracy_soft_labels(predicted_distribution, target_distribution)
+        self.assertAlmostEqual(acc, 1)
+
     def test_accuracy_batch(self):
         true_label = torch.tensor([1, 0, 2, 0]).int()
         predictions = torch.tensor([[0.05, 0.09, 0.05], [0.1, 0.8, 0.1],
