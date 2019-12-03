@@ -98,7 +98,6 @@ def gaussian_neg_log_likelihood(parameters, target, scale=None):
     average_nll /= B * N
 
     if average_nll < 0:
-        print(normalizer)
         raise Exception("Negative nll")
 
     return torch.mean(average_nll)  # Mean over batch

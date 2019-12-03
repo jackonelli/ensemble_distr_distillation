@@ -16,9 +16,12 @@ class DistilledNet(nn.Module, ABC):
         self.teacher = teacher
         self.loss = loss_function
         self.metrics = dict()
+        self.use_hard_labels = False
+
         if self.loss is None or not issubclass(type(self.loss),
                                                nn.modules.loss._Loss):
-            # raise ValueError("Must assign proper loss function to child.loss.")
+            # raise ValueError(
+            #    "Must assign proper loss function to child.loss.")
             self._log.warning(
                 "Must assign proper loss function to child.loss.")
         self.optimizer = None
@@ -32,8 +35,8 @@ class DistilledNet(nn.Module, ABC):
         scheduler = self.get_scheduler(step_size=4 * len(train_loader),
                                        cyclical=True)
 
-        #scheduler = torch_optim.lr_scheduler.CyclicLR(self.optimizer, 1e-7, 0.1, step_size_up=100)
-        self.use_hard_labels = False
+        # scheduler = torch_optim.lr_scheduler.CyclicLR(
+        #    self.optimizer, 1e-7, 0.1, step_size_up=100)
 
         self._log.info("Training distilled network.")
         for epoch_number in range(1, num_epochs + 1):
@@ -41,8 +44,8 @@ class DistilledNet(nn.Module, ABC):
                                      validation_loader=validation_loader,
                                      scheduler=scheduler)
             self._print_epoch(epoch_number, loss)
-            #if self._learning_rate_condition(epoch_number):
-            #    scheduler.step()
+            if self._learning_rate_condition(epoch_number):
+                scheduler.step()
 
     def _train_epoch(self,
                      train_loader,
@@ -54,7 +57,7 @@ class DistilledNet(nn.Module, ABC):
         if no labels are available.
         """
         running_loss = 0
-        #self._reset_metrics()
+        # self._reset_metrics()
 
         for batch in train_loader:
             self.optimizer.zero_grad()
