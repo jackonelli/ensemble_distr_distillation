@@ -29,11 +29,6 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
         self.fc1 = nn.Linear(self.input_size, self.hidden_size_1)
         self.fc2 = nn.Linear(self.hidden_size_1, self.hidden_size_2)
         self.fc3 = nn.Linear(self.hidden_size_2, self.output_size)
-        # Ad-hoc fix zero variance.
-        self.variance_lower_bound = 0.0
-        if self.variance_lower_bound > 0.0:
-            self._log.warning("Non-zero variance lower bound set ({})".format(
-                self.variance_lower_bound))
 
         self.layers = [self.fc1, self.fc2, self.fc3]
 
@@ -53,7 +48,7 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
 
         mean = x[:, :int((self.output_size / 2))]
         var_z = x[:, int((self.output_size / 2)):]
-        var = torch.log(1 + torch.exp(var_z)) + self.variance_lower_bound
+        var = torch.log(1 + torch.exp(var_z))
 
         return mean, var
 
