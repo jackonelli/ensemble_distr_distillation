@@ -62,9 +62,9 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
 
         logits = self.teacher.get_logits(inputs)
 
-        #scaled_logits = logits  # - torch.stack([logits[:, :, -1]], axis=-1)
+        # scaled_logits = logits  # - torch.stack([logits[:, :, -1]], axis=-1)
 
-        #return scaled_logits[:, :, 0:-1]
+        # return scaled_logits[:, :, 0:-1]
         return logits
 
     def predict(self, input_, num_samples=None):

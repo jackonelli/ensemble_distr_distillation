@@ -9,13 +9,14 @@ LOGGER = logging.getLogger(__name__)
 
 class Metric:
     """Metric class"""
-
     def __init__(self, name, function):
         self.name = name
         self.function = function
         self.running_value = 0.0
         self.counter = 0
-        self.memory = []  # So that we can go back an look at the data, should not take to much storage room
+        self.memory = []
+        # So that we can go back an look at the data,
+        # should not take to much storage room
 
     def __str__(self):
         return "{}: {}".format(self.name, self.mean())
@@ -131,7 +132,8 @@ def uncertainty_separation_entropy(predicted_distribution, true_labels):
         Aleatoric uncertainty: torch.tensor(B,)
     """
 
-    # We calculate the uncertainties relative the maximum possible uncertainty (log(C))
+    # We calculate the uncertainties relative the maximum possible uncertainty:
+    # (log(C))
     max_entropy = torch.log(
         torch.tensor(predicted_distribution.size(-1)).float())
 
@@ -218,10 +220,14 @@ def accuracy_soft_labels(predicted_distribution, target_distribution):
         Accuracy: float
     """
 
-    predicted_distribution = torch.cat((predicted_distribution, 1-torch.sum(predicted_distribution, dim=1,
-                                                                                            keepdim=True)), dim=1)
-    target_distribution = torch.cat((target_distribution, 1-torch.sum(target_distribution, dim=1,
-                                                                                            keepdim=True)), dim=1)
+    predicted_distribution = torch.cat(
+        (predicted_distribution,
+         1 - torch.sum(predicted_distribution, dim=1, keepdim=True)),
+        dim=1)
+    target_distribution = torch.cat(
+        (target_distribution,
+         1 - torch.sum(target_distribution, dim=1, keepdim=True)),
+        dim=1)
 
     predicted_labels, _ = utils.tensor_argmax(predicted_distribution)
     target_labels, _ = utils.tensor_argmax(target_distribution)
@@ -247,15 +253,16 @@ def accuracy_logits(predicted_logits, target_logits):
         Accuracy: float
     """
     number_of_elements = np.prod(predicted_logits.size(0))
-    predicted_distribution = (torch.nn.Softmax(dim=-1))(torch.cat((predicted_logits,
-                                                                   torch.zeros(number_of_elements, 1)), dim=-1))
-    target_distribution = (torch.nn.Softmax(dim=-1))(torch.cat((target_logits,
-                                                                torch.zeros(number_of_elements,
-                                                                             target_logits.size(1), 1)),
-                                                               dim=-1))
+    predicted_distribution = (torch.nn.Softmax(dim=-1))(torch.cat(
+        (predicted_logits, torch.zeros(number_of_elements, 1)), dim=-1))
+    target_distribution = (torch.nn.Softmax(dim=-1))(torch.cat(
+        (target_logits,
+         torch.zeros(number_of_elements, target_logits.size(1), 1)),
+        dim=-1))
 
     predicted_labels, _ = utils.tensor_argmax(predicted_distribution)
-    target_labels, _ = utils.tensor_argmax(torch.mean(target_distribution, dim=1))
+    target_labels, _ = utils.tensor_argmax(
+        torch.mean(target_distribution, dim=1))
 
     if number_of_elements == 0:
         number_of_elements = 1
