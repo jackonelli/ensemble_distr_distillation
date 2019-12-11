@@ -10,15 +10,18 @@ import src.utils as utils
 
 class DistilledNet(nn.Module, ABC):
     """Parent class for distilled net logic in one place"""
-
     def __init__(self, teacher, loss_function, device=torch.device("cpu")):
         super().__init__()
         self._log = logging.getLogger(self.__class__.__name__)
         self.teacher = teacher
         self.loss = loss_function
         self.metrics = dict()
-        if self.loss is None or not issubclass(type(self.loss), nn.modules.loss._Loss):
-            # raise ValueError("Must assign proper loss function to child.loss.")
+        self.use_hard_labels = False
+
+        if self.loss is None or not issubclass(type(self.loss),
+                                               nn.modules.loss._Loss):
+            # raise ValueError(
+            #    "Must assign proper loss function to child.loss.")
             self._log.warning(
                 "Must assign proper loss function to child.loss.")
         self.optimizer = None
@@ -31,18 +34,21 @@ class DistilledNet(nn.Module, ABC):
         """
         scheduler = self.get_scheduler(step_size=5*len(train_loader), cyclical=True)
         #scheduler = torch_optim.lr_scheduler.CyclicLR(self.optimizer, 1e-7, 0.1, step_size_up=100)
-        self.use_hard_labels = False
+        self.use_hard_labels = False # VILL VI HA DENNA?
 
         self._log.info("Training distilled network.")
         for epoch_number in range(1, num_epochs + 1):
-            loss = self._train_epoch(train_loader, validation_loader=validation_loader, scheduler=scheduler)
+            loss = self._train_epoch(train_loader,
+                                     validation_loader=validation_loader,
+                                     scheduler=scheduler)
             self._print_epoch(epoch_number, loss)
-            #if self._learning_rate_condition(epoch_number):
-            #    scheduler.step()
+            if self._learning_rate_condition(epoch_number):
+                scheduler.step()
 
         self._reset_metrics()  # For storing purposes
 
     def _train_epoch(self, train_loader, validation_loader=None, scheduler=None):
+
         """Common train epoch method for all distilled networks
         Should NOT be overridden!
         TODO: Make sure train_loader returns None for labels,
@@ -57,17 +63,17 @@ class DistilledNet(nn.Module, ABC):
             self.calculate_metric_dataloader(validation_loader)
 
         self._reset_metrics()
-        self._log.info(scheduler.get_lr())
 
         for batch in train_loader:
             self.optimizer.zero_grad()
             inputs, labels = batch
             inputs, labels = inputs.to(self.device), labels.to(self.device)
-            teacher_predictions = self._generate_teacher_predictions(inputs)
+            teacher_predictions = self._generate_teacher_predictions(
+                inputs).detach()
 
             outputs = self.forward(inputs)
 
-            loss = self.calculate_loss(outputs, teacher_predictions, labels)
+            loss = self.calculate_loss(outputs, teacher_predictions, None)
 
             loss.backward()
             self.optimizer.step()
@@ -78,8 +84,10 @@ class DistilledNet(nn.Module, ABC):
 
             if validation_loader is None:
                 #self._reset_metrics()
-                self._update_metrics(outputs, teacher_predictions)  # BUT THIS DOES NOT WORK FOR EG ACCURACY
-                                                                    # USE EITHER METRICS.ACCURACY_SOFT_LABELS OR METRICS.ACCURACY_LOGITS
+                self._update_metrics(
+                    outputs, teacher_predictions
+                )  # BUT THIS DOES NOT WORK FOR EG ACCURACY
+                # USE EITHER METRICS.ACCURACY_SOFT_LABELS OR METRICS.ACCURACY_LOGITS
 
             if self._learning_rate_condition():
                 scheduler.step()
@@ -131,8 +139,11 @@ class DistilledNet(nn.Module, ABC):
 
         if cyclical:
             end_lr = self.learning_rate
-            clr = utils.cyclical_lr(step_size, min_lr=end_lr / factor, max_lr=end_lr)
-            scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, [clr])
+            clr = utils.cyclical_lr(step_size,
+                                    min_lr=end_lr / factor,
+                                    max_lr=end_lr)
+            scheduler = torch.optim.lr_scheduler.LambdaLR(
+                self.optimizer, [clr])
         else:
             scheduler = torch_optim.lr_scheduler.StepLR(self.optimizer,
                                                         step_size=step_size,

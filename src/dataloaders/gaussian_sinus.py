@@ -1,3 +1,8 @@
+"""One dimensional dataset,
+Gaussian with sinus wave mean, variance increasing in x
+
+Taken from paper: "https://arxiv.org/abs/1906.01620"
+"""
 from pathlib import Path
 import csv
 import numpy as np
@@ -6,14 +11,14 @@ import matplotlib.pyplot as plt
 import logging
 
 
-class SyntheticRegressionData(torch.utils.data.Dataset):
+class GaussianSinus(torch.utils.data.Dataset):
     def __init__(self,
                  store_file,
                  train=True,
                  reuse_data=False,
                  n_samples=1000):
 
-        super(SyntheticRegressionData).__init__()
+        super(GaussianSinus).__init__()
         self._log = logging.getLogger(self.__class__.__name__)
         self.n_samples = n_samples
         self.train = train
@@ -44,24 +49,17 @@ class SyntheticRegressionData(torch.utils.data.Dataset):
 
     def sample_new_data(self):
         self.file.parent.mkdir(parents=True, exist_ok=True)
-
         if self.train:
-            x_1 = np.random.normal(-4, 2 / 5,
-                                   [int(np.ceil(self.n_samples / 3)), 1])
-            x_2 = np.random.normal(0, 0.9,
-                                   [int(np.ceil(self.n_samples / 3)), 1])
-            x_3 = np.random.normal(
-                4, 2 / 5,
-                [self.n_samples - 2 * int(np.ceil(self.n_samples / 3)), 1])
-            all_x = np.row_stack([x_1, x_2, x_3])
+            x = np.random.uniform(low=-3.0, high=3.0, size=self.n_samples)
+            mu = np.sin(x)
+            sigma = 0.15 * 1 / (1 + np.exp(-x))
+            sigma **= 2
+            y = np.random.multivariate_normal(mean=mu, cov=(np.diag(sigma)))
 
         else:
-            all_x = np.linspace(-5, 5, self.n_samples)[:, np.newaxis]
+            x = np.random.uniform(low=-3.0, high=3.0, size=self.n_samples)
 
-        all_y = all_x + 0.5 * np.abs(all_x) * np.random.normal(
-            size=[self.n_samples, 1])
-
-        combined_data = np.column_stack((all_x, all_y))
+        combined_data = np.column_stack((x, y))
         np.random.shuffle(combined_data)
         np.savetxt(self.file, combined_data, delimiter=",")
 
@@ -87,7 +85,7 @@ def plot_reg_data(data, ax):
 
 def main():
     _, ax = plt.subplots()
-    dataset = SyntheticRegressionData(store_file=Path("data/1d_reg_1000"))
+    dataset = GaussianSinus(store_file=Path("data/1d_gauss_sinus_1000"))
     plot_reg_data(dataset.get_full_data(), ax)
 
 

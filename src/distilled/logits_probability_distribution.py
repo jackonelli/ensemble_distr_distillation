@@ -16,6 +16,7 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
                  device=torch.device('cpu'),
                  use_hard_labels=False,
                  learning_rate=0.001):
+
         super().__init__(
             teacher=teacher,
             loss_function=custom_loss.gaussian_neg_log_likelihood,
@@ -31,6 +32,11 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
         self.fc1 = nn.Linear(self.input_size, self.hidden_size_1)
         self.fc2 = nn.Linear(self.hidden_size_1, self.hidden_size_2)
         self.fc3 = nn.Linear(self.hidden_size_2, self.output_size)
+        # Ad-hoc fix zero variance.
+        self.variance_lower_bound = 0.0
+        if self.variance_lower_bound > 0.0:
+            self._log.warning("Non-zero variance lower bound set ({})".format(
+                self.variance_lower_bound))
 
         self.layers = [self.fc1, self.fc2, self.fc3]
 
@@ -48,26 +54,21 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
         x = self.fc3(x)
 
         mean = x[:, :int((self.output_size / 2))]
-        var = torch.exp(x[:, int(self.output_size / 2):])
-        #var = torch.log(1 + torch.exp(x[:, int(self.output_size / 2):]))
+
+        var_z = x[:, int((self.output_size / 2)):]
+        var = torch.log(1 + torch.exp(var_z)) + self.variance_lower_bound
 
         return mean, var
 
     def _generate_teacher_predictions(self, inputs):
-        """Generate teacher predictions
-        The intention is to get the logits of the ensemble members
-        and then apply some transformation to get the desired predictions.
-        Default implementation is to recreate the exact ensemble member output.
-        Override this method if another logit transformation is desired,
-        e.g. unit transformation if desired predictions
-        are the logits themselves
-        """
+        """Generate teacher predictions"""
 
         logits = self.teacher.get_logits(inputs)
 
-        scaled_logits = logits - torch.stack([logits[:, :, -1]], dim=-1)
+        # scaled_logits = logits  # - torch.stack([logits[:, :, -1]], axis=-1)
 
-        return scaled_logits[:, :, 0:-1]
+        # return scaled_logits[:, :, 0:-1]
+        return logits
 
     def predict(self, input_, num_samples=None):
         """Predict parameters
@@ -79,12 +80,17 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
 
         mean, var = self.forward(input_)
 
-        samples = torch.zeros([input_.size(0), num_samples, int(self.output_size / 2)])
+        samples = torch.zeros(
+            [input_.size(0), num_samples,
+             int(self.output_size / 2)])
         for i in range(input_.size(0)):
-            rv = torch_mvn.MultivariateNormal(loc=mean[i, :], covariance_matrix=torch.diag(var[i, :]))
+
+            rv = torch.distributions.multivariate_normal.MultivariateNormal(
+                loc=mean[i, :], covariance_matrix=torch.diag(var[i, :]))
             samples[i, :, :] = rv.rsample([num_samples])
 
-        softmax_samples = torch.exp(samples) / (torch.sum(torch.exp(samples), dim=-1, keepdim=True) + 1)
+        softmax_samples = torch.exp(samples) / (
+            torch.sum(torch.exp(samples), dim=-1, keepdim=True) + 1)
 
         return torch.exp(mean) / (torch.sum(torch.exp(mean), dim=-1, keepdim=True) + 1)
 

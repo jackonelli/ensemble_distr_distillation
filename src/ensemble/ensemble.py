@@ -90,7 +90,8 @@ class Ensemble():
         """
 
         batch_size = logits.size(0)
-        transformed_logits = torch.zeros((batch_size, self.size, self.output_size))
+        transformed_logits = torch.zeros(
+            (batch_size, self.size, self.output_size))
         for member_ind, member in enumerate(self.members):
             if transformation:
                 transformed_logits[:, member_ind, :] = transformation(
@@ -170,7 +171,11 @@ class EnsembleMember(nn.Module, ABC):
 
             raise ValueError("Must assign proper loss function to child.loss.")
 
-    def train(self, train_loader, num_epochs, validation_loader=None, metrics=list()):
+    def train(self,
+              train_loader,
+              num_epochs,
+              validation_loader=None,
+              metrics=list()):
         """Common train method for all ensemble member classes
         Should NOT be overridden!
         """
@@ -184,7 +189,10 @@ class EnsembleMember(nn.Module, ABC):
             if self._learning_rate_condition(epoch_number):
                 scheduler.step()
 
-    def _train_epoch(self, train_loader, validation_loader=None, metrics=list()):
+    def _train_epoch(self,
+                     train_loader,
+                     validation_loader=None,
+                     metrics=list()):
         """Common train epoch method for all ensemble member classes
         Should NOT be overridden!
         """
@@ -194,6 +202,7 @@ class EnsembleMember(nn.Module, ABC):
         for batch in train_loader:
             self.optimizer.zero_grad()
             inputs, labels = batch
+            self._log.debug((inputs[0, 0].item(), labels[0, 0].item()))
 
             inputs, labels = inputs.to(self.device), labels.to(self.device)
 
@@ -273,6 +282,9 @@ class EnsembleMember(nn.Module, ABC):
 
         Default impl. is not given to avoid this transf.
         being implicitly included in the forward method.
+
+        Args:
+            logits (torch.tensor(B, K)):
         """
 
     @abstractmethod

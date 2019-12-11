@@ -9,13 +9,13 @@ LOGGER = logging.getLogger(__name__)
 
 class Metric:
     """Metric class"""
-
     def __init__(self, name, function):
         self.name = name
         self.function = function
         self.running_value = 0.0
         self.counter = 0
         self.memory = []  # So that we can go back an look at the data
+
 
     def __str__(self):
         return "{}: {}".format(self.name, self.mean())
@@ -60,11 +60,32 @@ def entropy(predicted_distribution, true_labels):
         predicted_distribution * torch.log(predicted_distribution), dim=-1)
 
 
+def uncertainty_separation_parametric(mu, var):
+    """Total, epistemic and aleatoric uncertainty
+
+    based on a parametric (normal) variance measure
+
+    M = length of input data x, N = number of distributions
+
+    Args:
+        mu: torch.tensor((M, N)): E(y|x) for M x and N distr.
+        var: torch.tensor((M, N)): var(y|x) for M x and N distr.
+
+    Returns:
+        aleatoric_uncertainty: torch.tensor((M)):
+            E_theta[var(y|x, theta)] for M x and N distr.
+        epistemic_uncertainty: torch.tensor((M)):
+            var_theta[E(y|x, theta)] for M x and N distr.
+    """
+    epistemic_uncertainty = torch.var(mu, dim=1)
+    aleatoric_uncertainty = torch.mean(var, dim=1)
+    return aleatoric_uncertainty, epistemic_uncertainty
+
+
 def uncertainty_separation_variance(predicted_distribution, true_labels):
     """Total, epistemic and aleatoric uncertainty based on a variance measure
 
     B = batch size, N = num predictions
-    Labels as one hot vectors
     Note: if a batch with B samples is given,
     then the output is a tensor with B values
     The true labels argument is simply there for conformity
@@ -110,7 +131,8 @@ def uncertainty_separation_entropy(predicted_distribution, true_labels):
         Aleatoric uncertainty: torch.tensor(B,)
     """
 
-    # We calculate the uncertainties relative the maximum possible uncertainty (log(C))
+    # We calculate the uncertainties relative the maximum possible uncertainty:
+    # (log(C))
     max_entropy = torch.log(
         torch.tensor(predicted_distribution.size(-1)).float())
 
@@ -197,10 +219,14 @@ def accuracy_soft_labels(predicted_distribution, target_distribution):
         Accuracy: float
     """
 
-    predicted_distribution = torch.cat((predicted_distribution, 1-torch.sum(predicted_distribution, dim=1,
-                                                                                            keepdim=True)), dim=1)
-    target_distribution = torch.cat((target_distribution, 1-torch.sum(target_distribution, dim=1,
-                                                                                            keepdim=True)), dim=1)
+    predicted_distribution = torch.cat(
+        (predicted_distribution,
+         1 - torch.sum(predicted_distribution, dim=1, keepdim=True)),
+        dim=1)
+    target_distribution = torch.cat(
+        (target_distribution,
+         1 - torch.sum(target_distribution, dim=1, keepdim=True)),
+        dim=1)
 
     predicted_labels, _ = utils.tensor_argmax(predicted_distribution)
     target_labels, _ = utils.tensor_argmax(target_distribution)
@@ -227,7 +253,6 @@ def accuracy_logits(predicted_logits, targets, label_targets=False):
         Accuracy: float
     """
     number_of_elements = np.prod(predicted_logits.size(0))
-
     if predicted_logits.dim() == 3:
         predicted_distribution = torch.mean((torch.nn.Softmax(dim=-1))(torch.cat((predicted_logits,
                                                                                   torch.zeros(number_of_elements,
@@ -247,6 +272,7 @@ def accuracy_logits(predicted_logits, targets, label_targets=False):
         target_labels, _ = utils.tensor_argmax(target_distribution)
 
     predicted_labels, _ = utils.tensor_argmax(predicted_distribution)
+
 
     if number_of_elements == 0:
         number_of_elements = 1

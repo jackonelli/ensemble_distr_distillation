@@ -13,10 +13,13 @@ def cross_entropy_soft_targets(predictions, soft_targets):
         soft_target (torch.tensor((B, D - 1))): target distribution
     """
 
-    predicted_distribution = torch.cat((predictions, 1 - torch.sum(predictions, dim=1, keepdim=True)), dim=1)
-    target_distribution = torch.cat((soft_targets, 1 - torch.sum(soft_targets, dim=1, keepdim=True)), dim=1)
+    predicted_distribution = torch.cat(
+        (predictions, 1 - torch.sum(predictions, dim=1, keepdim=True)), dim=1)
+    target_distribution = torch.cat(
+        (soft_targets, 1 - torch.sum(soft_targets, dim=1, keepdim=True)),
+        dim=1)
 
-    return torch.sum(- target_distribution * torch.log(predicted_distribution))
+    return torch.sum(-target_distribution * torch.log(predicted_distribution))
 
 
 def dirichlet_neg_log_likelihood(alphas, target_distribution):
@@ -55,6 +58,27 @@ def _dirichlet_sufficient_statistics(target_distribution):
     return torch.mean(torch.log(target_distribution), 1)
 
 
+def gaussian_neg_log_likelihood_1d(parameters, target):
+    """Negative log likelihood loss for 1D Gaussian distribution
+    B = batch size, 2
+
+    Args:
+        parameters (torch.tensor((B, 2)), torch.tensor((B, 1))):
+            mean values and variances of y|x for every x in
+            batch.
+        target (torch.tensor((B, 1))): sample from the normal
+            distribution, if not an ensemble prediction N=1.
+    """
+
+    mean = parameters[:, 0]
+    var = parameters[:, 1]
+    # print("mean", mean.shape)
+    # print("target", target.shape)
+    neg_log_prob = 1 / (2 * var) * (target[:, 0] -
+                                    mean)**2 + 0.5 * torch.log(var)
+    return torch.mean(neg_log_prob)
+
+
 def gaussian_neg_log_likelihood(parameters, target):
 
     mean = parameters[0]
@@ -63,7 +87,8 @@ def gaussian_neg_log_likelihood(parameters, target):
     if target.dim() == 2:
         target = torch.unsqueeze(target, dim=1)
 
-    cov_mat = torch.stack([torch.diag(var[b, :]) for b in np.arange(target.size(0))])
+    cov_mat = torch.stack(
+        [torch.diag(var[b, :]) for b in np.arange(target.size(0))])
 
     loss = 0
     for b, cov_mat_b in enumerate(cov_mat):
@@ -100,17 +125,24 @@ def gaussian_neg_log_likelihood_2(parameters, target):
         var = torch.unsqueeze(var, dim=1)
         mean = torch.unsqueeze(mean, dim=1)
 
-    cov_mat = torch.stack([torch.diag(var[b, 0, :]) for b in np.arange(target.size(0))])
+    cov_mat = torch.stack(
+        [torch.diag(var[b, 0, :]) for b in np.arange(target.size(0))])
 
     normalizer = torch.mean(torch.stack([
         0.5 * (target.size(-1) * torch.log(torch.tensor(2 * np.pi)) +
-               torch.sum(torch.log(torch.diag(cov_mat_b)))) for cov_mat_b in cov_mat
-    ], dim=0), dim=[0, -1])
+               torch.sum(torch.log(torch.diag(cov_mat_b))))
+        for cov_mat_b in cov_mat
+    ],
+                                        dim=0),
+                            dim=[0, -1])
 
     ll = torch.mean(torch.diagonal(
-        0.5 * torch.matmul(
-            torch.matmul((target - mean), cov_mat),
-            torch.transpose((target - mean), -2, -1)), dim1=-2, dim2=-1), dim=[0, -1])  # Mean over ensemble members + batch
+        0.5 * torch.matmul(torch.matmul(
+            (target - mean), cov_mat), torch.transpose(
+                (target - mean), -2, -1)),
+        dim1=-2,
+        dim2=-1),
+                    dim=[0, -1])  # Mean over ensemble members + batch
 
     return normalizer + ll
 
@@ -124,51 +156,33 @@ def gaussian_neg_log_likelihood_unopt(parameters, target, scale=None):
     Args:
         parameters (torch.tensor((B, N, D)), torch.tensor((B, N, D))):
             mean values and variances of y|x for every x in
-            batch (and for every ensemble member).
+            batch.
         target (torch.tensor((B, N, D))): sample from the normal
             distribution, if not an ensemble prediction N=1.
         scale (torch.tensor(B, 1)): scaling parameter for the variance
             (/covariance matrix) for every x in batch.
     """
 
+    B, N, D = target.shape
     mean = parameters[0]
     var = parameters[1]
 
-    # This should only happen when we only have one target (i.e. N=1)
-    if target.dim() == 2:
-        target = torch.unsqueeze(target, dim=1)
+    average_nll = 0.0
+    for b, b_target in enumerate(target):
+        #print("target", b_target)
+        cov_mat = torch.diag(var[b])
+        #print("cov_mat", cov_mat.shape)
+        diff = b_target - mean[b]
+        #print("diff", diff.shape)
+        var_dist = (diff @ torch.inverse(cov_mat) @ diff.T).sum()
+        normalizer = 0.5 * torch.log((2 * np.pi)**D * torch.det(cov_mat))
+        average_nll += normalizer + var_dist
+    average_nll /= B * N
 
-    if scale is None:
-        scale = torch.ones([target.size(0), 1])
+    if average_nll < 0:
+        raise Exception("Negative nll")
 
-    normalizer = 0
-    ll = 0
-    for i in np.arange(target.size(1)):
-
-        if var.dim() == 2:
-            cov_mat = [torch.diag(var[b, :]) for b in np.arange(target.size(0))]
-        else:
-            cov_mat = [torch.diag(var[b, i, :]) for b in np.arange(target.size(0))]
-
-        # normalizer += torch.stack([
-        #     0.5 * (target.size(-1) * torch.log(torch.tensor(2 * np.pi)) +
-        #            torch.log(torch.det(cov_mat_i))) for cov_mat_i in cov_mat
-        # ], dim=0) / target.size(1)
-
-        normalizer += torch.stack([
-            0.5 * (target.size(-1) * torch.log(torch.tensor(2 * np.pi)) +
-                   torch.sum(torch.log(torch.diag(cov_mat_i)))) for cov_mat_i in cov_mat
-        ], dim=0) / target.size(1)
-
-        ll += torch.stack([
-            0.5 * torch.matmul(
-                torch.matmul((target[b, i, :] - mean[b, :]),
-                             (1 / scale[b]) * torch.inverse(cov_mat_i)),
-                torch.transpose((target[b, i, :] - mean[b, :]), 0, -1))
-            for b, cov_mat_i in enumerate(cov_mat)
-        ], dim=0) / target.size(1)  # Mean over ensemble members
-
-    return torch.mean(normalizer + ll)  # Mean over batch
+    return torch.mean(average_nll)  # Mean over batch
 
 
 def gaussian_neg_log_likelihood_normalizer(parameters, target, scale=None):
@@ -195,14 +209,19 @@ def gaussian_neg_log_likelihood_normalizer(parameters, target, scale=None):
     for i in np.arange(target.size(1)):
 
         if var.dim() == 2:
-            cov_mat = [torch.diag(var[b, :]) for b in np.arange(target.size(0))]
+            cov_mat = [
+                torch.diag(var[b, :]) for b in np.arange(target.size(0))
+            ]
         else:
-            cov_mat = [torch.diag(var[b, i, :]) for b in np.arange(target.size(0))]
+            cov_mat = [
+                torch.diag(var[b, i, :]) for b in np.arange(target.size(0))
+            ]
 
         normalizer += torch.stack([
             0.5 * (target.size(-1) * torch.log(torch.tensor(2 * np.pi)) +
                    torch.log(torch.det(cov_mat_i))) for cov_mat_i in cov_mat
-        ], dim=0) / target.size(1)
+        ],
+                                  dim=0) / target.size(1)
 
     return torch.mean(normalizer)
 
@@ -260,9 +279,13 @@ def gaussian_neg_log_likelihood_ll(parameters, target, scale=None):
     for i in np.arange(target.size(1)):
 
         if var.dim() == 2:
-            cov_mat = [torch.diag(var[b, :]) for b in np.arange(target.size(0))]
+            cov_mat = [
+                torch.diag(var[b, :]) for b in np.arange(target.size(0))
+            ]
         else:
-            cov_mat = [torch.diag(var[b, i, :]) for b in np.arange(target.size(0))]
+            cov_mat = [
+                torch.diag(var[b, i, :]) for b in np.arange(target.size(0))
+            ]
 
         ll += torch.stack([
             0.5 * torch.matmul(
@@ -270,7 +293,8 @@ def gaussian_neg_log_likelihood_ll(parameters, target, scale=None):
                              (1 / scale[b]) * torch.inverse(cov_mat_i)),
                 torch.transpose((target[b, i, :] - mean[b, :]), 0, -1))
             for b, cov_mat_i in enumerate(cov_mat)
-        ], dim=0) / target.size(1)  # Mean over ensemble members
+        ],
+                          dim=0) / target.size(1)  # Mean over ensemble members
 
     return torch.mean(ll)
 
