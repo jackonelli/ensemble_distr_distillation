@@ -273,7 +273,6 @@ def accuracy_logits(predicted_logits, targets, label_targets=False):
 
     predicted_labels, _ = utils.tensor_argmax(predicted_distribution)
 
-
     if number_of_elements == 0:
         number_of_elements = 1
     return (target_labels.int() == predicted_labels.int()

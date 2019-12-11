@@ -32,18 +32,28 @@ class DistilledNet(nn.Module, ABC):
         """ Common train method for all distilled networks
         Should NOT be overridden!
         """
-        scheduler = self.get_scheduler(step_size=5*len(train_loader), cyclical=True)
+        scheduler = self.get_scheduler(step_size=5*len(train_loader), cyclical=False)
         #scheduler = torch_optim.lr_scheduler.CyclicLR(self.optimizer, 1e-7, 0.1, step_size_up=100)
+
         self.use_hard_labels = False # VILL VI HA DENNA?
 
         self._log.info("Training distilled network.")
+
+        # Want to look at metrices at initialization
+        if validation_loader is None:
+            self.calculate_metric_dataloader(train_loader)
+        else:
+            self.calculate_metric_dataloader(validation_loader)
+
+        self._print_epoch(0, None)
+
         for epoch_number in range(1, num_epochs + 1):
             loss = self._train_epoch(train_loader,
                                      validation_loader=validation_loader,
                                      scheduler=scheduler)
             self._print_epoch(epoch_number, loss)
-            if self._learning_rate_condition(epoch_number):
-                scheduler.step()
+            #if self._learning_rate_condition(epoch_number):
+            #    scheduler.step()
 
         self._reset_metrics()  # For storing purposes
 
@@ -55,12 +65,6 @@ class DistilledNet(nn.Module, ABC):
         if no labels are available.
         """
         running_loss = 0
-
-        # Want to look at metrices at initialization
-        if validation_loader is None:
-            self.calculate_metric_dataloader(train_loader)
-        else:
-            self.calculate_metric_dataloader(validation_loader)
 
         self._reset_metrics()
 
