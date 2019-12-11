@@ -108,5 +108,5 @@ class XCSoftLabels(distilled_network.DistilledNet):
         prediction_total = 1 / last_prob_predictions
         prediction_logits = torch.log(outputs * prediction_total)
 
-        return custom_loss.rmse(prediction_logits, target_logits)
+        return custom_loss.mse(prediction_logits, target_logits)
 

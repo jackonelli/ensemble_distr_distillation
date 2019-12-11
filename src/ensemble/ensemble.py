@@ -214,7 +214,7 @@ class EnsembleMember(nn.Module, ABC):
                 valid_outputs = self.transform_logits(valid_logits)
                 self._update_metrics(valid_outputs, valid_labels)
 
-                # Will automatically cal
+                # Will automatically call
 
         return running_loss
 

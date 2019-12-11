@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.optim as torch_optim
 import src.loss as custom_loss
 import src.distilled.distilled_network as distilled_network
+import torch.distributions.multivariate_normal as torch_mvn
 
 
 class LogitsProbabilityDistribution(distilled_network.DistilledNet):
@@ -17,7 +18,7 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
                  learning_rate=0.001):
         super().__init__(
             teacher=teacher,
-            loss_function=custom_loss.gaussian_neg_log_likelihood_2,
+            loss_function=custom_loss.gaussian_neg_log_likelihood,
             device=device)
 
         self.input_size = input_size
@@ -33,9 +34,8 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
 
         self.layers = [self.fc1, self.fc2, self.fc3]
 
-        self.optimizer = torch_optim.SGD(self.parameters(),
-                                         lr=self.learning_rate,
-                                         momentum=0.9)
+        self.optimizer = torch_optim.Adam(self.parameters(),
+                                          lr=self.learning_rate)
 
         self.to(self.device)
 
@@ -48,7 +48,8 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
         x = self.fc3(x)
 
         mean = x[:, :int((self.output_size / 2))]
-        var = torch.exp(x[:, int((self.output_size / 2)):])
+        var = torch.exp(x[:, int(self.output_size / 2):])
+        #var = torch.log(1 + torch.exp(x[:, int(self.output_size / 2):]))
 
         return mean, var
 
@@ -64,7 +65,7 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
 
         logits = self.teacher.get_logits(inputs)
 
-        scaled_logits = logits - torch.stack([logits[:, :, -1]], axis=-1)
+        scaled_logits = logits - torch.stack([logits[:, :, -1]], dim=-1)
 
         return scaled_logits[:, :, 0:-1]
 
@@ -80,13 +81,12 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
 
         samples = torch.zeros([input_.size(0), num_samples, int(self.output_size / 2)])
         for i in range(input_.size(0)):
-            rv = torch.distributions.multivariate_normal.MultivariateNormal(loc=mean[i, :],
-                                                                            covariance_matrix=torch.diag(var[i, :]))
+            rv = torch_mvn.MultivariateNormal(loc=mean[i, :], covariance_matrix=torch.diag(var[i, :]))
             samples[i, :, :] = rv.rsample([num_samples])
 
         softmax_samples = torch.exp(samples) / (torch.sum(torch.exp(samples), dim=-1, keepdim=True) + 1)
 
-        return softmax_samples
+        return torch.exp(mean) / (torch.sum(torch.exp(mean), dim=-1, keepdim=True) + 1)
 
     def _learning_rate_condition(self, epoch=None):
         """Evaluate condition for increasing learning rate
@@ -100,3 +100,15 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
         Wrapper function for the loss function.
         """
         return self.loss(outputs, teacher_predictions)
+
+    def mean_expected_value(self, outputs, teacher_predictions):
+        exp_value = outputs[0]
+
+        return torch.mean(exp_value, dim=0)
+
+    def mean_variance(self, outputs, teacher_predictions):
+        variance = outputs[1]
+
+        return torch.mean(variance, dim=0)
+
+

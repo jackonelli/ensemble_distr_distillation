@@ -15,13 +15,13 @@ class Metric:
         self.function = function
         self.running_value = 0.0
         self.counter = 0
-        self.memory = []  # So that we can go back an look at the data, should not take to much storage room
+        self.memory = []  # So that we can go back an look at the data
 
     def __str__(self):
         return "{}: {}".format(self.name, self.mean())
 
     def update(self, labels, outputs):
-        self.running_value += self.function(outputs, labels)
+        self.running_value += self.function(outputs, labels).detach()  # Do this to save memory
         self.counter += 1
 
     def mean(self):
@@ -212,29 +212,41 @@ def accuracy_soft_labels(predicted_distribution, target_distribution):
             ).sum().item() / number_of_elements
 
 
-def accuracy_logits(predicted_logits, target_logits):
+def accuracy_logits(predicted_logits, targets, label_targets=False):
     """ Accuracy given that the inputs are logits assumed to be scaled relative the last class K
     B = batch size
     K = number of classes
     N = number of ensemble member
 
     Args:
-        target_logits: torch.tensor(B, N, K-1)
-        predicted_logits: torch.tensor(B, K-1)
+        targets: torch.tensor(B, N, K-1) if logits targets, (B, K) otherwise
+        predicted_logits: torch.tensor(B, (N,) K-1)
+        softmax_targets: specifies if the targets is in logits or in labels form
 
     Returns:
         Accuracy: float
     """
     number_of_elements = np.prod(predicted_logits.size(0))
-    predicted_distribution = (torch.nn.Softmax(dim=-1))(torch.cat((predicted_logits,
-                                                                   torch.zeros(number_of_elements, 1)), dim=-1))
-    target_distribution = (torch.nn.Softmax(dim=-1))(torch.cat((target_logits,
-                                                                torch.zeros(number_of_elements,
-                                                                             target_logits.size(1), 1)),
-                                                               dim=-1))
+
+    if predicted_logits.dim() == 3:
+        predicted_distribution = torch.mean((torch.nn.Softmax(dim=-1))(torch.cat((predicted_logits,
+                                                                                  torch.zeros(number_of_elements,
+                                                                                              predicted_logits.size(1), 1)),
+                                                                                 dim=-1)), dim=1)
+    else:
+        predicted_distribution = (torch.nn.Softmax(dim=-1))(torch.cat((predicted_logits,
+                                                                       torch.zeros(number_of_elements, 1)), dim=-1))
+
+    if label_targets:
+        target_labels = targets
+
+    else:
+        target_distribution = torch.mean((torch.nn.Softmax(dim=-1))(torch.cat((targets,
+                                                                    torch.zeros(number_of_elements,
+                                                                                targets.size(1), 1)),  dim=-1)), dim=1)
+        target_labels, _ = utils.tensor_argmax(target_distribution)
 
     predicted_labels, _ = utils.tensor_argmax(predicted_distribution)
-    target_labels, _ = utils.tensor_argmax(torch.mean(target_distribution, dim=1))
 
     if number_of_elements == 0:
         number_of_elements = 1
