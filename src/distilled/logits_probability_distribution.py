@@ -15,7 +15,8 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
                  teacher,
                  device=torch.device('cpu'),
                  use_hard_labels=False,
-                 learning_rate=0.001):
+                 learning_rate=0.001,
+                 scale_teacher_logits=False):
 
         super().__init__(
             teacher=teacher,
@@ -28,6 +29,7 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
         self.output_size = output_size
         self.use_hard_labels = use_hard_labels
         self.learning_rate = learning_rate
+        self.scale_teacher_logits = scale_teacher_logits
 
         self.fc1 = nn.Linear(self.input_size, self.hidden_size_1)
         self.fc2 = nn.Linear(self.hidden_size_1, self.hidden_size_2)
@@ -57,7 +59,7 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
         mean = x[:, :int((self.output_size / 2))]
 
         var_z = x[:, int((self.output_size / 2)):]
-        #var = torch.log(1 + torch.exp(var_z)) + self.variance_lower_bound
+        #var = torch.log(1 + torch.exp(var_z))# + self.variance_lower_bound
         var = torch.exp(var_z)
 
         return mean, var
@@ -67,9 +69,10 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
 
         logits = self.teacher.get_logits(inputs)
 
-#        scaled_logits = logits - torch.stack([logits[:, :, -1]], axis=-1)
+        if self.scale_teacher_logits:
+            scaled_logits = logits - torch.stack([logits[:, :, -1]], axis=-1)
+            logits = scaled_logits[:, :, 0:-1]
 
- #       return scaled_logits[:, :, 0:-1]
         return logits
 
     def predict(self, input_, num_samples=None):
@@ -94,7 +97,7 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
         softmax_samples = torch.exp(samples) / (
             torch.sum(torch.exp(samples), dim=-1, keepdim=True) + 1)
 
-        return torch.exp(mean) / (torch.sum(torch.exp(mean), dim=-1, keepdim=True) + 1)
+        return softmax_samples
 
     def _learning_rate_condition(self, epoch=None):
         """Evaluate condition for increasing learning rate
