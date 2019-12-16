@@ -1,7 +1,11 @@
 """Loss module"""
+import math
+import logging
 import torch
 import numpy as np
 import torch.distributions.multivariate_normal as torch_mvn
+
+LOGGER = logging.getLogger(__name__)
 
 
 def cross_entropy_soft_targets(predictions, soft_targets):
@@ -74,12 +78,24 @@ def gaussian_neg_log_likelihood_1d(parameters, target):
     var = parameters[:, 1]
     # print("mean", mean.shape)
     # print("target", target.shape)
-    neg_log_prob = 1 / (2 * var) * (target[:, 0] -
-                                    mean)**2 + 0.5 * torch.log(var)
+    neg_log_prob = 1 / (2 * var) * (target[:, 0] - mean)**2 + 0.5 * torch.log(
+        torch.sqrt(var))
     return torch.mean(neg_log_prob)
 
 
 def gaussian_neg_log_likelihood(parameters, target):
+    """Negative log likelihood loss for the Gaussian distribution
+    B = batch size, D = dimension of target, N = ensemble size
+
+    Args:
+        parameters (torch.tensor(B, N, D)), torch.tensor((B, N, D))):
+            mean values and variances of y|x for every x in
+            batch (and for every ensemble member).
+        target (torch.tensor((B(, N), D))): sample from the normal
+            distribution, if not an ensemble prediction N=1.
+        scale (torch.tensor(B, 1)): scaling parameter for the variance
+            (/covariance matrix) for every x in batch.
+    """
 
     mean = parameters[0]
     var = parameters[1]
@@ -105,7 +121,7 @@ def gaussian_neg_log_likelihood_2(parameters, target):
     B = batch size, D = dimension of target (num classes), N = ensemble size
 
     Args:
-        parameters (torch.tensor((B(, N), D)), torch.tensor((B(, N), D))):
+        parameters (torch.tensor((B, N, D)), torch.tensor((B, N, D))):
             mean values and variances of y|x for every x in
             batch (and for every ensemble member).
         target (torch.tensor((B(, N), D))): sample from the normal
@@ -252,12 +268,12 @@ def rmse(mean, target):
     return torch.mean(ll)
 
 
-def gaussian_neg_log_likelihood_ll(parameters, target, scale=None):
+def gaussian_neg_log_likelihood_ll(parameters, target):
     """Negative log likelihood loss for the Gaussian distribution
     B = batch size, D = dimension of target (num classes), N = ensemble size
 
     Args:
-        parameters (torch.tensor((B, D)), torch.tensor((B, N, D))):
+        parameters (torch.tensor((B, D)), torch.tensor((B, D))):
             mean values and variances of y|x for every x in
             batch (and for every ensemble member).
         target (torch.tensor((B, N, D))): sample from the normal
@@ -266,38 +282,26 @@ def gaussian_neg_log_likelihood_ll(parameters, target, scale=None):
             (/covariance matrix) for every x in batch.
     """
 
+    LOGGER.error("This function does not work yet")
+    raise ValueError("This function does not work yet")
     mean = parameters[0]
     var = parameters[1]
 
-    # This should only happen when we only have one target (i.e. N=1)
-    if target.dim() == 2:
-        target = torch.unsqueeze(target, dim=1)
-
-    if scale is None:
-        scale = torch.ones([target.size(0), 1])
+    B, N, D = target.shape
 
     ll = 0
-    for i in np.arange(target.size(1)):
+    for (mu_b, sigma_sq_b, target_b) in zip(mean, var, target):
 
-        if var.dim() == 2:
-            cov_mat = [
-                torch.diag(var[b, :]) for b in np.arange(target.size(0))
-            ]
-        else:
-            cov_mat = [
-                torch.diag(var[b, i, :]) for b in np.arange(target.size(0))
-            ]
+        cov_mat = torch.diag(sigma_sq_b)
 
-        ll += torch.stack([
-            0.5 * torch.matmul(
-                torch.matmul((target[b, i, :] - mean[b, :]),
-                             (1 / scale[b]) * torch.inverse(cov_mat_i)),
-                torch.transpose((target[b, i, :] - mean[b, :]), 0, -1))
-            for b, cov_mat_i in enumerate(cov_mat)
-        ],
-                          dim=0) / target.size(1)  # Mean over ensemble members
+        normalizer = D / 2 * math.log(2 * math.pi) + torch.log(
+            torch.det(cov_mat)) / 2
+        diff = target_b - mu_b
+        normalized_distance = diff @ torch.inverse(cov_mat) @ diff.T
+        ll += (normalizer + normalized_distance) / N
+    ll /= B
 
-    return torch.mean(ll)
+    return ll
 
 
 def inverse_wishart_neg_log_likelihood(parameters, target):
@@ -475,3 +479,22 @@ def flat_prior(alphas):
         alphas.sum(-1, keepdim=True))
     digamma_term = torch.sum((alphas - 1.0) * exp_log_p, dim=-1)
     return torch.mean(log_numerator - log_denominator + digamma_term)
+
+
+def main():
+    B, N, D = 1, 1, 1
+    target = torch.tensor([[1.0]], dtype=torch.float).reshape(B, N, D)
+    mean = torch.tensor([[0.5]], dtype=torch.float)
+    var = torch.tensor([[10]], dtype=torch.float)
+    B, N, D = 1, 1, 2
+    target = torch.tensor([[1.0, 2.0]], dtype=torch.float).reshape(B, N, D)
+    mean = torch.tensor([[0.5, 1.0]], dtype=torch.float)
+    var = torch.tensor([[2.0, 5.0]], dtype=torch.float)
+
+    gauss_nll = gaussian_neg_log_likelihood((mean, var), target)
+    gauss_nll_ll = gaussian_neg_log_likelihood_ll((mean, var), target)
+    print("Real: {}, Jakobs: {}", gauss_nll, gauss_nll_ll)
+
+
+if __name__ == "__main__":
+    main()
