@@ -5,8 +5,7 @@ import src.loss as custom_loss
 import src.distilled.distilled_network as distilled_network
 
 
-class LogitsMatching(distilled_network.DistilledNet):
-    """We match only the mean of the logits"""
+class VanillaDistill(distilled_network.DistilledNet):
     def __init__(self,
                  input_size,
                  hidden_size_1,
@@ -16,7 +15,8 @@ class LogitsMatching(distilled_network.DistilledNet):
                  device=torch.device('cpu'),
                  use_hard_labels=False,
                  use_teacher_hard_labels=False,
-                 learning_rate=0.001):
+                 learning_rate=0.001,
+                 temp=10):
         super().__init__(
             teacher=teacher,
             loss_function=custom_loss.mse,
@@ -29,6 +29,7 @@ class LogitsMatching(distilled_network.DistilledNet):
         self.use_hard_labels = use_hard_labels
         self.use_teacher_hard_labels = use_teacher_hard_labels
         self.learning_rate = learning_rate
+        self.temp = temp
 
         self.fc1 = nn.Linear(self.input_size, self.hidden_size_1)
         self.fc2 = nn.Linear(self.hidden_size_1, self.hidden_size_2)
@@ -43,18 +44,11 @@ class LogitsMatching(distilled_network.DistilledNet):
 
     def forward(self, x):
 
-        """Estimate parameters of distribution
-        """
-
         x = nn.functional.relu(self.fc1(x))
         x = nn.functional.relu(self.fc2(x))
         x = self.fc3(x)
 
-        mean = x
-        # Note: we actually don't learn the variance
-        #var = torch.ones(mean.size())
-
-        return mean#, var
+        return torch.exp(x/self.temp) / (torch.sum(torch.exp(x/self.temp), dim=-1, keepdim=True) + 1)
 
     def _generate_teacher_predictions(self, inputs):
         """Generate teacher predictions
@@ -67,23 +61,23 @@ class LogitsMatching(distilled_network.DistilledNet):
         """
 
         logits = self.teacher.get_logits(inputs)
+        scaled_logits = logits - torch.stack([logits[:, :, -1]], dim=-1)
+        teacher_pred = torch.exp(scaled_logits / self.temp) / (torch.sum(torch.exp(scaled_logits / self.temp), dim=-1,
+                                                                         keepdim=True))
 
-        if self.use_teacher_hard_labels:
-            pass
-        else:
-            scaled_logits = logits - torch.stack([logits[:, :, -1]], axis=-1)
-            teacher_pred = scaled_logits[:, :, 0:-1]
+        return teacher_pred[:, :, :-1]
 
-        return teacher_pred
-
-    def predict(self, input_, num_samples=None):
+    def predict(self, input_):
         """Predict parameters
         Wrapper function for the forward function.
         """
 
-        mean = self.forward(input_)
+        temp = self.temp
+        self.temp = 1  # A bit of an ugly hack atm
+        x = self.forward(input_)
+        self.temp = temp
 
-        return torch.exp(mean) / (torch.sum(torch.exp(mean), dim=1, keepdim=True) + 1)
+        return x
 
     def calculate_loss(self, outputs, teacher_predictions, labels=None):
         """Calculate loss function
@@ -98,19 +92,10 @@ class LogitsMatching(distilled_network.DistilledNet):
 
         return True
 
-    def softmax_rmse(self, outputs, teacher_predictions):
-        # We will convert this to the softmax output so that we can calculate metrics on them
-        teacher_distribution = torch.exp(teacher_predictions) / (torch.sum(torch.exp(teacher_predictions), dim=-1,
-                                                                           keepdim=True) + 1)
-        predicted_distribution = torch.exp(outputs) / (torch.sum(torch.exp(outputs), dim=-1, keepdim=True) + 1)
+    def mean_output(self, outputs, teacher_predictions):
+        # Not sure if this makes sense, but want some kind of convergence proof for the parameters
+        return torch.mean(outputs, dim=0)
 
-        return custom_loss.mse(predicted_distribution, teacher_distribution)
 
-    def softmax_xentropy(self, outputs, teacher_predictions):
-        # We will convert this to the softmax output so that we can calculate metrics on them
-        # NOTE: this function is only defined for one ensemble member
-        teacher_distribution = torch.exp(teacher_predictions[:, 0, :]) / (torch.sum(torch.exp(teacher_predictions[:, 0, :]),
-                                                                                    dim=-1, keepdim=True) + 1)
-        predicted_distribution = torch.exp(outputs) / (torch.sum(torch.exp(outputs), dim=-1, keepdim=True) + 1)
 
-        return custom_loss.cross_entropy_soft_targets(predicted_distribution, teacher_distribution)
+

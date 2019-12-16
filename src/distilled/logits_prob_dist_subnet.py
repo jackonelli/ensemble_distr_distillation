@@ -6,43 +6,45 @@ import src.distilled.distilled_network as distilled_network
 import torch.distributions.multivariate_normal as torch_mvn
 
 
-class LogitsProbabilityDistribution(distilled_network.DistilledNet):
+class LogitsProbabilityDistributionSubNet(distilled_network.DistilledNet):
+    # Will make two subnetwork, where on predicts the mean and one the variance of the distribution
     def __init__(self,
                  input_size,
                  hidden_size_1,
                  hidden_size_2,
-                 hidden_size_3,
                  output_size,
                  teacher,
                  device=torch.device('cpu'),
                  use_hard_labels=False,
-                 learning_rate=0.001,
-                 scale_teacher_logits=False):
+                 learning_rate=0.001):
 
-        super().__init__(teacher=teacher,
-                         loss_function=custom_loss.gaussian_neg_log_likelihood,
-                         device=device)
+        super().__init__(
+            teacher=teacher,
+            loss_function=custom_loss.gaussian_neg_log_likelihood,
+            device=device)
 
         self.input_size = input_size
         self.hidden_size_1 = hidden_size_1  # Or make a list or something
         self.hidden_size_2 = hidden_size_2
-        self.hidden_size_3 = hidden_size_3
         self.output_size = output_size
         self.use_hard_labels = use_hard_labels
         self.learning_rate = learning_rate
-        self.scale_teacher_logits = scale_teacher_logits
 
-        self.fc1 = nn.Linear(self.input_size, self.hidden_size_1)
-        self.fc2 = nn.Linear(self.hidden_size_1, self.hidden_size_2)
-        self.fc3 = nn.Linear(self.hidden_size_2, self.output_size)
+        self.fc1a = nn.Linear(self.input_size, self.hidden_size_1)
+        self.fc2a = nn.Linear(self.hidden_size_1, self.hidden_size_2)
+        self.fc3a = nn.Linear(self.hidden_size_2, int((self.output_size / 2)))
+
+        self.fc1b = nn.Linear(self.input_size, self.hidden_size_1)
+        self.fc2b = nn.Linear(self.hidden_size_1, self.hidden_size_2)
+        self.fc3b = nn.Linear(self.hidden_size_2, int((self.output_size / 2)))
+
         # Ad-hoc fix zero variance.
-
-        self.variance_lower_bound = 0.001
+        self.variance_lower_bound = 0.0
         if self.variance_lower_bound > 0.0:
             self._log.warning("Non-zero variance lower bound set ({})".format(
                 self.variance_lower_bound))
 
-        self.layers = [self.fc1, self.fc2, self.fc3, self.fc4]
+        self.layers = [self.fc1a, self.fc2a, self.fc3a, self.fc2b, self.fc2b, self.fc3b]
 
         self.optimizer = torch_optim.Adam(self.parameters(),
                                           lr=self.learning_rate)
@@ -53,15 +55,14 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
         """Estimate parameters of distribution
         """
 
-        x = nn.functional.relu(self.fc1(x))
-        x = nn.functional.relu(self.fc2(x))
-        x = nn.functional.relu(self.fc3(x))
-        x = self.fc4(x)
+        y = nn.functional.relu(self.fc1a(x))
+        y = nn.functional.relu(self.fc2a(y))
+        mean = self.fc3a(y)
 
-        mean = x[:, :int((self.output_size / 2))]
-
-        var_z = x[:, int((self.output_size / 2)):]
-        var = torch.log(1 + torch.exp(var_z))
+        y = nn.functional.relu(self.fc1b(x))
+        y = nn.functional.relu(self.fc2b(y))
+        var_z = self.fc3b(y)
+        var = torch.log(1 + torch.exp(var_z)) + self.variance_lower_bound
 
         return mean, var
 
@@ -70,11 +71,11 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
 
         logits = self.teacher.get_logits(inputs)
 
-        if self.scale_teacher_logits:
-            scaled_logits = logits - torch.stack([logits[:, :, -1]], axis=-1)
-            logits = scaled_logits[:, :, 0:-1]
+        # OBS JAKOB ANVÄNDER INTE SCALED LOGITS; VET INTE HUR VI SKA LÖSA DET (ÄR JU INTE LOGISKT FÖ REG.OUTPUT)
+        scaled_logits = logits - torch.stack([logits[:, :, -1]], axis=-1)
 
-        return logits
+        return scaled_logits[:, :, 0:-1]
+        #return logits
 
     def predict(self, input_, num_samples=None):
         """Predict parameters
@@ -98,22 +99,20 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
         softmax_samples = torch.exp(samples) / (
             torch.sum(torch.exp(samples), dim=-1, keepdim=True) + 1)
 
-        return softmax_samples
+        return torch.exp(mean) / (torch.sum(torch.exp(mean), dim=-1, keepdim=True) + 1)
 
     def _learning_rate_condition(self, epoch=None):
         """Evaluate condition for increasing learning rate
         Defaults to never increasing. I.e. returns False
         """
 
-        return False
+        return True
 
     def calculate_loss(self, outputs, teacher_predictions, labels=None):
         """Calculate loss function
         Wrapper function for the loss function.
         """
         return self.loss(outputs, teacher_predictions)
-
-    # TÄNKER MIG ATT VI KAN HA EN CALC_REG
 
     def mean_expected_value(self, outputs, teacher_predictions):
         exp_value = outputs[0]
@@ -124,3 +123,5 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
         variance = outputs[1]
 
         return torch.mean(variance, dim=0)
+
+

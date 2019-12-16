@@ -242,7 +242,7 @@ def gaussian_neg_log_likelihood_normalizer(parameters, target, scale=None):
     return torch.mean(normalizer)
 
 
-def rmse(mean, target):
+def mse(mean, target):
     """Squared loss
     B = batch size, D = dimension of target (num classes), N = ensemble size
 
@@ -258,14 +258,13 @@ def rmse(mean, target):
     if target.dim() == 2:
         target = torch.unsqueeze(target, dim=1)
 
-    ll = 0
-    for i in np.arange(target.size(1)):
-        ll += torch.diag(0.5 * torch.matmul(
-            (target[:, i, :] - mean),
-            torch.transpose((target[:, i, :] - mean), 0, -1))) / target.size(
-                1)  # Mean over ensemble members
+    if mean.dim() == 2:
+        mean = torch.unsqueeze(mean, dim=1)
 
-    return torch.mean(ll)
+    ll = torch.mean(torch.diagonal(torch.matmul((target - mean), torch.transpose((target - mean), -2, -1)),
+                                   dim1=-1, dim2=-2), dim=[0,1])
+
+    return ll
 
 
 def gaussian_neg_log_likelihood_ll(parameters, target):
