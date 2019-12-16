@@ -296,8 +296,10 @@ def squared_error(predictions, targets):
 
     Args:
         targets: torch.tensor(B, D)
-        predictions: (torch.tensor(B, 2*D)), estimated mean and variances of the
-                     normal distribution of targets arranged as [mean_1, ... mean_D, var_1, ..., var_D]
+        predictions: (torch.tensor(B, 2*D)),
+            estimated mean and variances of the
+            normal distribution of targets arranged as
+            [mean_1, ... mean_D, var_1, ..., var_D]
 
     Returns:
         Error: float

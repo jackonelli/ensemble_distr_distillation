@@ -21,7 +21,8 @@ class Ensemble():
         self.size = 0
 
     def add_member(self, new_member):
-        if issubclass(type(new_member), EnsembleMember):
+        if issubclass(type(new_member), EnsembleMember) or True:
+            self._log.warning("Is subclass check disabled")
             self._log.info("Adding {} to ensemble".format(type(new_member)))
             self.members.append(new_member)
             self.size += 1
@@ -156,7 +157,6 @@ class Ensemble():
 
 class EnsembleMember(nn.Module, ABC):
     """Parent class for keeping common logic in one place"""
-
     def __init__(self, loss_function, device=torch.device("cpu")):
         super().__init__()
         self._log = logging.getLogger(self.__class__.__name__)
@@ -202,11 +202,11 @@ class EnsembleMember(nn.Module, ABC):
         for batch in train_loader:
             self.optimizer.zero_grad()
             inputs, labels = batch
-            self._log.debug((inputs[0, 0].item(), labels[0, 0].item()))
 
             inputs, labels = inputs.to(self.device), labels.to(self.device)
 
             logits = self.forward(inputs)
+            self._log.debug(logits.shape)
             outputs = self.transform_logits(logits)
             loss = self.calculate_loss(outputs, labels)
             loss.backward()
@@ -272,7 +272,6 @@ class EnsembleMember(nn.Module, ABC):
         That is instead handled by transform_logits
         This is for flexibility when using the ensemble as teacher.
         """
-
     @abstractmethod
     def transform_logits(self, logits):
         """Transforms the networks logits
@@ -286,7 +285,6 @@ class EnsembleMember(nn.Module, ABC):
         Args:
             logits (torch.tensor(B, K)):
         """
-
     @abstractmethod
     def calculate_loss(self, labels, outputs):
         """Calculates loss"""
