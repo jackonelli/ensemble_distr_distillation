@@ -3,7 +3,7 @@ import unittest
 import math
 import src.loss as loss
 
-NUM_DECIMALS = 0
+NUM_DECIMALS = 5
 
 
 class TestGaussianLoss(unittest.TestCase):
@@ -19,7 +19,6 @@ class TestGaussianLoss(unittest.TestCase):
                                places=NUM_DECIMALS)
 
     def test_gaussian_nll_two_dim(self):
-        pass
         B, N, D = 1, 1, 2
         target = torch.tensor([[1.0, 2.0]], dtype=torch.float).reshape(B, N, D)
         mean = torch.tensor([[0.5, 1.0]], dtype=torch.float)
