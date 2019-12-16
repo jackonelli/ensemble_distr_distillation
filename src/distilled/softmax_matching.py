@@ -20,7 +20,7 @@ class SoftmaxMatching(distilled_network.DistilledNet):
                  learning_rate=0.001):
         super().__init__(
             teacher=teacher,
-            loss_function=custom_loss.rmse,
+            loss_function=custom_loss.mse,
             device=device)
         print(self.device)
         self.input_size = input_size
@@ -107,7 +107,7 @@ class SoftmaxMatching(distilled_network.DistilledNet):
         prediction_total = 1 / last_prob_predictions
         prediction_logits = torch.log(outputs * prediction_total)
 
-        return custom_loss.rmse(prediction_logits, target_logits)
+        return custom_loss.mse(prediction_logits, target_logits)
 
 
 

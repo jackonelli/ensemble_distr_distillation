@@ -14,10 +14,12 @@ import src.utils as utils
 from src.dataloaders import mnist
 from src.ensemble import simple_classifier
 from src.distilled import logits_probability_distribution
+from src.distilled import logits_prob_dist_subnet
 from src.distilled import dummy_logits_probability_distribution
 from src.distilled import logits_matching
 from src.distilled import cross_entropy_soft_labels
 from src.distilled import softmax_matching
+from src.distilled import vanilla_distill
 
 import src.loss as custom_loss
 
@@ -44,23 +46,21 @@ def create_distilled_model(output_size,
                                  hidden_size_2,
                                  output_size,
                                  prob_ensemble,
-                                 learning_rate=args.lr*10)
+                                 learning_rate=args.lr*0.01)
 
     loss_metric = metrics.Metric(name="Mean loss", function=distilled_model.calculate_loss)
     #softmax_se_metric = metrics.Metric(name="Softmax SE", function=distilled_model.softmax_rmse) MÅSTE FIXA DENNA FÖR DEN FUNGERAR INTE NÄR VI HAR EN VARIANSPAR OCKSÅ
     #softmax_ce_metric = metrics.Metric(name="Softmax CE", function=distilled_model.softmax_xentropy)
     #acc_metric = metrics.Metric(name="Accuracy", function=metrics.accuracy_logits)
-    #loss_norm_metric = metrics.Metric(name="Loss normalizer", function=custom_loss.gaussian_neg_log_likelihood_normalizer)
-    #loss_ll_metric = metrics.Metric(name="Loss ll", function=custom_loss.gaussian_neg_log_likelihood_ll)
-    #distilled_model.add_metric(loss_metric)
-    #distilled_model.add_metric(softmax_se_metric)
-    #distilled_model.add_metric(softmax_ce_metric)
-    #distilled_model.add_metric(acc_metric)
-    # VILL GÖRA LOSSEN SNABBARE
+    mean_metric = metrics.Metric(name="Mean expected value", function=distilled_model.mean_expected_value)  # Bör generalisera detta sen
+    var_metric = metrics.Metric(name="Mean variance", function=distilled_model.mean_variance)
+    distilled_model.add_metric(loss_metric)
+    distilled_model.add_metric(mean_metric)
+    distilled_model.add_metric(var_metric)
 
 #    distilled_model = torch.load(filepath)
     distilled_model.train(train_loader, num_epochs=100)  #args.num_epochs, validation_loader
-    torch.save(distilled_model, filepath)
+    #torch.save(distilled_model, filepath)
 
     #LOGGER.info("Distilled model accuracy on test data: {}".format(
     #    get_accuracy(distilled_model, test_loader)))
@@ -68,7 +68,7 @@ def create_distilled_model(output_size,
     return distilled_model
 
 
-def create_ensemble(train_loader, test_loader, args, num_ensemble_members,
+def create_ensemble(train_loader, validation_loader, test_loader, args, num_ensemble_members,
                     filepath):
     """Create an ensemble model"""
 
@@ -85,15 +85,15 @@ def create_ensemble(train_loader, test_loader, args, num_ensemble_members,
                                                     hidden_size_1,
                                                     hidden_size_2,
                                                     output_size,
-                                                    learning_rate=args.lr)
+                                                    learning_rate=args.lr*10)
 
         prob_ensemble.add_member(member)
 
-    acc_metric = metrics.Metric(name="Acc", function=metrics.accuracy)
-    prob_ensemble.add_metrics([acc_metric])
-    prob_ensemble.train(train_loader, args.num_epochs)
-    LOGGER.info("Ensemble accuracy on test data: {}".format(
-        get_accuracy(prob_ensemble, test_loader)))
+    loss_metric = metrics.Metric(name="Loss", function=member.calculate_loss)
+    prob_ensemble.add_metrics([loss_metric])
+    prob_ensemble.train(train_loader, validation_loader=validation_loader, num_epochs=5)
+    #LOGGER.info("Ensemble accuracy on test data: {}".format(
+    #    get_accuracy(prob_ensemble, test_loader)))
 
     prob_ensemble.save_ensemble(filepath)
 
@@ -116,12 +116,15 @@ def entropy_comparison_rotation(prob_ensemble, distilled_model, test_sample):
     rotated_data_set = torch.stack(
         [data_point.view(28 * 28) for data_point in rotated_data_set])
     ensemble_member = prob_ensemble.members[0]
-    ensemble_rotation_entropy, ensemble_rotation_prediction = get_entropy(
-        prob_ensemble, [rotated_data_set])
-    ensemble_member_rotation_entropy, ensemble_member_rotation_prediction = \
-        get_entropy(ensemble_member, [rotated_data_set])
-    distilled_model_rotation_entropy, distilled_model_rotation_prediction = \
-        get_entropy(distilled_model, [rotated_data_set])
+
+    ensemble_rotation_prediction = prob_ensemble.predict(rotated_data_set)
+    ensemble_rotation_entropy = metrics.entropy(None, ensemble_rotation_prediction)
+
+    ensemble_member_rotation_prediction = ensemble_member.predict(rotated_data_set)
+    ensemble_member_rotation_entropy = metrics.entropy(None, ensemble_member_rotation_prediction)
+
+    distilled_model_rotation_prediction = distilled_model.predict(rotated_data_set)
+    distilled_model_rotation_entropy = metrics.entropy(None, distilled_model_rotation_prediction)
 
     LOGGER.info("True label is: {}".format(test_label))
     LOGGER.info("Ensemble prediction: {}".format(ensemble_rotation_prediction))
@@ -156,40 +159,13 @@ def generate_rotated_data_set(img, angles):
     return data_set
 
 
-def get_accuracy(model, data_loader):
-    """Calculate accuracy of model on data in dataloader"""
-
-    accuracy = 0
-    num_batches = 0
-    for batch in data_loader:
-        inputs, labels = batch
-        predicted_distribution = model.predict(inputs)
-        accuracy += metrics.accuracy(labels, predicted_distribution)
-        num_batches += 1
-
-    return accuracy / num_batches
-
-
-def get_entropy(model, test_loader):
-    """Calculate entropy of model output over a dataloader"""
-
-    entropy = []
-    prediction = []
-    for i, batch in enumerate(test_loader):
-        inputs, labels = batch
-
-        output = model.predict(inputs)
-        entropy.append(metrics.entropy(None, output))
-
-        prediction.append(torch.max(output, dim=-1))
-
-    return torch.stack(entropy, dim=0), torch.stack(prediction, dim=0)
-
-
-def noise_effect_on_entropy(model, ensemble, test_loader):
+def noise_effect_on_entropy(distilled_model, data_loader):
     """Effect on entropy of ensemble and model with increasing noise added to the input"""
 
-    ensemble_member = ensemble.members[0]
+    inputs, _ = next(iter(data_loader))
+
+    prob_ensemble = distilled_model.teacher
+    ensemble_member = prob_ensemble.members[0]
 
     epsilon = torch.linspace(0.0001, 1, 10)
     ensemble_entropy = torch.zeros([
@@ -204,19 +180,21 @@ def noise_effect_on_entropy(model, ensemble, test_loader):
 
     for i, e in enumerate(epsilon):
 
-        for batch in test_loader:
-            inputs, labels = batch
+        distr = torch.distributions.Normal(0, e)
+        input_perturbed = inputs + distr.sample(
+            (inputs.shape[0], inputs.shape[1]))
 
-            distr = torch.distributions.Normal(0, e)
-            input_perturbed = inputs + distr.sample(
-                (inputs.shape[0], inputs.shape[1]))
+        ensemble_prediction = prob_ensemble.predict(input_perturbed)
+        ensemble_entropy[i] += torch.sum(metrics.entropy(None, ensemble_prediction))
 
-            ensemble_entropy[i] += torch.sum(
-                get_entropy(ensemble, input_perturbed)[0])
-            ensemble_member_entropy[i] += torch.sum(
-                get_entropy(ensemble_member, input_perturbed)[0])
-            model_entropy[i] += torch.sum(
-                get_entropy(model, input_perturbed)[0])
+        ensemble_member_prediction = ensemble_member.predict(input_perturbed)
+        ensemble_member_entropy[i] += torch.sum(metrics.entropy(None, ensemble_member_prediction))
+
+        distilled_model_prediction = distilled_model.predict(input_perturbed)
+
+        model_entropy[i] += torch.sum(metrics.entropy(None, torch.cat((distilled_model_prediction,
+                                                                 1 - torch.sum(distilled_model_prediction, dim=1,
+                                                                               keepdim=True)), dim=1)))
 
     epsilon = epsilon.data.numpy()
     plt.plot(epsilon, ensemble_entropy.data.numpy())
@@ -224,7 +202,7 @@ def noise_effect_on_entropy(model, ensemble, test_loader):
     plt.plot(epsilon, model_entropy.data.numpy())
     plt.xlabel('\u03B5')
     plt.ylabel('Entropy')
-    plt.legend(['Ensemble model', 'Ensemble member', 'Distilled model'])
+    plt.legend(['Ensemble', 'Ensemble member', 'Distilled model'])
     plt.show()
 
 
@@ -232,12 +210,8 @@ def effect_of_ensemble_size(full_ensemble, train_loader, test_loader, args):
     """Effect of ensemble size on error and nll of distilled model"""
 
     ensemble_size = len(full_ensemble.members)
-    ensemble_member = full_ensemble.members[0]
 
     ensemble_error = torch.zeros([
-        ensemble_size,
-    ])
-    ensemble_member_error = torch.zeros([
         ensemble_size,
     ])
     distilled_model_error = torch.zeros([
@@ -245,9 +219,6 @@ def effect_of_ensemble_size(full_ensemble, train_loader, test_loader, args):
     ])
 
     ensemble_nll = torch.zeros([
-        ensemble_size,
-    ])
-    ensemble_member_nll = torch.zeros([
         ensemble_size,
     ])
     distilled_model_nll = torch.zeros([
@@ -262,55 +233,40 @@ def effect_of_ensemble_size(full_ensemble, train_loader, test_loader, args):
         filepath = Path(
             "models/distilled_models_concat/distilled_model_ensemble_size_{}".
             format(i + 1))
-        distilled_model = torch.load(
-            filepath
-        )  # create_distilled_model(train_loader, test_loader, args, concat_ensemble, filepath)
+        distilled_model = create_distilled_model(train_loader, test_loader, args, concat_ensemble, filepath)
 
-        ensemble_error[i] = 1 - get_accuracy(concat_ensemble, test_loader)
-        ensemble_member_error[i] = 1 - get_accuracy(ensemble_member,
-                                                    test_loader)
-        distilled_model_error[i] = 1 - get_accuracy(distilled_model,
-                                                    test_loader)
-        ensemble_nll[i] = torch.sum(
-            get_entropy(concat_ensemble, test_loader)[0])
-        ensemble_member_nll[i] = torch.sum(
-            get_entropy(ensemble_member, test_loader)[0])
-        distilled_model_nll[i] = torch.sum(
-            get_entropy(distilled_model, test_loader)[0])
+        ensemble_error[i], distilled_model_error[i] = 1 - get_accuracy(distilled_model, test_loader)
+        ensemble_nll[i], distilled_model_nll[i] = 1 - get_entropy(distilled_model, test_loader)
 
     fig, axes = plt.subplots(1, 2)
     axes[0].plot(np.arange(ensemble_size), ensemble_error.data.numpy())
-    axes[0].plot(np.arange(ensemble_size), ensemble_member_error.data.numpy())
     axes[0].plot(np.arange(ensemble_size), distilled_model_error.data.numpy())
     axes[0].set_xlabel('Ensemble size')
     axes[0].set_ylabel('Error')
-    axes[0].legend(['Ensemble', 'Ensemble member', 'Distilled model'])
+    axes[0].legend(['Ensemble', 'Distilled model'])
 
     axes[1].plot(np.arange(ensemble_size), ensemble_nll.data.numpy())
-    axes[1].plot(np.arange(ensemble_size), ensemble_member_nll.data.numpy())
     axes[1].plot(np.arange(ensemble_size), distilled_model_nll.data.numpy())
     axes[1].set_xlabel('Ensemble size')
-    axes[1].set_ylabel('NLL')
-    axes[1].legend(['Ensemble', 'Ensemble member', 'Distilled model'])
+    axes[1].set_ylabel('Entropy')
+    axes[1].legend(['Ensemble', 'Distilled model'])
     plt.show()
 
 
-def entropy_histogram(ensemble, model, test_loader):
+def get_histogram(distilled_model, test_loader, obj_fun):
     """Comparison of entropy histograms of ensemble and model"""
 
-    ensemble_member = ensemble.members[0]
-
-    ensemble_entropy = get_entropy(ensemble, test_loader).data.numpy()
-    ensemble_member_entropy = get_entropy(ensemble_member,
-                                          test_loader).data.numpy()
-    distilled_model_entropy = get_entropy(model, test_loader).data.numpy()
+    ensemble_entropy, distilled_model_entropy = obj_fun(distilled_model, test_loader)
 
     num_bins = 100
-    plt.hist(ensemble_entropy, bins=num_bins, alpha=0.5, density=True)
-    plt.hist(ensemble_member_entropy, bins=num_bins, alpha=0.5, density=True)
-    plt.hist(distilled_model_entropy, bins=num_bins, alpha=0.5, density=True)
-    plt.xlabel('Entropy')
-    plt.legend(['Ensemble model', 'Ensemble member', 'Distilled model'])
+
+    fig, ax = plt.subplots(1, 2)
+    ax[0].hist(ensemble_entropy, bins=num_bins, alpha=0.5, density=True)
+    ax[1].hist(distilled_model_entropy, bins=num_bins, alpha=0.5, density=True)
+    ax[0].set_xlabel('Entropy')
+    ax[1].set_xlabel('Entropy')
+    ax[0].set_title('Ensemble')
+    ax[1].set_title('Distilled model')
 
     plt.show()
 
@@ -330,36 +286,73 @@ def plot_data_set(data_set):
     plt.show()
 
 
-def get_accuracy(distilled_model, test_loader, label='test'):
-    # DEN HÄR METODEN KAN NOG FÖRFINAS NU MED DE NYA ACCURACY-FUNKTIONERNA I UTILS
+def get_accuracy(distilled_model, data_loader, label='test'):
+    # SKA KANSKE INTE VARA EN EGEN METOD
     prob_ensemble = distilled_model.teacher
 
-    test_inputs, test_labels = next(iter(test_loader))
-    test_labels = test_labels.data.numpy()
+    inputs, labels = next(iter(data_loader))
 
-    teacher_test_predictions = prob_ensemble.predict(test_inputs)
-    teacher_predictions = torch.argmax(torch.mean(teacher_test_predictions, dim=1), dim=-1).data.numpy()
-    teacher_acc = np.mean(teacher_predictions == test_labels)
+    teacher_logits = prob_ensemble.predict(inputs)
+    teacher_acc = metrics.accuracy_logits(teacher_logits, labels, label_targets=True)
     LOGGER.info("Ensemble model accuracy on {} data {}".format(label, teacher_acc))
 
-    student_test_predictions = distilled_model.predict(test_inputs)
-
-    # if distilled_model.output_size == 10:
-    #     student_predictions = torch.argmax(student_test_predictions, dim=1).data.numpy()
-    # else:
-    student_predictions = torch.argmax(torch.cat((student_test_predictions, 1-torch.sum(student_test_predictions, dim=1,
-                                                                                            keepdim=True)), dim=1),
-                                       axis=1).data.numpy()
-
-    student_acc = np.mean(np.transpose(student_predictions) == test_labels)
+    student_test_logits = distilled_model.forward(inputs)[0]  # We will look at the expectation value
+    student_acc = metrics.accuracy_logits(student_test_logits, labels, label_targets=True)
     LOGGER.info("Distilled model accuracy on {} data {}".format(label, student_acc))
 
     # Find student predictions relative teacher predictions
-    student_acc_teacher = np.mean(np.transpose(student_predictions) == teacher_predictions)
+    student_acc_teacher = metrics.accuracy_logits(student_test_logits, teacher_logits)
     LOGGER.info("Distilled model accuracy on {} data relative teacher {}".format(label, student_acc_teacher))
 
+    return teacher_acc, student_acc
 
-def distillation(class_type, distilled_output_dim):
+
+# TODO: MAKE THIS ONE CORRECT
+def get_entropy(distilled_model, data_loader, label='test'):
+    # KAN EVENTUELLT HA EN GEMENSAM METOD MED ACCURACY OCH GÖRA EN NY METRIC
+    prob_ensemble = distilled_model.teacher
+
+    inputs, labels = next(iter(data_loader))
+
+    ensemble_prediction = prob_ensemble.predict(inputs)
+    ensemble_entropy = metrics.entropy(ensemble_prediction, None).data.numpy()
+
+    distilled_model_prediction = distilled_model.predict(inputs)
+    distilled_model_entropy = metrics.entropy(torch.cat((distilled_model_prediction,
+                                                                         1 - torch.sum(distilled_model_prediction,
+                                                                                       dim=1, keepdim=True)), dim=1),
+                                                        None).data.numpy()
+    LOGGER.info("Ensemble mean entropy on {} data {}".format(label, np.mean(distilled_model_entropy)))
+    LOGGER.info("Distilled model mean entropy on {} data {}".format(label, np.mean(ensemble_entropy)))
+
+    return ensemble_entropy, distilled_model_entropy
+
+
+def get_var(distilled_model, data_loader, label='test'):
+
+    inputs, _ = next(iter(data_loader))
+
+    prob_ensemble = distilled_model.teacher
+    ensemble_logits = prob_ensemble.get_logits(inputs).detach().numpy()
+    scaled_logits = ensemble_logits - ensemble_logits[:, :, -1][:, :, np.newaxis]
+    ensemble_var = np.var(scaled_logits, axis=1)
+    LOGGER.info("Min ensemble variance on {} data: {}".format(label, ensemble_var.min()))
+    LOGGER.info("Max ensemble variance on {} data: {}".format(label, ensemble_var.max()))
+    LOGGER.info("Mean ensemble variance on {} data: {}".format(label, np.mean(ensemble_var, axis=0)))
+
+    # We will also look at the variance over all samples
+    scaled_logits = scaled_logits.reshape(scaled_logits.shape[0] * scaled_logits.shape[1], scaled_logits.shape[2])
+    LOGGER.info("Total mean ensemble variance on {} data: {}".format(label, np.var(scaled_logits, axis=0)))
+
+    distilled_model_var = distilled_model.forward(inputs)[1].detach().numpy()
+    LOGGER.info("Min distilled model variance on {} data: {}".format(label, distilled_model_var.min()))
+    LOGGER.info("Max distilled model variance on {} data: {}".format(label, distilled_model_var.max()))
+    LOGGER.info("Mean distilled model variance on {} data: {}".format(label, np.mean(distilled_model_var, axis=0)))
+
+    return ensemble_var, distilled_model_var
+
+
+def distillation(class_type, distilled_output_dim, ensemble_filepath, distilled_model_filepath, train_ensemble=False):
     args = utils.parse_args()
 
     log_file = Path("{}.log".format(datetime.now().strftime('%Y%m%d_%H%M%S')))
@@ -371,48 +364,54 @@ def distillation(class_type, distilled_output_dim):
     test_set = mnist.MnistData(train=False)
 
     train_loader = torch.utils.data.DataLoader(train_set,
-                                               batch_size=32,
+                                               batch_size=100,
                                                shuffle=True,
                                                num_workers=0)
 
+    train_loader_full = torch.utils.data.DataLoader(train_set,
+                                                    batch_size=len(train_set),
+                                                    shuffle=True,
+                                                    num_workers=0)
+
     valid_loader = torch.utils.data.DataLoader(valid_set,
-                                               batch_size=32,
+                                               batch_size=100,
                                                shuffle=True,
                                                num_workers=0)
+
+    valid_loader_full = torch.utils.data.DataLoader(valid_set,
+                                                    batch_size=len(valid_set),
+                                                    shuffle=True,
+                                                    num_workers=0)
 
     test_loader = torch.utils.data.DataLoader(test_set,
                                               batch_size=10000,
                                               shuffle=True,
                                               num_workers=0)
 
-    train_loader_full = torch.utils.data.DataLoader(train_set,
-                                                    batch_size=train_set.n_samples,
-                                                    shuffle=True,
-                                                    num_workers=0)
+    num_ensemble_members = 10
+    if train_ensemble:
+        prob_ensemble = create_ensemble(train_loader, valid_loader, test_loader, args, num_ensemble_members,
+                                        ensemble_filepath)
+    else:
+        prob_ensemble = ensemble.Ensemble(num_ensemble_members)
+        prob_ensemble.load_ensemble(ensemble_filepath, num_members=num_ensemble_members)
 
-    # num_ensemble_members = 10
 
-    ensemble_filepath = Path("models/mnist_ensemble_10")
-    distilled_model_filepath = Path("models/distilled_mnist_logits_model_one_member_cross_entropy")
-
-    prob_ensemble = ensemble.Ensemble(output_size=10)
-    prob_ensemble.load_ensemble(ensemble_filepath, num_members=5)
     # prob_ensemble.calc_metrics(test_loader)
 
-    ensemble_train_var = np.var(prob_ensemble.get_logits(
-        torch.tensor(train_set.data.reshape(train_set.data.shape[0], 28 ** 2) / 255,
-                     dtype=torch.float32)).detach().numpy(),
-                                axis=1)
-    LOGGER.info("Min ensemble variance: {}".format(ensemble_train_var.min()))
-    LOGGER.info("Max ensemble variance: {}".format(ensemble_train_var.max()))
+    #distilled_model = create_distilled_model(distilled_output_dim, train_loader, valid_loader, test_loader, args,
+    #                                         prob_ensemble, distilled_model_filepath, class_type)
 
-    distilled_model = create_distilled_model(distilled_output_dim, train_loader, valid_loader, test_loader, args,
-                                             prob_ensemble, distilled_model_filepath, class_type)
+    distilled_model = torch.load(distilled_model_filepath)
 
-    #distilled_model = torch.load(distilled_model_filepath)
+    get_var(distilled_model, train_loader_full, 'train')
+    get_var(distilled_model, valid_loader_full, 'validation')
+    get_var(distilled_model, test_loader)
+
+    get_accuracy(distilled_model, test_loader)
+    get_accuracy(distilled_model, train_loader_full, label='train')
 
     fig, axes = plt.subplots(2, 2)
-    y = ['SE loss', 'Softmax SE', 'Softmax CE', 'Accuracy (relative teacher)']
     for i, metric in enumerate(distilled_model.metrics.values()):
 
         if isinstance(metric.memory[1], torch.FloatTensor):
@@ -420,19 +419,15 @@ def distillation(class_type, distilled_output_dim):
         else:
             metric_batch_mean = np.stack(metric.memory[1:])
         axes.reshape(-1)[i].plot(np.arange(metric_batch_mean.shape[0]), metric_batch_mean)
-        axes.reshape(-1)[i].set_ylabel(y[i])
+        axes.reshape(-1)[i].set_ylabel(metric.name)
         axes.reshape(-1)[i].set_xlabel('it')
 
     plt.show()
 
-    get_accuracy(distilled_model, test_loader)
-    get_accuracy(distilled_model, train_loader_full, label='train')
-
-
     # distilled_model = torch.load(distilled_model_filepath)
 
     # effect_of_ensemble_size(prob_ensemble, train_loader, test_loader, args)
-    # entropy_histogram(prob_ensemble, distilled_model, test_loader)
+    get_histogram(distilled_model, test_loader, get_var)
 
     # test_sample = test_set.get_sample(5)
     # entropy_comparison_rotation(prob_ensemble, distilled_model, test_sample)
@@ -442,28 +437,47 @@ def distillation(class_type, distilled_output_dim):
 def main():
     """Main"""
 
-    # Distillation
-    class_type = logits_probability_distribution.LogitsProbabilityDistribution
+    # Distribution distillation
+    #class_type = logits_probability_distribution.LogitsProbabilityDistribution
+    #output_dim = 18
+    distilled_model_filepath = Path("models/distilled_mnist_logits_model")
+
+    # Distribution distillation, subnetworks
+    class_type = logits_prob_dist_subnet.LogitsProbabilityDistributionSubNet
     output_dim = 18
+    #distilled_model_filepath = Path("models/distilled_mnist_logits_model_subnets")
 
     # Dummy distillation
     #class_type = dummy_logits_probability_distribution.DummyLogitsProbabilityDistribution
     #output_dim = 18
+#    distilled_model_filepath = Path("models/distilled_mnist_dummy_logits_model")
+
 
     # Logits matching
     #class_type = logits_matching.LogitsMatching
     #output_dim = 9
+#    distilled_model_filepath = Path("models/distilled_mnist_logits_matching")
+
 
 
     # Softmax matching
     #class_type = softmax_matching.SoftmaxMatching
     #output_dim = 9
+#    distilled_model_filepath = Path("models/distilled_softmax_matching")
+
 
     # Cross entropy with soft labels
     #class_type = cross_entropy_soft_labels.XCSoftLabels
     #output_dim = 9
 
-    distillation(class_type, output_dim)
+    # Vanilla distillation
+    #class_type = vanilla_distill.VanillaDistill
+    #output_dim = 9
+#    distilled_model_filepath = Path("models/distilled_mnist_vanilla_model")
+
+    ensemble_filepath = Path("models/mnist_ensemble_10")
+    distillation(class_type, output_dim, ensemble_filepath, distilled_model_filepath)
+    # OBS HAR KOMMENTERAT BORT SPARNINGEN
 
 
 if __name__ == "__main__":

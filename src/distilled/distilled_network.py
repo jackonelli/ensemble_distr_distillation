@@ -32,31 +32,40 @@ class DistilledNet(nn.Module, ABC):
         """ Common train method for all distilled networks
         Should NOT be overridden!
         """
-        scheduler = self.get_scheduler(step_size=10 * len(train_loader),
-                                       cyclical=True)
+        scheduler = self.get_scheduler(step_size=5*len(train_loader), cyclical=False)
+        #scheduler = torch_optim.lr_scheduler.CyclicLR(self.optimizer, 1e-7, 0.1, step_size_up=100)
 
-        # scheduler = torch_optim.lr_scheduler.CyclicLR(
-        #    self.optimizer, 1e-7, 0.1, step_size_up=100)
+        self.use_hard_labels = False # VILL VI HA DENNA?
 
         self._log.info("Training distilled network.")
+
+        # Want to look at metrices at initialization
+        if validation_loader is None:
+            self.calculate_metric_dataloader(train_loader)
+        else:
+            self.calculate_metric_dataloader(validation_loader)
+
+        self._print_epoch(0, None)
+
         for epoch_number in range(1, num_epochs + 1):
             loss = self._train_epoch(train_loader,
                                      validation_loader=validation_loader,
                                      scheduler=scheduler)
             self._print_epoch(epoch_number, loss)
-            if self._learning_rate_condition(epoch_number):
-                scheduler.step()
+            #if self._learning_rate_condition(epoch_number):
+            #    scheduler.step()
 
-    def _train_epoch(self,
-                     train_loader,
-                     validation_loader=None,
-                     scheduler=None):
+        self._reset_metrics()  # For storing purposes
+
+    def _train_epoch(self, train_loader, validation_loader=None, scheduler=None):
+
         """Common train epoch method for all distilled networks
         Should NOT be overridden!
         TODO: Make sure train_loader returns None for labels,
         if no labels are available.
         """
         running_loss = 0
+
         self._reset_metrics()
 
         for batch in train_loader:
@@ -89,18 +98,19 @@ class DistilledNet(nn.Module, ABC):
 
         if validation_loader is not None:
             # We will compare here with the teacher predictions
-            for valid_batch in validation_loader:
-                #self._reset_metrics()
-                valid_inputs, valid_labels = valid_batch
-                valid_inputs, valid_labels = valid_inputs.to(
-                    self.device), valid_labels.to(self.device)
-                valid_outputs = self.forward(valid_inputs)
-                teacher_predictions = self._generate_teacher_predictions(
-                    valid_inputs)
-                teacher_predictions = teacher_predictions.to(self.device)
-                self._update_metrics(valid_outputs, teacher_predictions)
+            self.calculate_metric_dataloader(validation_loader)
 
         return running_loss
+
+    def calculate_metric_dataloader(self, data_loader):
+        for batch in data_loader:
+            # self._reset_metrics()
+            inputs, labels = batch
+            inputs, labels = inputs.to(self.device), labels.to(self.device)
+            outputs = self.forward(inputs)
+            teacher_predictions = self._generate_teacher_predictions(inputs)
+            teacher_predictions = teacher_predictions.to(self.device)
+            self._update_metrics(outputs, teacher_predictions)
 
     def _generate_teacher_predictions(self, inputs):
         """Generate teacher predictions
@@ -129,7 +139,7 @@ class DistilledNet(nn.Module, ABC):
             metric_string += " {}".format(metric)
         self._log.info(metric_string)
 
-    def get_scheduler(self, step_size, factor=100000, cyclical=False):
+    def get_scheduler(self, step_size=100, factor=100000, cyclical=False):
 
         if cyclical:
             end_lr = self.learning_rate
@@ -140,7 +150,7 @@ class DistilledNet(nn.Module, ABC):
                 self.optimizer, [clr])
         else:
             scheduler = torch_optim.lr_scheduler.StepLR(self.optimizer,
-                                                        step_size=100,
+                                                        step_size=step_size,
                                                         gamma=0.5)
 
         return scheduler

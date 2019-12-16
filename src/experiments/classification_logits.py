@@ -42,23 +42,22 @@ def get_accuracy_test(distilled_model):
     # Will also just check the loss on the test data
     distilled_model.calc_metrics(test_loader)
 
+    prob_ensemble = distilled_model.teacher
+
     test_inputs, test_labels = next(iter(test_loader))
-    test_labels = test_labels.data.numpy()
 
-    teacher_test_predictions = prob_ensemble.predict(test_inputs)
-    teacher_predictions = torch.argmax(torch.mean(teacher_test_predictions, axis=1), axis=-1).data.numpy()
-    teacher_acc = np.mean(teacher_predictions == test_labels)
-    LOGGER.info("Ensemble accuracy on test data {}".format(teacher_acc))
+    label = "test"
+    teacher_test_logits = prob_ensemble.predict(test_inputs)
+    teacher_acc = metrics.accuracy_logits(teacher_test_logits, test_labels, softmax_targets=True)
+    LOGGER.info("Ensemble model accuracy on {} data {}".format(label, teacher_acc))
 
-    student_test_predictions = torch.mean(distilled_model.predict(test_inputs), dim=1)  # !
-    student_predictions = torch.argmax(torch.cat((student_test_predictions, 1-student_test_predictions), dim=1), axis=1).data.numpy()
-    student_acc = np.mean(np.transpose(student_predictions) == test_labels)
-    LOGGER.info("Distilled model accuracy on test data {}".format(student_acc))
+    student_test_logits = distilled_model.forward(test_inputs)[0]  # We will look at the expectation value
+    student_acc = metrics.accuracy_logits(student_test_logits, test_labels, softmax_targets=True)
+    LOGGER.info("Distilled model accuracy on {} data {}".format(label, student_acc))
 
     # Find student predictions relative teacher predictions
-    student_acc_teacher = np.mean(np.transpose(student_predictions) == teacher_predictions)
-    LOGGER.info("Distilled model accuracy on data relative teacher {}".format(student_acc_teacher))
-
+    student_acc_teacher = metrics.accuracy_logits(student_test_logits, teacher_test_logits)
+    LOGGER.info("Distilled model accuracy on {} data relative teacher {}".format(label, student_acc_teacher))
 
 def uncertainty_plots(distilled_model):
 
@@ -257,17 +256,15 @@ def main():
         distilled_output_size,
         teacher=prob_ensemble,
         device=device,
-        learning_rate=args.lr*0.1)
+        learning_rate=args.lr*10)
 
     loss_metric = metrics.Metric(name="Mean val loss", function=distilled_model.calculate_loss)
     distilled_model.add_metric(loss_metric)
-    distilled_filepath = Path("models/simple_class_logits_distilled_overlap_full_training")
+    distilled_filepath = Path("models/simple_class_logits_distilled_overlap_full_training_adam")
     distilled_model = torch.load(distilled_filepath)
-    #distilled_model.train(full_train_loader, args.num_epochs*10, validation_loader=validation_loader)
+    #distilled_model.train(full_train_loader, args.num_epochs*5, validation_loader=validation_loader)
 
     #distilled_filepath = Path("models/simple_class_logits_distilled_matching_logits_one_ensemble_member")
-    distilled_filepath = Path("models/simple_class_logits_distilled_overlap_full_training")
-    #distilled_model = torch.load(distilled_filepath)
     distilled_model.calc_metrics(full_train_loader)
 
 
