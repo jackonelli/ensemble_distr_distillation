@@ -10,6 +10,7 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
                  input_size,
                  hidden_size_1,
                  hidden_size_2,
+                 hidden_size_3,
                  output_size,
                  teacher,
                  device=torch.device('cpu'),
@@ -24,6 +25,7 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
         self.input_size = input_size
         self.hidden_size_1 = hidden_size_1  # Or make a list or something
         self.hidden_size_2 = hidden_size_2
+        self.hidden_size_3 = hidden_size_3
         self.output_size = output_size
         self.use_hard_labels = use_hard_labels
         self.learning_rate = learning_rate
@@ -39,7 +41,7 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
             self._log.warning("Non-zero variance lower bound set ({})".format(
                 self.variance_lower_bound))
 
-        self.layers = [self.fc1, self.fc2, self.fc3]
+        self.layers = [self.fc1, self.fc2, self.fc3, self.fc4]
 
         self.optimizer = torch_optim.Adam(self.parameters(),
                                           lr=self.learning_rate)
@@ -52,7 +54,8 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
 
         x = nn.functional.relu(self.fc1(x))
         x = nn.functional.relu(self.fc2(x))
-        x = self.fc3(x)
+        x = nn.functional.relu(self.fc3(x))
+        x = self.fc4(x)
 
         mean = x[:, :int((self.output_size / 2))]
 
