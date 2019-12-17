@@ -17,7 +17,9 @@ class MeanRegressor(ensemble.EnsembleMember):
                  device=torch.device("cpu"),
                  learning_rate=0.001):
 
-        super().__init__(loss_function=nn.MSELoss(), device=device)
+        super().__init__(output_size=output_size,
+                         loss_function=nn.MSELoss(),
+                         device=device)
 
         self.input_size = input_size
         self.hidden_size_1 = hidden_size_1  # Or make a list or something
@@ -47,6 +49,7 @@ class MeanRegressor(ensemble.EnsembleMember):
         return logits
 
     def calculate_loss(self, outputs, targets):
+        self._log.warning("Using sub-networks loss function")
         return self.loss(outputs, targets)
 
     def predict(self, x):

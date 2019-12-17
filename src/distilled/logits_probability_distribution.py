@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.optim as torch_optim
 import src.loss as custom_loss
 import src.distilled.distilled_network as distilled_network
-import torch.distributions.multivariate_normal as torch_mvn
 
 
 class LogitsProbabilityDistribution(distilled_network.DistilledNet):

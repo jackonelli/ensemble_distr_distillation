@@ -45,7 +45,6 @@ class TestGaussianLoss(unittest.TestCase):
                                places=NUM_DECIMALS)
 
     def test_gaussian_nll_batch(self):
-        pass
         B, N, D = 2, 1, 1
         target = torch.tensor([[1.0], [0.75]],
                               dtype=torch.float).reshape(B, N, D)

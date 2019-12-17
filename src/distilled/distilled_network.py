@@ -32,10 +32,11 @@ class DistilledNet(nn.Module, ABC):
         """ Common train method for all distilled networks
         Should NOT be overridden!
         """
-        scheduler = self.get_scheduler(step_size=5*len(train_loader), cyclical=False)
+        scheduler = self.get_scheduler(step_size=5 * len(train_loader),
+                                       cyclical=False)
         #scheduler = torch_optim.lr_scheduler.CyclicLR(self.optimizer, 1e-7, 0.1, step_size_up=100)
 
-        self.use_hard_labels = False # VILL VI HA DENNA?
+        self.use_hard_labels = False  # VILL VI HA DENNA?
 
         self._log.info("Training distilled network.")
 
@@ -44,8 +45,6 @@ class DistilledNet(nn.Module, ABC):
             self.calculate_metric_dataloader(train_loader)
         else:
             self.calculate_metric_dataloader(validation_loader)
-
-        self._print_epoch(0, None)
 
         for epoch_number in range(1, num_epochs + 1):
             loss = self._train_epoch(train_loader,
@@ -57,8 +56,10 @@ class DistilledNet(nn.Module, ABC):
 
         self._reset_metrics()  # For storing purposes
 
-    def _train_epoch(self, train_loader, validation_loader=None, scheduler=None):
-
+    def _train_epoch(self,
+                     train_loader,
+                     validation_loader=None,
+                     scheduler=None):
         """Common train epoch method for all distilled networks
         Should NOT be overridden!
         TODO: Make sure train_loader returns None for labels,
