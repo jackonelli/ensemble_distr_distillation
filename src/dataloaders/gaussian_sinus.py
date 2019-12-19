@@ -15,12 +15,14 @@ class GaussianSinus(torch.utils.data.Dataset):
     def __init__(self,
                  store_file,
                  train=True,
+                 range_=(-3, 3),
                  reuse_data=False,
                  n_samples=1000):
 
         super(GaussianSinus).__init__()
         self._log = logging.getLogger(self.__class__.__name__)
         self.n_samples = n_samples
+        self.range = range_
         self.train = train
 
         self.file = Path(store_file)
@@ -49,15 +51,16 @@ class GaussianSinus(torch.utils.data.Dataset):
 
     def sample_new_data(self):
         self.file.parent.mkdir(parents=True, exist_ok=True)
+        lower, upper = self.range
         if self.train:
-            x = np.random.uniform(low=-3.0, high=3.0, size=self.n_samples)
-            mu = np.sin(x)
-            sigma = 0.15 * 1 / (1 + np.exp(-x))
-            sigma **= 2
-            y = np.random.multivariate_normal(mean=mu, cov=(np.diag(sigma)))
+            x = np.random.uniform(low=lower, high=upper, size=self.n_samples)
 
         else:
-            x = np.random.uniform(low=-3.0, high=3.0, size=self.n_samples)
+            x = np.random.uniform(low=lower, high=upper, size=self.n_samples)
+
+        mu = np.sin(x)
+        sigma = 0.15 * 1 / (1 + np.exp(-x))
+        y = np.random.multivariate_normal(mean=mu, cov=(np.diag(sigma)))
 
         combined_data = np.column_stack((x, y))
         np.random.shuffle(combined_data)
@@ -83,10 +86,33 @@ def plot_reg_data(data, ax):
     plt.show()
 
 
+def plot_uncert(ax, data, x):
+    inputs = data[:, :-1]
+    targets = data[:, -1]
+    mu = np.sin(x)
+    sigma = 0.15 * 1 / (1 + np.exp(-x))
+    ax.scatter(inputs, targets)
+
+    ax.plot(x, mu, "r-", label="$\mu(x)$")
+    ax.fill_between(x,
+                    mu + sigma,
+                    mu - sigma,
+                    facecolor="blue",
+                    alpha=0.5,
+                    label="$\mu(x) \pm \sigma(x)$")
+    plt.legend(prop={'size': 20})
+    plt.show()
+
+
 def main():
     _, ax = plt.subplots()
     dataset = GaussianSinus(store_file=Path("data/1d_gauss_sinus_1000"))
-    plot_reg_data(dataset.get_full_data(), ax)
+    start = -3
+    end = 3
+    step = 0.25
+    x_length = int((end - start) / step)
+    x = np.arange(start=start, stop=end, step=step, dtype=np.float)
+    plot_uncert(ax, dataset.get_full_data(), x)
 
 
 if __name__ == "__main__":

@@ -17,12 +17,12 @@ class Metric:
         self.counter = 0
         self.memory = []  # So that we can go back an look at the data
 
-
     def __str__(self):
         return "{}: {}".format(self.name, self.mean())
 
-    def update(self, labels, outputs):
-        self.running_value += self.function(outputs, labels).detach()  # Do this to save memory
+    def update(self, targets, outputs):
+        self.running_value += self.function(
+            outputs, targets).detach()  # Do this to save memory
         self.counter += 1
 
     def mean(self):
@@ -46,7 +46,7 @@ def entropy(predicted_distribution, true_labels, correct_nan=False):
     Labels as one hot vectors
     Note: if a batch with B samples is given,
     then the output is a tensor with B values
-    The true labels argument is simply there for conformity
+    The true targets argument is simply there for conformity
     so that the entropy metric functions like any metric.
 
     Args:
@@ -98,7 +98,7 @@ def uncertainty_separation_variance(predicted_distribution, true_labels):
     B = batch size, N = num predictions
     Note: if a batch with B samples is given,
     then the output is a tensor with B values
-    The true labels argument is simply there for conformity
+    The true targets argument is simply there for conformity
     so that the entropy metric functions like any metric.
 
     Args:
@@ -126,7 +126,7 @@ def uncertainty_separation_entropy(predicted_distribution, true_labels, logits=F
     Labels as one hot vectors
     Note: if a batch with B samples is given,
     then the output is a tensor with B values
-    The true labels argument is simply there for conformity
+    The true targets argument is simply there for conformity
     so that the entropy metric functions like any metric.
 
     Args:
@@ -265,7 +265,7 @@ def accuracy_logits(logits_distr_par, targets, label_targets=False, num_samples=
     Args:
         targets: torch.tensor(B, N, K-1) if logits targets, (B, K) otherwise
         logits_distr_par: torch.tensor((B, K-1), (B, K-1, K-1))
-        softmax_targets: specifies if the targets is in logits or in labels form
+        label_targets: specifies if the targets is in logits or in labels form
 
     Returns:
         Accuracy: float
@@ -293,6 +293,7 @@ def accuracy_logits(logits_distr_par, targets, label_targets=False, num_samples=
         target_distribution = torch.mean((torch.nn.Softmax(dim=-1))(torch.cat((targets,
                                                                     torch.zeros(mean.size(0),
                                                                                 targets.size(1), 1)),  dim=-1)), dim=1)
+
         target_labels, _ = utils.tensor_argmax(target_distribution)
 
     number_of_elements = np.prod(target_labels.size(0))
@@ -322,6 +323,30 @@ def error(predicted_distribution, true_labels):
     return (true_labels != predicted_labels).sum().item() / number_of_elements
 
 
+def mean_squared_error(predictions, targets):
+    """ Mean squared error
+    Replaces squared_error below
+    B = Batch size
+    N = Sample size
+    D = Output dimension
+
+    Args:
+        targets: torch.tensor(B, N, D)
+        predictions: (torch.tensor(B, D)),
+            regression estimate
+
+    Returns:
+        Error: float
+    """
+
+    B, N, D = targets.size()
+    total_loss = 0.0
+    for n in np.arange(N):
+        target = targets[:, n, :]
+        total_loss += ((target - predictions)**2).sum()
+    return total_loss / (B * N)
+
+
 def squared_error(predictions, targets):
     """ Error
     B = batch size
@@ -329,8 +354,10 @@ def squared_error(predictions, targets):
 
     Args:
         targets: torch.tensor(B, D)
-        predictions: (torch.tensor(B, 2*D)), estimated mean and variances of the
-                     normal distribution of targets arranged as [mean_1, ... mean_D, var_1, ..., var_D]
+        predictions: (torch.tensor(B, 2*D)),
+            estimated mean and variances of the
+            normal distribution of targets arranged as
+            [mean_1, ... mean_D, var_1, ..., var_D]
 
     Returns:
         Error: float
