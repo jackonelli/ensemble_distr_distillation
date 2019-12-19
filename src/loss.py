@@ -67,29 +67,28 @@ def gaussian_neg_log_likelihood(parameters, target):
     B = batch size, D = dimension of target, N = ensemble size
 
     Args:
-        parameters (torch.tensor(B, N, D)), torch.tensor((B, N, D))):
-            mean values and variances of y|x for every x in
+        parameters (torch.tensor(B, D)), torch.tensor((B, D))):
+            mean and variance of y|x for every x in
             batch (and for every ensemble member).
-        target (torch.tensor((B(, N), D))): sample from the normal
+
+        target (torch.tensor((B, N, D))): sample from the normal
             distribution, if not an ensemble prediction N=1.
-        scale (torch.tensor(B, 1)): scaling parameter for the variance
-            (/covariance matrix) for every x in batch.
     """
 
+    B = target.size(0)
     mean = parameters[0]
     var = parameters[1]
 
     if target.dim() == 2:
         target = torch.unsqueeze(target, dim=1)
 
-    cov_mat = torch.stack(
-        [torch.diag(var[b, :]) for b in np.arange(target.size(0))])
+    cov_mat = torch.stack([torch.diag(var[b, :]) for b in np.arange(B)])
 
     loss = 0
-    for b, cov_mat_b in enumerate(cov_mat):
-        m = torch_mvn.MultivariateNormal(mean[b, :], cov_mat_b)
+    for batch_index, cov_mat_b in enumerate(cov_mat):
+        mvn = torch_mvn.MultivariateNormal(mean[batch_index, :], cov_mat_b)
 
-        loss -= torch.mean(m.log_prob(target[b, :, :])) / target.size(0)
+        loss -= torch.mean(mvn.log_prob(target[batch_index, :, :])) / B
 
     return loss
 
