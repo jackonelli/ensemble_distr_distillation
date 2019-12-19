@@ -40,9 +40,11 @@ class TestMetrics(unittest.TestCase):
         self.assertAlmostEqual(acc, 1)
 
     def test_accuracy_logits(self):
-        logits = torch.tensor([[3, 4]]).float()
+        mean = torch.tensor([[1, 10]]).float()
+        var = torch.tensor([[1, 1]]).float()
+        distr_par = (mean, var)
         target_logits = torch.tensor([[[2, 5]]]).float()
-        acc = metrics.accuracy_logits(logits, target_logits)
+        acc = metrics.accuracy_logits(distr_par, target_logits)
         self.assertAlmostEqual(acc, 1)
 
     def test_accuracy_soft_labels(self):
@@ -68,7 +70,7 @@ class TestMetrics(unittest.TestCase):
         predictions = torch.tensor([[[0.8, 0.2], [0.6, 0.4]]])
         pred_mean = torch.mean(predictions, dim=1)
         self.assertAlmostEqual(torch.sum(pred_mean), 1.0)
-        tot_unc, ep_unc, al_unc = metrics.uncertainty_separation_entropy_categorical(
+        tot_unc, ep_unc, al_unc = metrics.uncertainty_separation_entropy(
             predictions, None)
         self.assertAlmostEqual(tot_unc.item(), 0.8813, places=4)
         self.assertAlmostEqual(ep_unc.item(), 0.0349, places=4)
