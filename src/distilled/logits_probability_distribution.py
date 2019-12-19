@@ -33,7 +33,9 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
 
         self.fc1 = nn.Linear(self.input_size, self.hidden_size_1)
         self.fc2 = nn.Linear(self.hidden_size_1, self.hidden_size_2)
-        self.fc3 = nn.Linear(self.hidden_size_2, self.output_size)
+        self.fc3 = nn.Linear(self.hidden_size_2, self.hidden_size_3)
+        self.fc4 = nn.Linear(self.hidden_size_3, self.output_size)
+
         # Ad-hoc fix zero variance.
 
         self.variance_lower_bound = 0.001
