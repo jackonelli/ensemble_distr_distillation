@@ -47,17 +47,21 @@ def get_accuracy_test(distilled_model):
     test_inputs, test_labels = next(iter(test_loader))
 
     label = "test"
-    teacher_test_logits = prob_ensemble.predict(test_inputs)
-    teacher_acc = metrics.accuracy_logits(teacher_test_logits, test_labels, softmax_targets=True)
+
+    teacher_distribution = torch.mean(prob_ensemble.predict(test_inputs), dim=1)
+    teacher_acc = metrics.accuracy(teacher_distribution, test_labels)
     LOGGER.info("Ensemble model accuracy on {} data {}".format(label, teacher_acc))
 
-    student_test_logits = distilled_model.forward(test_inputs)[0]  # We will look at the expectation value
-    student_acc = metrics.accuracy_logits(student_test_logits, test_labels, softmax_targets=True)
+    student_distribution = torch.mean(distilled_model.predict(test_inputs), dim=1)
+    student_distribution = torch.cat((student_distribution, 1 - student_distribution), dim=1)
+    student_acc = metrics.accuracy(student_distribution, test_labels)
     LOGGER.info("Distilled model accuracy on {} data {}".format(label, student_acc))
 
     # Find student predictions relative teacher predictions
-    student_acc_teacher = metrics.accuracy_logits(student_test_logits, teacher_test_logits)
+    teacher_labels, _ = utils.tensor_argmax(teacher_distribution)
+    student_acc_teacher = metrics.accuracy(student_distribution, teacher_labels.int())
     LOGGER.info("Distilled model accuracy on {} data relative teacher {}".format(label, student_acc_teacher))
+
 
 def uncertainty_plots(distilled_model):
 

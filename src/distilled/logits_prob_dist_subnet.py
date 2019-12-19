@@ -99,7 +99,7 @@ class LogitsProbabilityDistributionSubNet(distilled_network.DistilledNet):
         softmax_samples = torch.exp(samples) / (
             torch.sum(torch.exp(samples), dim=-1, keepdim=True) + 1)
 
-        return torch.exp(mean) / (torch.sum(torch.exp(mean), dim=-1, keepdim=True) + 1)
+        return so
 
     def _learning_rate_condition(self, epoch=None):
         """Evaluate condition for increasing learning rate

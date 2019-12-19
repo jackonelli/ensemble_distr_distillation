@@ -3,6 +3,7 @@ import logging
 import torch
 import numpy as np
 import src.utils as utils
+import torch.distributions.logistic_normal as torch_logistic_normal
 
 LOGGER = logging.getLogger(__name__)
 
@@ -38,7 +39,7 @@ class Metric:
         self.counter = 0
 
 
-def entropy(predicted_distribution, true_labels):
+def entropy(predicted_distribution, true_labels, correct_nan=False):
     """Entropy
 
     B = batch size, C = num classes
@@ -50,14 +51,23 @@ def entropy(predicted_distribution, true_labels):
 
     Args:
         NOT USED true_labels: torch.tensor((B, C))
-        predicted_distribution: torch.tensor((B, C))
+        predicted_distribution: torch.tensor((B(, N), C))
+        logits: predicted_distribution provided in logits-form (for numerical stability)
+        correct_nan: if True, will set 0*log 0 to 0
 
     Returns:
         entropy(ies): torch.tensor(B,)
     """
 
-    return -torch.sum(
-        predicted_distribution * torch.log(predicted_distribution), dim=-1)
+    if correct_nan:
+        entr = predicted_distribution * torch.log(predicted_distribution)
+        entr[torch.isnan(entr)] = 0
+        # FRÅGAN ÄR OM DET SKULLE VARA LOGISKT ATT UTESLUTA DESSA ISTÄLLET
+        entr = -torch.sum(entr, dim=-1)
+    else:
+        entr = -torch.sum(predicted_distribution * torch.log(predicted_distribution), dim=-1)
+
+    return entr
 
 
 def uncertainty_separation_parametric(mu, var):
@@ -109,8 +119,8 @@ def uncertainty_separation_variance(predicted_distribution, true_labels):
     return total_uncertainty, epistemic_uncertainty, aleatoric_uncertainty
 
 
-def uncertainty_separation_entropy(predicted_distribution, true_labels):
-    """Total, epistemic and aleatoric uncertainty based on an entropy measure
+def uncertainty_separation_entropy(predicted_distribution, true_labels, logits=False):
+    """Total, epistemic and aleatoric uncertainty based on entropy of categorical distribution
 
     B = batch size, C = num classes, N = num predictions
     Labels as one hot vectors
@@ -118,7 +128,6 @@ def uncertainty_separation_entropy(predicted_distribution, true_labels):
     then the output is a tensor with B values
     The true targets argument is simply there for conformity
     so that the entropy metric functions like any metric.
-    in the same context as the other metrices?
 
     Args:
         NOT USED true_labels: torch.tensor((B, C))
@@ -131,21 +140,27 @@ def uncertainty_separation_entropy(predicted_distribution, true_labels):
         Aleatoric uncertainty: torch.tensor(B,)
     """
 
-    # We calculate the uncertainties relative the maximum possible uncertainty:
-    # (log(C))
     max_entropy = torch.log(
         torch.tensor(predicted_distribution.size(-1)).float())
 
-    mean_predictions = torch.mean(predicted_distribution, dim=1)
-    total_uncertainty = -torch.sum(
-        mean_predictions * torch.log(mean_predictions), dim=-1) / max_entropy
-    aleatoric_uncertainty = - torch.sum(predicted_distribution * torch.log(predicted_distribution), dim=[1, 2]) \
-        / (max_entropy * predicted_distribution.size(1))
+    if logits:
+        log_sum_exp_logits = torch.logsumexp(predicted_distribution, dim=-1, keepdim=True)
+        p = torch.exp(predicted_distribution) / torch.exp(log_sum_exp_logits)
+        mean_predicted_distribution = torch.mean(p, dim=1)
+
+        aleatoric_uncertainty = - torch.sum(p * (predicted_distribution - log_sum_exp_logits), dim=[1, 2]) / \
+            (predicted_distribution.size(1) * max_entropy)
+    else:
+        mean_predicted_distribution = torch.mean(predicted_distribution, dim=1)
+        aleatoric_uncertainty = torch.mean(entropy(predicted_distribution, None), dim=1) / max_entropy
+
+    total_uncertainty = entropy(mean_predicted_distribution, None) / max_entropy
     epistemic_uncertainty = total_uncertainty - aleatoric_uncertainty
 
     return total_uncertainty, epistemic_uncertainty, aleatoric_uncertainty
 
 
+# DENNA KAN VI TA BORT?
 def nll(predicted_distribution, true_labels):
     """Negative log likelihood
 
@@ -167,6 +182,7 @@ def nll(predicted_distribution, true_labels):
                       dim=-1)
 
 
+# DENNA KAN VI TA BORT?
 def brier_score(predicted_distribution, true_labels):
     """Brier score
 
@@ -206,6 +222,7 @@ def accuracy(predicted_distribution, true_labels):
             ).sum().item() / number_of_elements
 
 
+# DENNA BEHÖVER VI EVENTUELLT INTE LÄNGRE; BEHÖVDE DEN INNAN FÖR ATT KOLLA PÅ ACC UNDER TRÄNING FÖR TESTFALL
 def accuracy_soft_labels(predicted_distribution, target_distribution):
     """ Accuracy
     B = batch size
@@ -238,43 +255,48 @@ def accuracy_soft_labels(predicted_distribution, target_distribution):
             ).sum().item() / number_of_elements
 
 
-def accuracy_logits(predicted_logits, targets, label_targets=False):
-    """ Accuracy given that the inputs are logits assumed to be scaled relative the last class K
+def accuracy_logits(logits_distr_par, targets, label_targets=False, num_samples=50):
+    """ Accuracy given that the inputs are parameters of the normal distribution over logits.
+
     B = batch size
     K = number of classes
     N = number of ensemble member
 
     Args:
         targets: torch.tensor(B, N, K-1) if logits targets, (B, K) otherwise
-        predicted_logits: torch.tensor(B, (N,) K-1)
-        softmax_targets: specifies if the targets is in logits or in targets form
+        logits_distr_par: torch.tensor((B, K-1), (B, K-1, K-1))
+        label_targets: specifies if the targets is in logits or in labels form
 
     Returns:
         Accuracy: float
     """
-    number_of_elements = np.prod(predicted_logits.size(0))
-    if predicted_logits.dim() == 3:
-        predicted_distribution = torch.mean(
-            (torch.nn.Softmax(dim=-1))(torch.cat(
-                (predicted_logits,
-                 torch.zeros(number_of_elements, predicted_logits.size(1), 1)),
-                dim=-1)),
-            dim=1)
-    else:
-        predicted_distribution = (torch.nn.Softmax(dim=-1))(torch.cat(
-            (predicted_logits, torch.zeros(number_of_elements, 1)), dim=-1))
+
+    mean = logits_distr_par[0]
+    var = logits_distr_par[1]
+
+    samples = torch.zeros(
+        [mean.size(0), num_samples, mean.size(-1)])
+    for i in range(mean.size(0)):
+        rv = torch.distributions.multivariate_normal.MultivariateNormal(
+            loc=mean[i, :], covariance_matrix=torch.diag(var[i, :]))
+        samples[i, :, :] = rv.rsample([num_samples])
+
+    predicted_distribution = torch.mean((torch.nn.Softmax(dim=-1))(torch.cat((targets, torch.zeros(mean.size(0),
+                                                                                                   num_samples, 1)),
+                                                                             dim=-1)), dim=1)
+    predicted_labels, _ = utils.tensor_argmax(predicted_distribution)
 
     if label_targets:
         target_labels = targets
 
     else:
-        target_distribution = torch.mean((torch.nn.Softmax(dim=-1))(torch.cat(
-            (targets, torch.zeros(number_of_elements, targets.size(1), 1)),
-            dim=-1)),
-                                         dim=1)
+        target_distribution = torch.mean((torch.nn.Softmax(dim=-1))(torch.cat((targets,
+                                                                    torch.zeros(mean.size(0),
+                                                                                targets.size(1), 1)),  dim=-1)), dim=1)
+
         target_labels, _ = utils.tensor_argmax(target_distribution)
 
-    predicted_labels, _ = utils.tensor_argmax(predicted_distribution)
+    number_of_elements = np.prod(target_labels.size(0))
 
     if number_of_elements == 0:
         number_of_elements = 1

@@ -68,7 +68,7 @@ class TestMetrics(unittest.TestCase):
         predictions = torch.tensor([[[0.8, 0.2], [0.6, 0.4]]])
         pred_mean = torch.mean(predictions, dim=1)
         self.assertAlmostEqual(torch.sum(pred_mean), 1.0)
-        tot_unc, ep_unc, al_unc = metrics.uncertainty_separation_entropy(
+        tot_unc, ep_unc, al_unc = metrics.uncertainty_separation_entropy_categorical(
             predictions, None)
         self.assertAlmostEqual(tot_unc.item(), 0.8813, places=4)
         self.assertAlmostEqual(ep_unc.item(), 0.0349, places=4)

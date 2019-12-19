@@ -68,7 +68,7 @@ def uncertainty_rotation(model, test_sample):
         [data_point.view(28 * 28) for data_point in rotated_data_set])
 
     predicted_distribution = model.predict(rotated_data_set)
-    tot_unc, ep_unc, al_unc = metrics.uncertainty_separation_entropy(predicted_distribution, None)
+    tot_unc, ep_unc, al_unc = metrics.uncertainty_separation_entropy_categorical(predicted_distribution, None)
 
     LOGGER.info("True label is: {}".format(test_label))
     LOGGER.info("Model prediction: {}".format(np.argmax(predicted_distribution.detach().numpy(), axis=-1)))
