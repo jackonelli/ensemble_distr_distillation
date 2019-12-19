@@ -46,7 +46,8 @@ def create_distilled_model(output_size,
                                  hidden_size_2,
                                  output_size,
                                  prob_ensemble,
-                                 learning_rate=args.lr*0.01)
+                                 learning_rate=args.lr*0.01,
+                                 scale_teacher_logits=True)
 
     loss_metric = metrics.Metric(name="Mean loss", function=distilled_model.calculate_loss)
     #softmax_se_metric = metrics.Metric(name="Softmax SE", function=distilled_model.softmax_rmse) MÅSTE FIXA DENNA FÖR DEN FUNGERAR INTE NÄR VI HAR EN VARIANSPAR OCKSÅ
@@ -165,16 +166,15 @@ def noise_effect_on_entropy(distilled_model, data_loader):
     inputs, _ = next(iter(data_loader))
 
     prob_ensemble = distilled_model.teacher
-    ensemble_member = prob_ensemble.members[0]
 
     epsilon = torch.linspace(0.0001, 1, 10)
     ensemble_entropy = torch.zeros([
         len(epsilon),
     ])
     ensemble_member_entropy = torch.zeros([
-        len(epsilon),
+        len(epsilon), len(prob_ensemble.members)
     ])
-    model_entropy = torch.zeros([
+    distilled_model_entropy = torch.zeros([
         len(epsilon),
     ])
 
@@ -184,25 +184,44 @@ def noise_effect_on_entropy(distilled_model, data_loader):
         input_perturbed = inputs + distr.sample(
             (inputs.shape[0], inputs.shape[1]))
 
-        ensemble_prediction = prob_ensemble.predict(input_perturbed)
-        ensemble_entropy[i] += torch.sum(metrics.entropy(None, ensemble_prediction))
+        ensemble_prediction = torch.mean(prob_ensemble.predict(input_perturbed), dim=1)
+        ensemble_entropy[i] += torch.mean(metrics.entropy(ensemble_prediction, None))
 
-        ensemble_member_prediction = ensemble_member.predict(input_perturbed)
-        ensemble_member_entropy[i] += torch.sum(metrics.entropy(None, ensemble_member_prediction))
+        for j in range(len(prob_ensemble.members)):
+            ensemble_member_prediction = prob_ensemble.members[j].predict(input_perturbed)
+            ensemble_member_entropy[i, j] += torch.mean(metrics.entropy(ensemble_member_prediction, None))
 
         distilled_model_prediction = distilled_model.predict(input_perturbed)
+        distilled_model_prediction = torch.mean(torch.cat((distilled_model_prediction,
+                                                1- torch.sum(distilled_model_prediction, dim=-1, keepdim=True)),
+                                                dim=-1), dim=1)
 
-        model_entropy[i] += torch.sum(metrics.entropy(None, torch.cat((distilled_model_prediction,
-                                                                 1 - torch.sum(distilled_model_prediction, dim=1,
-                                                                               keepdim=True)), dim=1)))
+        distilled_model_entropy[i] += torch.mean(metrics.entropy(distilled_model_prediction, None, correct_nan=True))
+
+        if i == (len(epsilon) - 1):
+            # We will investigate the results on the noisiest data a bit more
+            # We want to look at the mean logits for all x, ensemble and distilled model
+            teacher_logits = distilled_model._generate_teacher_predictions(input_perturbed)
+            teacher_mean_logits = torch.mean(teacher_logits, dim=[0, 1])
+            teacher_mean_variance = torch.mean(torch.var(teacher_logits, dim=1), dim=0)
+            student_mean_logits = torch.mean(distilled_model.predict_logits(input_perturbed), dim=[0, 1])
+            student_mean_variance = torch.mean(distilled_model.forward(input_perturbed)[1], dim=0)
+
+    print('Ensemble mean logits: {}'.format(teacher_mean_logits))
+    print('Distilled model mean logits: {}'.format(student_mean_logits))
+    print('Ensemble mean variance: {}'.format(teacher_mean_variance))
+    print('Distilled model mean variance: {}'.format(student_mean_variance))
 
     epsilon = epsilon.data.numpy()
-    plt.plot(epsilon, ensemble_entropy.data.numpy())
-    plt.plot(epsilon, ensemble_member_entropy.data.numpy())
-    plt.plot(epsilon, model_entropy.data.numpy())
+    plt.plot(epsilon, ensemble_entropy.data.numpy(), label='Ensemble')
+
+    for j in range(len(prob_ensemble.members)):
+        plt.plot(epsilon, ensemble_member_entropy[:, j].data.numpy(), label='Ensemble member ' + str(j))
+
+    plt.plot(epsilon, distilled_model_entropy.data.numpy(), label='Distilled model')
     plt.xlabel('\u03B5')
     plt.ylabel('Entropy')
-    plt.legend(['Ensemble', 'Ensemble member', 'Distilled model'])
+    plt.legend()
     plt.show()
 
 
@@ -253,20 +272,21 @@ def effect_of_ensemble_size(full_ensemble, train_loader, test_loader, args):
     plt.show()
 
 
-def get_histogram(distilled_model, test_loader, obj_fun):
+def get_histogram(distilled_model, test_loader, obj_fun, label):
     """Comparison of entropy histograms of ensemble and model"""
 
-    ensemble_entropy, distilled_model_entropy = obj_fun(distilled_model, test_loader)
+    ensemble_metric, distilled_model_metric = obj_fun(distilled_model, test_loader)
 
     num_bins = 100
 
-    fig, ax = plt.subplots(1, 2)
-    ax[0].hist(ensemble_entropy, bins=num_bins, alpha=0.5, density=True)
-    ax[1].hist(distilled_model_entropy, bins=num_bins, alpha=0.5, density=True)
-    ax[0].set_xlabel('Entropy')
-    ax[1].set_xlabel('Entropy')
-    ax[0].set_title('Ensemble')
-    ax[1].set_title('Distilled model')
+    fig, axes = plt.subplots(np.int(np.ceil(distilled_model_metric.shape[-1]/2)), 2)
+
+    for i, ax in enumerate(axes.reshape(-1)):
+        if i < distilled_model_metric.shape[-1]:
+            ax.hist(ensemble_metric[:, i], bins=num_bins, alpha=0.5, density=True)
+            ax.hist(distilled_model_metric[:, i], bins=num_bins, alpha=0.5, density=True)
+            ax.set_xlabel(label)
+            ax.legend(['Ensemble', 'Distilled model'])
 
     plt.show()
 
@@ -287,43 +307,55 @@ def plot_data_set(data_set):
 
 
 def get_accuracy(distilled_model, data_loader, label='test'):
-    # SKA KANSKE INTE VARA EN EGEN METOD
+    # SKA KANSKE INTE VARA EN EGEN METOD; EV. SKICKA IN METRIC
     prob_ensemble = distilled_model.teacher
 
     inputs, labels = next(iter(data_loader))
 
-    teacher_logits = prob_ensemble.predict(inputs)
-    teacher_acc = metrics.accuracy_logits(teacher_logits, labels, label_targets=True)
+    teacher_distribution = torch.mean(prob_ensemble.predict(inputs), dim=1)
+    teacher_acc = metrics.accuracy(teacher_distribution, labels)
     LOGGER.info("Ensemble model accuracy on {} data {}".format(label, teacher_acc))
 
-    student_test_logits = distilled_model.forward(inputs)[0]  # We will look at the expectation value
-    student_acc = metrics.accuracy_logits(student_test_logits, labels, label_targets=True)
+    student_distribution = torch.mean(distilled_model.predict(inputs), dim=1)
+    student_distribution = torch.cat((student_distribution,
+         1 - torch.sum(student_distribution, dim=-1, keepdim=True)), dim=-1)
+    student_acc = metrics.accuracy(student_distribution, labels)
     LOGGER.info("Distilled model accuracy on {} data {}".format(label, student_acc))
 
     # Find student predictions relative teacher predictions
-    student_acc_teacher = metrics.accuracy_logits(student_test_logits, teacher_logits)
+    teacher_labels, _ = utils.tensor_argmax(teacher_distribution)
+    student_acc_teacher = metrics.accuracy(student_distribution, teacher_labels.int())
     LOGGER.info("Distilled model accuracy on {} data relative teacher {}".format(label, student_acc_teacher))
 
     return teacher_acc, student_acc
 
 
-# TODO: MAKE THIS ONE CORRECT
 def get_entropy(distilled_model, data_loader, label='test'):
-    # KAN EVENTUELLT HA EN GEMENSAM METOD MED ACCURACY OCH GÖRA EN NY METRIC
+    # KAN EVENTUELLT HA EN GEMENSAM METOD MED ACCURACY OCH GÖRA EN NY METRIC, KAN LOOPA ÖVER TUPELSEN
     prob_ensemble = distilled_model.teacher
 
     inputs, labels = next(iter(data_loader))
 
-    ensemble_prediction = prob_ensemble.predict(inputs)
-    ensemble_entropy = metrics.entropy(ensemble_prediction, None).data.numpy()
+    teacher_distribution = prob_ensemble.predict(inputs)
+    ensemble_entropy = metrics.uncertainty_separation_entropy(teacher_distribution, None)
+    ensemble_entropy = np.stack((ensemble_entropy[0].data.numpy(), ensemble_entropy[1].data.numpy(),
+                                 ensemble_entropy[2].data.numpy()), axis=1)
 
-    distilled_model_prediction = distilled_model.predict(inputs)
-    distilled_model_entropy = metrics.entropy(torch.cat((distilled_model_prediction,
-                                                                         1 - torch.sum(distilled_model_prediction,
-                                                                                       dim=1, keepdim=True)), dim=1),
-                                                        None).data.numpy()
-    LOGGER.info("Ensemble mean entropy on {} data {}".format(label, np.mean(distilled_model_entropy)))
-    LOGGER.info("Distilled model mean entropy on {} data {}".format(label, np.mean(ensemble_entropy)))
+    student_distribution = distilled_model.predict_logits(inputs)
+    student_distribution = torch.cat((student_distribution,
+                                      torch.ones([inputs.shape[0], student_distribution.shape[1], 1])), dim=-1)
+    distilled_model_entropy = metrics.uncertainty_separation_entropy(student_distribution, None, logits=True)
+    distilled_model_entropy = np.stack((distilled_model_entropy[0].data.numpy(),
+                                        distilled_model_entropy[1].data.numpy(),
+                                        distilled_model_entropy[2].data.numpy()), axis=1)
+
+    LOGGER.info("Ensemble mean total entropy on {} data {}".format(label, np.mean(ensemble_entropy[:, 0])))
+    LOGGER.info("Ensemble mean epistemic entropy on {} data {}".format(label, np.mean(ensemble_entropy[:, 1])))
+    LOGGER.info("Ensemble mean aleatoric entropy on {} data {}".format(label, np.mean(ensemble_entropy[:, 2])))
+
+    LOGGER.info("Distilled model mean total entropy on {} data {}".format(label, np.mean(distilled_model_entropy[:, 0])))
+    LOGGER.info("Distilled model mean epistemic entropy on {} data {}".format(label, np.mean(distilled_model_entropy[:, 1])))
+    LOGGER.info("Distilled model mean aleatoric entropy on {} data {}".format(label, np.mean(distilled_model_entropy[:, 2])))
 
     return ensemble_entropy, distilled_model_entropy
 
@@ -350,6 +382,21 @@ def get_var(distilled_model, data_loader, label='test'):
     LOGGER.info("Mean distilled model variance on {} data: {}".format(label, np.mean(distilled_model_var, axis=0)))
 
     return ensemble_var, distilled_model_var
+
+
+def plot_metrics(model):
+    fig, axes = plt.subplots(2, 2)
+    for i, metric in enumerate(model.metrics.values()):
+
+        if isinstance(metric.memory[1], torch.FloatTensor):
+            metric_batch_mean = torch.stack(metric.memory[1:]).data.numpy()
+        else:
+            metric_batch_mean = np.stack(metric.memory[1:])
+        axes.reshape(-1)[i].plot(np.arange(metric_batch_mean.shape[0]), metric_batch_mean)
+        axes.reshape(-1)[i].set_ylabel(metric.name)
+        axes.reshape(-1)[i].set_xlabel('it')
+
+    plt.show()
 
 
 def distillation(class_type, distilled_output_dim, ensemble_filepath, distilled_model_filepath, train_ensemble=False):
@@ -404,30 +451,22 @@ def distillation(class_type, distilled_output_dim, ensemble_filepath, distilled_
 
     distilled_model = torch.load(distilled_model_filepath)
 
-    get_var(distilled_model, train_loader_full, 'train')
-    get_var(distilled_model, valid_loader_full, 'validation')
-    get_var(distilled_model, test_loader)
+    #get_var(distilled_model, train_loader_full, 'train')
+    #get_var(distilled_model, valid_loader_full, 'validation')
+    #get_var(distilled_model, test_loader)
 
-    get_accuracy(distilled_model, test_loader)
-    get_accuracy(distilled_model, train_loader_full, label='train')
+    #get_accuracy(distilled_model, test_loader)
+    #get_accuracy(distilled_model, train_loader_full, label='train')
 
-    fig, axes = plt.subplots(2, 2)
-    for i, metric in enumerate(distilled_model.metrics.values()):
+    get_entropy(distilled_model, test_loader)
 
-        if isinstance(metric.memory[1], torch.FloatTensor):
-            metric_batch_mean = torch.stack(metric.memory[1:]).data.numpy()
-        else:
-            metric_batch_mean = np.stack(metric.memory[1:])
-        axes.reshape(-1)[i].plot(np.arange(metric_batch_mean.shape[0]), metric_batch_mean)
-        axes.reshape(-1)[i].set_ylabel(metric.name)
-        axes.reshape(-1)[i].set_xlabel('it')
-
-    plt.show()
-
+    #plot_metrics(distilled_model)
     # distilled_model = torch.load(distilled_model_filepath)
 
     # effect_of_ensemble_size(prob_ensemble, train_loader, test_loader, args)
-    get_histogram(distilled_model, test_loader, get_var)
+    #get_histogram(distilled_model, test_loader, get_var, 'Variance')
+    get_histogram(distilled_model, train_loader_full, get_entropy, 'Entropy')
+    noise_effect_on_entropy(distilled_model, test_loader)
 
     # test_sample = test_set.get_sample(5)
     # entropy_comparison_rotation(prob_ensemble, distilled_model, test_sample)
@@ -438,13 +477,13 @@ def main():
     """Main"""
 
     # Distribution distillation
-    #class_type = logits_probability_distribution.LogitsProbabilityDistribution
-    #output_dim = 18
+    class_type = logits_probability_distribution.LogitsProbabilityDistribution
+    output_dim = 18
     distilled_model_filepath = Path("models/distilled_mnist_logits_model")
 
     # Distribution distillation, subnetworks
-    class_type = logits_prob_dist_subnet.LogitsProbabilityDistributionSubNet
-    output_dim = 18
+    #class_type = logits_prob_dist_subnet.LogitsProbabilityDistributionSubNet
+    #output_dim = 18
     #distilled_model_filepath = Path("models/distilled_mnist_logits_model_subnets")
 
     # Dummy distillation

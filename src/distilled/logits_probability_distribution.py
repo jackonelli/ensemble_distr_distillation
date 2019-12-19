@@ -59,8 +59,9 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
         mean = x[:, :int((self.output_size / 2))]
 
         var_z = x[:, int((self.output_size / 2)):]
-        #var = torch.log(1 + torch.exp(var_z))# + self.variance_lower_bound
-        var = torch.exp(var_z)
+
+        var = torch.log(1 + torch.exp(var_z) + self.variance_lower_bound)
+        #var = torch.exp(var_z)
 
         return mean, var
 
@@ -71,7 +72,7 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
 
         if self.scale_teacher_logits:
             scaled_logits = logits - torch.stack([logits[:, :, -1]], axis=-1)
-            logits = scaled_logits[:, :, 0:-1]
+            logits = scaled_logits[:, :, :-1]
 
         return logits
 
@@ -81,7 +82,7 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
         """
 
         if num_samples is None:
-            num_samples = len(self.teacher.members)
+            num_samples = 50
 
         mean, var = self.forward(input_)
 
@@ -92,12 +93,35 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
 
             rv = torch.distributions.multivariate_normal.MultivariateNormal(
                 loc=mean[i, :], covariance_matrix=torch.diag(var[i, :]))
+
             samples[i, :, :] = rv.rsample([num_samples])
 
         softmax_samples = torch.exp(samples) / (
             torch.sum(torch.exp(samples), dim=-1, keepdim=True) + 1)
 
         return softmax_samples
+
+    def predict_logits(self, input_, num_samples=None):
+        """Predict parameters
+        Wrapper function for the forward function.
+        """
+
+        if num_samples is None:
+            num_samples = 50
+
+        mean, var = self.forward(input_)
+
+        samples = torch.zeros(
+            [input_.size(0), num_samples,
+             int(self.output_size / 2)])
+        for i in range(input_.size(0)):
+
+            rv = torch.distributions.multivariate_normal.MultivariateNormal(
+                loc=mean[i, :], covariance_matrix=torch.diag(var[i, :]))
+
+            samples[i, :, :] = rv.rsample([num_samples])
+
+        return samples
 
     def _learning_rate_condition(self, epoch=None):
         """Evaluate condition for increasing learning rate
