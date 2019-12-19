@@ -264,7 +264,7 @@ def accuracy_logits(logits_distr_par, targets, label_targets=False, num_samples=
 
     Args:
         targets: torch.tensor(B, N, K-1) if logits targets, (B, K) otherwise
-        logits_distr_par: torch.tensor((B, K-1), (B, K-1, K-1))
+        logits_distr_par: torch.tensor((B, K-1), (B, K-1))
         label_targets: specifies if the targets is in logits or in labels form
 
     Returns:
@@ -281,7 +281,7 @@ def accuracy_logits(logits_distr_par, targets, label_targets=False, num_samples=
             loc=mean[i, :], covariance_matrix=torch.diag(var[i, :]))
         samples[i, :, :] = rv.rsample([num_samples])
 
-    predicted_distribution = torch.mean((torch.nn.Softmax(dim=-1))(torch.cat((targets, torch.zeros(mean.size(0),
+    predicted_distribution = torch.mean((torch.nn.Softmax(dim=-1))(torch.cat((samples, torch.zeros(mean.size(0),
                                                                                                    num_samples, 1)),
                                                                              dim=-1)), dim=1)
     predicted_labels, _ = utils.tensor_argmax(predicted_distribution)
