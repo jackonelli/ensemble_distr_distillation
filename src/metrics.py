@@ -16,12 +16,12 @@ class Metric:
         self.counter = 0
         self.memory = []  # So that we can go back an look at the data
 
-
     def __str__(self):
         return "{}: {}".format(self.name, self.mean())
 
-    def update(self, labels, outputs):
-        self.running_value += self.function(outputs, labels).detach()  # Do this to save memory
+    def update(self, targets, outputs):
+        self.running_value += self.function(
+            outputs, targets).detach()  # Do this to save memory
         self.counter += 1
 
     def mean(self):
@@ -45,7 +45,7 @@ def entropy(predicted_distribution, true_labels):
     Labels as one hot vectors
     Note: if a batch with B samples is given,
     then the output is a tensor with B values
-    The true labels argument is simply there for conformity
+    The true targets argument is simply there for conformity
     so that the entropy metric functions like any metric.
 
     Args:
@@ -88,7 +88,7 @@ def uncertainty_separation_variance(predicted_distribution, true_labels):
     B = batch size, N = num predictions
     Note: if a batch with B samples is given,
     then the output is a tensor with B values
-    The true labels argument is simply there for conformity
+    The true targets argument is simply there for conformity
     so that the entropy metric functions like any metric.
 
     Args:
@@ -116,7 +116,7 @@ def uncertainty_separation_entropy(predicted_distribution, true_labels):
     Labels as one hot vectors
     Note: if a batch with B samples is given,
     then the output is a tensor with B values
-    The true labels argument is simply there for conformity
+    The true targets argument is simply there for conformity
     so that the entropy metric functions like any metric.
     in the same context as the other metrices?
 
@@ -247,28 +247,31 @@ def accuracy_logits(predicted_logits, targets, label_targets=False):
     Args:
         targets: torch.tensor(B, N, K-1) if logits targets, (B, K) otherwise
         predicted_logits: torch.tensor(B, (N,) K-1)
-        softmax_targets: specifies if the targets is in logits or in labels form
+        softmax_targets: specifies if the targets is in logits or in targets form
 
     Returns:
         Accuracy: float
     """
     number_of_elements = np.prod(predicted_logits.size(0))
     if predicted_logits.dim() == 3:
-        predicted_distribution = torch.mean((torch.nn.Softmax(dim=-1))(torch.cat((predicted_logits,
-                                                                                  torch.zeros(number_of_elements,
-                                                                                              predicted_logits.size(1), 1)),
-                                                                                 dim=-1)), dim=1)
+        predicted_distribution = torch.mean(
+            (torch.nn.Softmax(dim=-1))(torch.cat(
+                (predicted_logits,
+                 torch.zeros(number_of_elements, predicted_logits.size(1), 1)),
+                dim=-1)),
+            dim=1)
     else:
-        predicted_distribution = (torch.nn.Softmax(dim=-1))(torch.cat((predicted_logits,
-                                                                       torch.zeros(number_of_elements, 1)), dim=-1))
+        predicted_distribution = (torch.nn.Softmax(dim=-1))(torch.cat(
+            (predicted_logits, torch.zeros(number_of_elements, 1)), dim=-1))
 
     if label_targets:
         target_labels = targets
 
     else:
-        target_distribution = torch.mean((torch.nn.Softmax(dim=-1))(torch.cat((targets,
-                                                                    torch.zeros(number_of_elements,
-                                                                                targets.size(1), 1)),  dim=-1)), dim=1)
+        target_distribution = torch.mean((torch.nn.Softmax(dim=-1))(torch.cat(
+            (targets, torch.zeros(number_of_elements, targets.size(1), 1)),
+            dim=-1)),
+                                         dim=1)
         target_labels, _ = utils.tensor_argmax(target_distribution)
 
     predicted_labels, _ = utils.tensor_argmax(predicted_distribution)
@@ -296,6 +299,30 @@ def error(predicted_distribution, true_labels):
         number_of_elements = 1
 
     return (true_labels != predicted_labels).sum().item() / number_of_elements
+
+
+def mean_squared_error(predictions, targets):
+    """ Mean squared error
+    Replaces squared_error below
+    B = Batch size
+    N = Sample size
+    D = Output dimension
+
+    Args:
+        targets: torch.tensor(B, N, D)
+        predictions: (torch.tensor(B, D)),
+            regression estimate
+
+    Returns:
+        Error: float
+    """
+
+    B, N, D = targets.size()
+    total_loss = 0.0
+    for n in np.arange(N):
+        target = targets[:, n, :]
+        total_loss += ((target - predictions)**2).sum()
+    return total_loss / (B * N)
 
 
 def squared_error(predictions, targets):

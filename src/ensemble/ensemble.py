@@ -157,9 +157,10 @@ class Ensemble():
 
 class EnsembleMember(nn.Module, ABC):
     """Parent class for keeping common logic in one place"""
-    def __init__(self, loss_function, device=torch.device("cpu")):
+    def __init__(self, output_size, loss_function, device=torch.device("cpu")):
         super().__init__()
         self._log = logging.getLogger(self.__class__.__name__)
+        self.output_size = output_size
         self.loss = loss_function
         self.metrics = dict()
         self.optimizer = None
@@ -167,7 +168,7 @@ class EnsembleMember(nn.Module, ABC):
         self.device = device
 
         if self.loss is None:  # or not issubclass(type(self.loss),
-            #                nn.modules.loss._Loss): THIS DOES NOT WORK OUT
+            # nn.modules.loss._Loss): THIS DOES NOT WORK OUT
 
             raise ValueError("Must assign proper loss function to child.loss.")
 
@@ -201,20 +202,27 @@ class EnsembleMember(nn.Module, ABC):
         running_loss = 0.0
         for batch in train_loader:
             self.optimizer.zero_grad()
-            inputs, labels = batch
+            inputs, targets = batch
 
-            inputs, labels = inputs.to(self.device), labels.to(self.device)
+            inputs, targets = inputs.to(self.device), targets.to(self.device)
 
             logits = self.forward(inputs)
-            self._log.debug(logits.shape)
             outputs = self.transform_logits(logits)
-            loss = self.calculate_loss(outputs, labels)
+            # num_samples is different from batch size,
+            # the loss expects a target with shape
+            # (B, N, D), so that it can handle a full ensemble pred.
+            # Here, we use a single sample N = 1.
+            num_samples = 1
+            batch_size = targets.size(0)
+            targets = targets.reshape(
+                (batch_size, num_samples, self.output_size // 2))
+            loss = self.calculate_loss(outputs, targets)
             loss.backward()
             self.optimizer.step()
             running_loss += loss.item()
 
             if validation_loader is None:
-                self._update_metrics(outputs, labels)
+                self._update_metrics(outputs, targets)
 
         if validation_loader is not None:
             for valid_batch in validation_loader:
@@ -244,9 +252,21 @@ class EnsembleMember(nn.Module, ABC):
     def _add_metric(self, metric):
         self.metrics[metric.name] = metric
 
-    def _update_metrics(self, outputs, labels):
+    def _output_to_metric_domain(self, outputs):
+        """Transform output for metric calculation
+        Output distribution parameters are not necessarily
+        exact representation for metrics calculation.
+        This helper function can be overloaded to massage the output
+        into the correct shape
+
+        If not overridden, it works as an identity map.
+        """
+        return outputs
+
+    def _update_metrics(self, outputs, targets):
         for metric in self.metrics.values():
-            metric.update(labels=labels, outputs=outputs)
+            metric_output = self._output_to_metric_domain(outputs)
+            metric.update(targets=targets, outputs=metric_output)
 
     def _reset_metrics(self):
         for metric in self.metrics.values():
@@ -286,5 +306,5 @@ class EnsembleMember(nn.Module, ABC):
             logits (torch.tensor(B, K)):
         """
     @abstractmethod
-    def calculate_loss(self, labels, outputs):
+    def calculate_loss(self, targets, outputs):
         """Calculates loss"""

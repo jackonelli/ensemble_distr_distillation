@@ -19,9 +19,9 @@ class SepRegressor(ensemble.EnsembleMember):
                  device=torch.device("cpu"),
                  learning_rate=0.001):
 
-        super().__init__(
-            loss_function=custom_loss.gaussian_neg_log_likelihood_1d,
-            device=device)
+        super().__init__(output_size=output_size,
+                         loss_function=custom_loss.gaussian_neg_log_likelihood,
+                         device=device)
 
         self.learning_rate = learning_rate
         self.mu_network = mean_regressor.MeanRegressor(
@@ -32,7 +32,6 @@ class SepRegressor(ensemble.EnsembleMember):
             device=device,
             learning_rate=self.learning_rate)
 
-        self._log.debug(output_size // 2)
         self.sigma_sq_network = mean_regressor.MeanRegressor(
             input_size,
             hidden_size_1,
@@ -51,7 +50,6 @@ class SepRegressor(ensemble.EnsembleMember):
         mu = self.mu_network.forward(x)
         sigma_sq_logit = self.sigma_sq_network.forward(x)
         logits = torch.cat((mu, sigma_sq_logit), dim=1)
-        self._log.debug("Forward")
         self._log.debug(sigma_sq_logit.shape)
 
         return logits
@@ -68,10 +66,24 @@ class SepRegressor(ensemble.EnsembleMember):
         return outputs
 
     def calculate_loss(self, outputs, targets):
-        return self.loss(outputs, targets)
+        mean = outputs[:, 0].reshape((outputs.size(0), 1))
+        var = outputs[:, 1].reshape((outputs.size(0), 1))
+        parameters = (mean, var)
+        return self.loss(parameters, targets)
 
     def predict(self, x):
         logits = self.forward(x)
         x = self.transform_logits(logits)
 
         return x
+
+    def _output_to_metric_domain(self, outputs):
+        """Transform output for metric calculation
+        Output distribution parameters are not necessarily
+        exact representation for metrics calculation.
+        This helper function can be overloaded to massage the output
+        into the correct shape
+
+        Extracts mean value
+        """
+        return outputs[:, 0]
