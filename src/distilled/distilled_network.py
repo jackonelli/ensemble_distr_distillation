@@ -85,6 +85,7 @@ class DistilledNet(nn.Module, ABC):
             running_loss += loss.item()
 
             if math.isnan(running_loss):
+                self._log.error("Loss is NaN")
                 break
 
             if validation_loader is None:

@@ -1,3 +1,7 @@
+"""Distilled Normal Inverse Wishart model
+
+Distills an ensemble where each member predicts the actual mean and variance
+"""
 import torch
 import torch.nn as nn
 import torch.optim as torch_optim
@@ -6,6 +10,9 @@ import src.distilled.distilled_network as distilled_network
 
 
 class NiwProbabilityDistribution(distilled_network.DistilledNet):
+    """NiwProbabilityDistribution
+    Sub class of DistilledNet
+    """
     def __init__(self,
                  input_size,
                  hidden_size_1,
@@ -48,15 +55,20 @@ class NiwProbabilityDistribution(distilled_network.DistilledNet):
         x = nn.functional.relu(self.fc1(x))
         x = nn.functional.relu(self.fc2(x))
         x = self.fc3(x)
+        #print("x", x[:, self.target_dim:(self.target_dim + 1)])
 
-        mu = x[:, :self.target_dim]
-        scale = torch.exp(x[:, self.target_dim:(self.target_dim+1)])
-        psi = torch.exp(x[:, (self.target_dim+1):(2*self.target_dim+1)])
+        mu_0 = x[:, :self.target_dim]
+        lambda_ = torch.log(1.0 +
+                            torch.exp(x[:, self.target_dim:(self.target_dim +
+                                                            1)]))
+        #print("lambda", lambda_)
+        psi = torch.exp(x[:, (self.target_dim + 1):(2 * self.target_dim + 1)])
+
         # Degrees of freedom should be larger than D - 1
-        # Temporary way of defining that
-        nu = torch.exp(x[:, (2*self.target_dim+1):]) + (self.target_dim - 1)
+        nu = torch.exp(
+            x[:, (2 * self.target_dim + 1):]) + (self.target_dim - 1)
 
-        return mu, scale, psi, nu
+        return mu_0, lambda_, psi, nu
 
     def predict(self, input_):
         """Predict parameters
@@ -68,5 +80,7 @@ class NiwProbabilityDistribution(distilled_network.DistilledNet):
         """Calculate loss function
         Wrapper function for the loss function.
         """
-        return self.loss(outputs, (teacher_predictions[:, :, :self.target_dim],
-                                   teacher_predictions[:, :, self.target_dim:]))
+
+        return self.loss(outputs,
+                         (teacher_predictions[:, :, :self.target_dim],
+                          teacher_predictions[:, :, self.target_dim:]))

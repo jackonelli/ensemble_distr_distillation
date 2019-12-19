@@ -102,7 +102,7 @@ def gaussian_neg_log_likelihood_unopt(parameters, target, scale=None):
             (/covariance matrix) for every x in batch.
     """
 
-    B, N, D = target.shape
+    B, N, D = target.size()
     mean = parameters[0]
     var = parameters[1]
 
@@ -158,7 +158,8 @@ def inverse_wishart_neg_log_likelihood(parameters, target):
         parameters (torch.tensor((B, D)), torch.tensor((B, 1))):
             diagonal of psi and degrees-of-freedom, nu > D - 1, of the
             inverse-Wishart distribution for every x in batch.
-        target (torch.tensor((B, N, D))): variance (diagonal of covariance matrix)
+        target (torch.tensor((B, N, D))):
+            variance (diagonal of covariance matrix)
             as output by N ensemble members.
             """
 
@@ -201,32 +202,44 @@ def inverse_wishart_neg_log_likelihood(parameters, target):
     return torch.mean(normalizer + ll)  # Mean over batch
 
 
-def gaussian_inv_wishart_neg_log_likelihood(parameters,
-                                            targets,
-                                            true_targets=None):
-    """Negative log likelihood loss for the Gaussian inverse-Wishart distribution
-        B = batch size, D = target dimension, N = ensemble size
+def gaussian_inv_wishart_neg_log_likelihood(parameters, targets):
+    """Negative log likelihood loss for the Normal-Inverse Wishart distribution
+    B = batch size, D = target dimension, N = ensemble size
 
-        Args:
-        parameters (torch.tensor((B, D)), torch.tensor((B, D)),
-             torch.tensor((B, D)), torch.tensor((B, D)): parameters of the normal distribution (mu_0, scale)
-             and of the inverse-Wishart distribution (psi, nu)
-        targets (torch.tensor((B, N, D)), torch.tensor((B, N, D))): mean and variance (diagonal of covariance
-             matrix) as output by N ensemble members.
-        true_targets (torch.tensor(B, D)): true output of the training data
-        """
+    The distribution parameters are tensors:
+        - mu_0: torch.tensor((B, D))
+        - lambda_: torch.tensor(B)
+        - psi: torch.tensor((B, D))
+        - nu: torch.tensor(B)
+    parameters of the normal distribution (mu_0, scale)
+    and of the inverse-Wishart distribution (psi, nu)
+
+    Args:
+        parameters (mu_0, lambda_, psi, nu): See above
+
+        targets (torch.tensor((B, N, D)), torch.tensor((B, N, D))):
+            mean and variance (diagonal of covariance
+            matrix) as output by N ensemble members.
+    """
+
+    B, N, D = targets[0].size()
 
     mu_0 = parameters[0]
-    scale = parameters[1]
+    lambda_ = parameters[1]
     psi = parameters[2]
     nu = parameters[3]
     mu = targets[0]
     var = targets[1]
 
-    nll_gaussian = gaussian_neg_log_likelihood_unopt((mu_0, var), mu, scale)
+    print(var)
+    nll_gaussian = 0.0
+    for sample in np.arange(N):
+        cov_mat = var[:, sample, :]
+        nll_gaussian += gaussian_neg_log_likelihood((mu_0, cov_mat / lambda_),
+                                                    mu)
     nll_inverse_wishart = inverse_wishart_neg_log_likelihood((psi, nu), var)
 
-    return nll_gaussian + nll_inverse_wishart
+    return nll_gaussian / N + nll_inverse_wishart
 
 
 def sum_of_squares_bayes_risk(alphas,
@@ -269,8 +282,11 @@ def cross_entropy_bayes_risk(alphas,
         Args:
             alphas (torch.tensor((B, C))): alpha vectors for every x in batch
                 alpha_c must be > 0 for all c.
+
             target_distribution (torch.tensor((B, C))): ensemble distribution
-            hard_targets (torch.tensor((B, C))): one-hot-encoded vectors representing
+
+            hard_targets (torch.tensor((B, C))):
+            one-hot-encoded vectors representing
             the true label of every x in batch
             lambda_t (float): weight parameter for regularisation
         """
@@ -297,9 +313,13 @@ def type_two_maximum_likelihood(alphas,
         Args:
             alphas (torch.tensor((B, C))): alpha vectors for every x in batch
                 alpha_c must be > 0 for all c.
+
             target_distribution (torch.tensor((B, C))): ensemble distribution
-            hard_targets (torch.tensor((B, C))): one-hot-encoded vectors representing
+
+            hard_targets (torch.tensor((B, C))):
+            one-hot-encoded vectors representing
             the true label of every x in batch
+
             lambda_t (float): weight parameter for regularisation
         """
     strength = torch.sum(alphas, dim=-1, keepdim=True)

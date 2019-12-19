@@ -127,7 +127,6 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
         """Evaluate condition for increasing learning rate
         Defaults to never increasing. I.e. returns False
         """
-
         return False
 
     def calculate_loss(self, outputs, teacher_predictions, labels=None):
