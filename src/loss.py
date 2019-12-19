@@ -1,11 +1,7 @@
 """Loss module"""
-import math
-import logging
 import torch
 import numpy as np
 import torch.distributions.multivariate_normal as torch_mvn
-
-LOGGER = logging.getLogger(__name__)
 
 
 def cross_entropy_soft_targets(predictions, soft_targets):
@@ -64,31 +60,27 @@ def _dirichlet_sufficient_statistics(target_distribution):
 
 def gaussian_neg_log_likelihood(parameters, target):
     """Negative log likelihood loss for the Gaussian distribution
-    B = batch size, D = dimension of target, N = ensemble size
+    B = batch size, D = dimension of target (num classes), N = ensemble size
 
     Args:
-        parameters (torch.tensor(B, D)), torch.tensor((B, D))):
-            mean and variance of y|x for every x in
-            batch (and for every ensemble member).
+        parameters (torch.tensor((B, D)), torch.tensor((B, D))):
+            mean values and variances of y|x for every x in
+            batch.
 
         target (torch.tensor((B, N, D))): sample from the normal
             distribution, if not an ensemble prediction N=1.
     """
-
-    B = target.size(0)
     mean = parameters[0]
     var = parameters[1]
 
-    if target.dim() == 2:
-        target = torch.unsqueeze(target, dim=1)
-
-    cov_mat = torch.stack([torch.diag(var[b, :]) for b in np.arange(B)])
-
     loss = 0
-    for batch_index, cov_mat_b in enumerate(cov_mat):
-        mvn = torch_mvn.MultivariateNormal(mean[batch_index, :], cov_mat_b)
+    for batch_index, (mean_b, cov_b) in enumerate(zip(mean, var)):
+        cov_mat_b = torch.diag(cov_b)
+        torch.diag(var[batch_index, :])
+        distr = torch_mvn.MultivariateNormal(mean_b, cov_mat_b)
 
-        loss -= torch.mean(mvn.log_prob(target[batch_index, :, :])) / B
+        loss -= torch.mean(distr.log_prob(
+            target[batch_index, :, :])) / target.size(0)
 
     return loss
 
