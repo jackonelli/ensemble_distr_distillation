@@ -9,10 +9,8 @@ import torch.distributions.multivariate_normal as torch_mvn
 class LogitsProbabilityDistributionSubNet(distilled_network.DistilledNet):
     # Will make two subnetwork, where on predicts the mean and one the variance of the distribution
     def __init__(self,
-                 input_size,
-                 hidden_size_1,
-                 hidden_size_2,
-                 output_size,
+                 layer_sizes_1,
+                 layer_sizes_2,
                  teacher,
                  device=torch.device('cpu'),
                  use_hard_labels=False,
@@ -23,20 +21,16 @@ class LogitsProbabilityDistributionSubNet(distilled_network.DistilledNet):
             loss_function=custom_loss.gaussian_neg_log_likelihood,
             device=device)
 
-        self.input_size = input_size
-        self.hidden_size_1 = hidden_size_1  # Or make a list or something
-        self.hidden_size_2 = hidden_size_2
-        self.output_size = output_size
         self.use_hard_labels = use_hard_labels
         self.learning_rate = learning_rate
 
-        self.fc1a = nn.Linear(self.input_size, self.hidden_size_1)
-        self.fc2a = nn.Linear(self.hidden_size_1, self.hidden_size_2)
-        self.fc3a = nn.Linear(self.hidden_size_2, int((self.output_size / 2)))
+        self.layers_1 = nn.ModuleList()
+        for i in range(len(layer_sizes_1) - 1):
+            self.layers.append(nn.Linear(layer_sizes_1[i], layer_sizes_1[i + 1]))
 
-        self.fc1b = nn.Linear(self.input_size, self.hidden_size_1)
-        self.fc2b = nn.Linear(self.hidden_size_1, self.hidden_size_2)
-        self.fc3b = nn.Linear(self.hidden_size_2, int((self.output_size / 2)))
+        self.layers_2 = nn.ModuleList()
+        for i in range(len(layer_sizes_2) - 1):
+            self.layers.append(nn.Linear(layer_sizes_2[i], layer_sizes_2[i + 1]))
 
         # Ad-hoc fix zero variance.
         self.variance_lower_bound = 0.0
@@ -55,14 +49,19 @@ class LogitsProbabilityDistributionSubNet(distilled_network.DistilledNet):
         """Estimate parameters of distribution
         """
 
-        y = nn.functional.relu(self.fc1a(x))
-        y = nn.functional.relu(self.fc2a(y))
-        mean = self.fc3a(y)
+        input = x
+        for layer in self.layers_1[:-1]:
+            x = nn.functional.relu(layer(x))
 
-        y = nn.functional.relu(self.fc1b(x))
-        y = nn.functional.relu(self.fc2b(y))
-        var_z = self.fc3b(y)
-        var = torch.log(1 + torch.exp(var_z)) + self.variance_lower_bound
+        mean = self.layers_1[-1](x)
+
+        x = input
+        for layer in self.layers_2[:-1]:
+            x = nn.functional.relu(layer(x))
+
+        var_z = self.layers_2[-1](x)
+
+        var = torch.log(1 + torch.exp(var_z) + self.variance_lower_bound)
 
         return mean, var
 
@@ -99,7 +98,7 @@ class LogitsProbabilityDistributionSubNet(distilled_network.DistilledNet):
         softmax_samples = torch.exp(samples) / (
             torch.sum(torch.exp(samples), dim=-1, keepdim=True) + 1)
 
-        return so
+        return softmax_samples
 
     def _learning_rate_condition(self, epoch=None):
         """Evaluate condition for increasing learning rate

@@ -10,10 +10,7 @@ class MeanRegressor(ensemble.EnsembleMember):
     Network that predicts the parameters of a normal distribution
     """
     def __init__(self,
-                 input_size,
-                 hidden_size_1,
-                 hidden_size_2,
-                 output_size,
+                 layer_sizes,
                  device=torch.device("cpu"),
                  learning_rate=0.001):
 
@@ -21,26 +18,23 @@ class MeanRegressor(ensemble.EnsembleMember):
                          loss_function=nn.MSELoss(),
                          device=device)
 
-        self.input_size = input_size
-        self.hidden_size_1 = hidden_size_1  # Or make a list or something
-        self.hidden_size_2 = hidden_size_2
-        self.output_size = output_size
         self.learning_rate = learning_rate
 
-        self.fc1 = nn.Linear(self.input_size, self.hidden_size_1)
-        self.fc2 = nn.Linear(self.hidden_size_1, self.hidden_size_2)
-        self.fc3 = nn.Linear(self.hidden_size_2, self.output_size)
+        self.layers = nn.ModuleList()
+        for i in range(len(layer_sizes) - 1):
+            self.layers.append(nn.Linear(layer_sizes[i], layer_sizes[i + 1]))
 
-        self.layers = [self.fc1, self.fc2, self.fc3]
         self.optimizer = torch_optim.SGD(self.parameters(),
                                          lr=self.learning_rate,
                                          momentum=0.9)
         self.to(self.device)
 
     def forward(self, x):
-        x = nn.functional.relu(self.fc1(x))
-        x = nn.functional.relu(self.fc2(x))
-        x = self.fc3(x)
+
+        for layer in self.layers[:-1]:
+            x = nn.functional.relu(layer(x))
+
+        x = self.layers[-1](x)
         # Add normalise here?
 
         return x

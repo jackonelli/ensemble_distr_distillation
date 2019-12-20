@@ -12,9 +12,7 @@ class SepRegressor(ensemble.EnsembleMember):
     Network that predicts the parameters of a normal distribution
     """
     def __init__(self,
-                 input_size,
-                 hidden_size_1,
-                 hidden_size_2,
+                 layer_sizes,
                  output_size,
                  device=torch.device("cpu"),
                  learning_rate=0.001):
@@ -25,18 +23,12 @@ class SepRegressor(ensemble.EnsembleMember):
 
         self.learning_rate = learning_rate
         self.mu_network = mean_regressor.MeanRegressor(
-            input_size,
-            hidden_size_1,
-            hidden_size_2,
-            output_size // 2,
+            layer_sizes=layer_sizes,
             device=device,
             learning_rate=self.learning_rate)
 
         self.sigma_sq_network = mean_regressor.MeanRegressor(
-            input_size,
-            hidden_size_1,
-            hidden_size_2,
-            output_size // 2,
+            layer_sizes=layer_sizes,
             device=device,
             learning_rate=self.learning_rate)
 
