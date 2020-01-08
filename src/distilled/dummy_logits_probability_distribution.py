@@ -8,10 +8,7 @@ import src.distilled.distilled_network as distilled_network
 class DummyLogitsProbabilityDistribution(distilled_network.DistilledNet):
     """We do "dummy" distillation and make the output independent of the input"""
     def __init__(self,
-                 input_size,
-                 hidden_size_1,
-                 hidden_size_2,
-                 output_size,
+                 layer_sizes,
                  teacher,
                  device=torch.device('cpu'),
                  use_hard_labels=False,
@@ -21,10 +18,6 @@ class DummyLogitsProbabilityDistribution(distilled_network.DistilledNet):
             loss_function=custom_loss.gaussian_neg_log_likelihood,
             device=device)
 
-        self.input_size = input_size
-        self.hidden_size_1 = hidden_size_1  # Or make a list or something
-        self.hidden_size_2 = hidden_size_2
-        self.output_size = output_size
         self.use_hard_labels = use_hard_labels
         self.learning_rate = learning_rate
 
@@ -46,12 +39,14 @@ class DummyLogitsProbabilityDistribution(distilled_network.DistilledNet):
 
         # We make the output independent of the input
         x = torch.ones(x.size())
-        x = nn.functional.relu(self.fc1(x))
-        x = nn.functional.relu(self.fc2(x))
-        x = self.fc3(x)
+        for layer in self.layers[:-1]:
+            x = nn.functional.relu(layer(x))
 
-        mean = x[:, :int((self.output_size / 2))]
-        var = torch.exp(x[:, int((self.output_size / 2)):])
+        x = self.layers[-1](x)
+
+        mid = int(x.shape[-1] / 2)
+        mean = x[:, :mid]
+        var = torch.exp(x[:, mid:])
 
         return mean, var
 

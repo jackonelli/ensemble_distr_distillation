@@ -7,10 +7,7 @@ import src.distilled.distilled_network as distilled_network
 
 class LogitsProbabilityDistribution(distilled_network.DistilledNet):
     def __init__(self,
-                 input_size,
-                 hidden_size_1,
-                 hidden_size_2,
-                 output_size,
+                 layer_sizes,
                  teacher,
                  device=torch.device('cpu'),
                  use_hard_labels=False,
@@ -21,27 +18,19 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
                          loss_function=custom_loss.gaussian_neg_log_likelihood,
                          device=device)
 
-        self.input_size = input_size
-        self.hidden_size_1 = hidden_size_1  # Or make a list or something
-        self.hidden_size_2 = hidden_size_2
-        self.output_size = output_size
         self.use_hard_labels = use_hard_labels
         self.learning_rate = learning_rate
         self.scale_teacher_logits = scale_teacher_logits
 
-        self.fc1 = nn.Linear(self.input_size, self.hidden_size_1)
-        self.fc2 = nn.Linear(self.hidden_size_1, self.hidden_size_2)
-        self.fc3 = nn.Linear(self.hidden_size_2, self.hidden_size_3)
-        self.fc4 = nn.Linear(self.hidden_size_3, self.output_size)
+        self.layers = nn.ModuleList()
+        for i in range(len(layer_sizes) - 1):
+            self.layers.append(nn.Linear(layer_sizes[i], layer_sizes[i + 1]))
 
         # Ad-hoc fix zero variance.
-
         self.variance_lower_bound = 0.001
         if self.variance_lower_bound > 0.0:
             self._log.warning("Non-zero variance lower bound set ({})".format(
                 self.variance_lower_bound))
-
-        self.layers = [self.fc1, self.fc2, self.fc3]
 
         self.optimizer = torch_optim.Adam(self.parameters(),
                                           lr=self.learning_rate)
@@ -52,16 +41,17 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
         """Estimate parameters of distribution
         """
 
-        x = nn.functional.relu(self.fc1(x))
-        x = nn.functional.relu(self.fc2(x))
-        x = self.fc3(x)
+        for layer in self.layers[:-1]:
+            x = nn.functional.relu(layer(x))
 
-        mean = x[:, :int((self.output_size / 2))]
+        x = self.layers[-1](x)
 
-        var_z = x[:, int((self.output_size / 2)):]
+        mid = int(x.shape[-1] / 2)
+        mean = x[:, :mid]
+        var_z = x[:, mid:]
 
         var = torch.log(1 + torch.exp(var_z) + self.variance_lower_bound)
-        #var = torch.exp(var_z)
+        # var = torch.exp(var_z)
 
         return mean, var
 
@@ -128,12 +118,13 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
         Defaults to never increasing. I.e. returns False
         """
 
-        return False
+        return True
 
     def calculate_loss(self, outputs, teacher_predictions, labels=None):
         """Calculate loss function
         Wrapper function for the loss function.
         """
+
         return self.loss(outputs, teacher_predictions)
 
     # TÄNKER MIG ATT VI KAN HA EN CALC_REG

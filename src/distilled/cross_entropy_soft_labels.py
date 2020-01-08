@@ -10,10 +10,7 @@ class XCSoftLabels(distilled_network.DistilledNet):
     """We match only the mean of the logits"""
 
     def __init__(self,
-                 input_size,
-                 hidden_size_1,
-                 hidden_size_2,
-                 output_size,
+                 layer_sizes,
                  teacher,
                  device=torch.device('cpu'),
                  use_hard_labels=False,
@@ -24,19 +21,14 @@ class XCSoftLabels(distilled_network.DistilledNet):
             loss_function=custom_loss.cross_entropy_soft_targets,
             device=device)
         print(self.device)
-        self.input_size = input_size
-        self.hidden_size_1 = hidden_size_1  # Or make a list or something
-        self.hidden_size_2 = hidden_size_2
-        self.output_size = output_size
+
         self.use_hard_labels = use_hard_labels
         self.use_teacher_hard_labels = use_teacher_hard_labels
         self.learning_rate = learning_rate
 
-        self.fc1 = nn.Linear(self.input_size, self.hidden_size_1)
-        self.fc2 = nn.Linear(self.hidden_size_1, self.hidden_size_2)
-        self.fc3 = nn.Linear(self.hidden_size_2, self.output_size)
-
-        self.layers = [self.fc1, self.fc2, self.fc3]
+        self.layers = nn.ModuleList()
+        for i in range(len(layer_sizes) - 1):
+            self.layers.append(nn.Linear(layer_sizes[i], layer_sizes[i + 1]))
 
         self.optimizer = torch_optim.Adam(self.parameters(),
                                           lr=self.learning_rate)
@@ -48,9 +40,10 @@ class XCSoftLabels(distilled_network.DistilledNet):
         """Estimate parameters of distribution
         """
 
-        x = nn.functional.relu(self.fc1(x))
-        x = nn.functional.relu(self.fc2(x))
-        x = self.fc3(x)
+        for layer in self.layers[:-1]:
+            x = nn.functional.relu(layer(x))
+
+        x = self.layers[-1](x)
 
         x = torch.exp(x) / (torch.sum(torch.exp(x), dim=-1, keepdim=True) + 1)
 

@@ -47,6 +47,7 @@ class DistilledNet(nn.Module, ABC):
             self.calculate_metric_dataloader(validation_loader)
 
         for epoch_number in range(1, num_epochs + 1):
+
             loss = self._train_epoch(train_loader,
                                      validation_loader=validation_loader,
                                      scheduler=scheduler)
@@ -152,7 +153,7 @@ class DistilledNet(nn.Module, ABC):
         else:
             scheduler = torch_optim.lr_scheduler.StepLR(self.optimizer,
                                                         step_size=step_size,
-                                                        gamma=0.5)
+                                                        gamma=0.7)
 
         return scheduler
 
@@ -161,7 +162,7 @@ class DistilledNet(nn.Module, ABC):
 
     def _update_metrics(self, outputs, labels):
         for metric in self.metrics.values():
-            metric.update(labels=labels, outputs=outputs)
+            metric.update(targets=labels, outputs=outputs)
 
     def _reset_metrics(self):
         for metric in self.metrics.values():
