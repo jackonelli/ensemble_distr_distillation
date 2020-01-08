@@ -7,14 +7,18 @@ import src.loss as custom_loss
 
 class MeanRegressor(ensemble.EnsembleMember):
     """MeanRegressor
-    Network that predicts the parameters of a normal distribution
+    Network that predicts the mean value (MSE loss)
+    Args:
+        layer_sizes (list(int)):
+        device (torch.Device)
+        learning_rate (float)
     """
     def __init__(self,
                  layer_sizes,
                  device=torch.device("cpu"),
                  learning_rate=0.001):
 
-        super().__init__(output_size=output_size,
+        super().__init__(output_size=layer_sizes[-1],
                          loss_function=nn.MSELoss(),
                          device=device)
 
@@ -35,11 +39,11 @@ class MeanRegressor(ensemble.EnsembleMember):
             x = nn.functional.relu(layer(x))
 
         x = self.layers[-1](x)
-        # Add normalise here?
 
         return x
 
     def transform_logits(self, logits):
+        """TODO: Transform to mu and sigma^2"""
         return logits
 
     def calculate_loss(self, outputs, targets):
