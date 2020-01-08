@@ -1,4 +1,4 @@
-"""Ensemble class"""
+"""Ensemble"""
 import logging
 from abc import ABC, abstractmethod
 import torch
@@ -7,14 +7,23 @@ import torch.optim as torch_optim
 import src.metrics as metrics
 
 
-# TODO: I added the option in the ensemble-members to be able to calculate metrics on new data, maybe we should have a similar ensemble-level option
+# TODO: I added the option in the ensemble-members to be able to
+# calculate metrics on new data,
+# maybe we should have a similar ensemble-level option
 class Ensemble():
+    """Ensemble base class
+    The ensemble member needs to track the size
+    of the output of the ensemble
+    This can be automatically inferred but it would look ugly
+    and this now works as a sanity check as well
+
+    Instance variables:
+        output_size (int): Represents the actual output size
+            i.e. the number of predicted parameters.
+            e.g. if we model D-dimensional target with a Gaussian
+            with mean and diagonal covariance, the output size would be 2D.
+    """
     def __init__(self, output_size):
-        """The ensemble member needs to track the size
-        of the output of the ensemble
-        This can be automatically inferred but it would look ugly
-        and this now works as a sanity check as well
-        """
         self.members = list()
         self._log = logging.getLogger(self.__class__.__name__)
         self.output_size = output_size
@@ -156,11 +165,26 @@ class Ensemble():
 
 
 class EnsembleMember(nn.Module, ABC):
-    """Parent class for keeping common logic in one place"""
-    def __init__(self, output_size, loss_function, device=torch.device("cpu")):
+    """Parent class for keeping common logic in one place
+    Instance variables:
+        output_size (int): Represents the actual output size
+            i.e number of dimensions D, or number of classes K
+    """
+    def __init__(self,
+                 output_size,
+                 loss_function,
+                 target_size=None,
+                 device=torch.device("cpu")):
         super().__init__()
+
         self._log = logging.getLogger(self.__class__.__name__)
+
         self.output_size = output_size
+        if target_size is None:
+            self.target_size = self.output_size
+        else:
+            self.target_size = target_size
+
         self.loss = loss_function
         self.metrics = dict()
         self.optimizer = None
@@ -172,11 +196,7 @@ class EnsembleMember(nn.Module, ABC):
 
             raise ValueError("Must assign proper loss function to child.loss.")
 
-    def train(self,
-              train_loader,
-              num_epochs,
-              validation_loader=None,
-              metrics=list()):
+    def train(self, train_loader, num_epochs, validation_loader=None):
         """Common train method for all ensemble member classes
         Should NOT be overridden!
         """
@@ -190,10 +210,7 @@ class EnsembleMember(nn.Module, ABC):
             if self._learning_rate_condition(epoch_number):
                 scheduler.step()
 
-    def _train_epoch(self,
-                     train_loader,
-                     validation_loader=None,
-                     metrics=list()):
+    def _train_epoch(self, train_loader, validation_loader=None):
         """Common train epoch method for all ensemble member classes
         Should NOT be overridden!
         """
@@ -215,7 +232,7 @@ class EnsembleMember(nn.Module, ABC):
             num_samples = 1
             batch_size = targets.size(0)
             targets = targets.reshape(
-                (batch_size, num_samples, self.output_size // 2))
+                (batch_size, num_samples, self.target_size))
             loss = self.calculate_loss(outputs, targets)
             loss.backward()
             self.optimizer.step()

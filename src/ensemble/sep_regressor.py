@@ -24,6 +24,7 @@ class SepRegressor(ensemble.EnsembleMember):
 
         # The actual output the output of the combined subnetworks
         super().__init__(output_size=layer_sizes[-1] * 2,
+                         target_size=layer_sizes[-1],
                          loss_function=custom_loss.gaussian_neg_log_likelihood,
                          device=device)
 
@@ -48,7 +49,6 @@ class SepRegressor(ensemble.EnsembleMember):
         mu = self.mu_network.forward(x)
         sigma_sq_logit = self.sigma_sq_network.forward(x)
         logits = torch.cat((mu, sigma_sq_logit), dim=1)
-        self._log.debug(sigma_sq_logit.shape)
 
         return logits
 
