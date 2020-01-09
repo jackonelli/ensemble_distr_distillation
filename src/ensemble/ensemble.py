@@ -217,7 +217,9 @@ class EnsembleMember(nn.Module, ABC):
 
         self._reset_metrics()
         running_loss = 0.0
+        batch_count = 0
         for batch in train_loader:
+            batch_count += 1
             self.optimizer.zero_grad()
             inputs, targets = batch
 
@@ -250,7 +252,7 @@ class EnsembleMember(nn.Module, ABC):
 
                 # Will automatically call
 
-        return running_loss
+        return running_loss / batch_count
 
     def calc_metrics(self, data_loader):
         self._reset_metrics()
