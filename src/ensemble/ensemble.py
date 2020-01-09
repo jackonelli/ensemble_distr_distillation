@@ -206,13 +206,18 @@ class EnsembleMember(nn.Module, ABC):
                                                     gamma=0.1)
         for epoch_number in range(1, num_epochs + 1):
             loss = self._train_epoch(train_loader, validation_loader)
-            self._print_epoch(epoch_number, loss)
+            self._print_epoch(epoch_number, loss, "Train")
+            if validation_loader is not None:
+                loss = self._validate_epoch(validation_loader)
+                self._print_epoch(epoch_number, loss, "Validation")
             if self._learning_rate_condition(epoch_number):
                 scheduler.step()
 
     def _train_epoch(self, train_loader, validation_loader=None):
         """Common train epoch method for all ensemble member classes
         Should NOT be overridden!
+
+        TODO: (Breaking change) Validation loader should be removed
         """
 
         self._reset_metrics()
@@ -240,21 +245,39 @@ class EnsembleMember(nn.Module, ABC):
             self.optimizer.step()
             running_loss += loss.item()
 
-            if validation_loader is None:
-                self._update_metrics(outputs, targets)
-
-        if validation_loader is not None:
-            for valid_batch in validation_loader:
-                valid_inputs, valid_labels = valid_batch
-                valid_logits = self.forward(valid_inputs)
-                valid_outputs = self.transform_logits(valid_logits)
-                self._update_metrics(valid_outputs, valid_labels)
-
-                # Will automatically call
+            self._update_metrics(outputs, targets)
 
         return running_loss / batch_count
 
+    def _validate_epoch(self, validation_loader):
+        """Common validate epoch method for all ensemble member classes
+        Should NOT be overridden!
+        """
+
+        with torch.no_grad():
+            self._reset_metrics()
+            running_loss = 0.0
+            batch_count = 0
+            for valid_batch in validation_loader:
+                batch_count += 1
+
+                valid_inputs, valid_targets = valid_batch
+                valid_logits = self.forward(valid_inputs)
+                valid_outputs = self.transform_logits(valid_logits)
+
+                num_samples = 1
+                batch_size = valid_targets.size(0)
+                valid_targets = valid_targets.reshape(
+                    (batch_size, num_samples, self.target_size))
+
+                running_loss += self.calculate_loss(valid_outputs,
+                                                    valid_targets)
+                self._update_metrics(valid_outputs, valid_targets)
+
+            return running_loss / batch_count
+
     def calc_metrics(self, data_loader):
+        """Calculate all metrics"""
         self._reset_metrics()
 
         for batch in data_loader:
@@ -291,8 +314,9 @@ class EnsembleMember(nn.Module, ABC):
         for metric in self.metrics.values():
             metric.reset()
 
-    def _print_epoch(self, epoch_number, loss):
-        epoch_string = "Epoch {}: Loss: {}".format(epoch_number, loss)
+    def _print_epoch(self, epoch_number, loss, type_="Train"):
+        epoch_string = "{} - Epoch {}: Loss: {}".format(
+            type_, epoch_number, loss)
         for metric in self.metrics.values():
             epoch_string += " {}".format(metric)
         self._log.info(epoch_string)

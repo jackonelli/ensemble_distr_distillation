@@ -47,8 +47,10 @@ class SepRegressor(ensemble.EnsembleMember):
 
     def forward(self, x):
         mu = self.mu_network.forward(x)
+        self._log.debug("x: {}".format(x.shape))
         sigma_sq_logit = self.sigma_sq_network.forward(x)
         logits = torch.cat((mu, sigma_sq_logit), dim=1)
+        self._log.debug("logits: {}".format(logits.shape))
 
         return logits
 
