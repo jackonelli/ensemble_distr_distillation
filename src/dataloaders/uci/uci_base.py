@@ -1,4 +1,5 @@
 """UCI dataset"""
+from abc import abstractmethod
 import logging
 from pathlib import Path
 import numpy as np
@@ -38,12 +39,10 @@ class UCIData(torch.utils.data.Dataset):
                 "Dataset file: '{}' does not exist".format(file_path))
         return file_path
 
+    @abstractmethod
     def load_full_data(self):
-        """Load csv data into np array"""
-        return np.genfromtxt(self.file_path,
-                             dtype=np.float32,
-                             delimiter=";",
-                             skip_header=1)
+        """Load UCI data into np array"""
+        pass
 
     def add_datasubset(self, data):
         """Add subset of data to a loader
