@@ -315,7 +315,7 @@ class EnsembleMember(nn.Module, ABC):
             metric.reset()
 
     def _print_epoch(self, epoch_number, loss, type_="Train"):
-        epoch_string = "{} - Epoch {}: Loss: {}".format(
+        epoch_string = "{} - Epoch {}: Loss: {:.3f}".format(
             type_, epoch_number, loss)
         for metric in self.metrics.values():
             epoch_string += " {}".format(metric)
