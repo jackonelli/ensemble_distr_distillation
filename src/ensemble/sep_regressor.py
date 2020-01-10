@@ -28,6 +28,7 @@ class SepRegressor(ensemble.EnsembleMember):
                          loss_function=custom_loss.gaussian_neg_log_likelihood,
                          device=device)
 
+        self.mean_only = False
         self.learning_rate = learning_rate
         self.mu_network = mean_regressor.MeanRegressor(
             layer_sizes=layer_sizes,
@@ -47,10 +48,8 @@ class SepRegressor(ensemble.EnsembleMember):
 
     def forward(self, x):
         mu = self.mu_network.forward(x)
-        self._log.debug("x: {}".format(x.shape))
         sigma_sq_logit = self.sigma_sq_network.forward(x)
         logits = torch.cat((mu, sigma_sq_logit), dim=1)
-        self._log.debug("logits: {}".format(logits.shape))
 
         return logits
 
@@ -67,7 +66,13 @@ class SepRegressor(ensemble.EnsembleMember):
         mean = outputs[:, 0].reshape((outputs.size(0), 1))
         var = outputs[:, 1].reshape((outputs.size(0), 1))
         parameters = (mean, var)
-        return self.loss(parameters, targets)
+        loss = None
+        if self.mean_only:
+            loss_function = nn.MSELoss()
+            loss = loss_function(mean, targets)
+        else:
+            loss = self.loss(parameters, targets)
+        return loss
 
     def predict(self, x):
         logits = self.forward(x)

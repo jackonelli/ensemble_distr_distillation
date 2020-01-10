@@ -14,14 +14,15 @@ class SimpleRegressor(ensemble.EnsembleMember):
                  device=torch.device("cpu"),
                  learning_rate=0.001):
 
-        super().__init__(
-            loss_function=custom_loss.gaussian_neg_log_likelihood_1d,
-            device=device)
+        super().__init__(output_size=layer_sizes[-1] // 2,
+                         loss_function=custom_loss.gaussian_neg_log_likelihood,
+                         device=device)
 
         self.learning_rate = learning_rate
+        self.mean_only = False
 
         # Ad-hoc fix zero variance.
-        self.variance_lower_bound = 0.0
+        self.variance_lower_bound = 0.001
         if self.variance_lower_bound > 0.0:
             self._log.warning("Non-zero variance lower bound set ({})".format(
                 self.variance_lower_bound))
@@ -56,7 +57,16 @@ class SimpleRegressor(ensemble.EnsembleMember):
         return outputs
 
     def calculate_loss(self, outputs, targets):
-        return self.loss(outputs, targets)
+        mean = outputs[:, 0].reshape((outputs.size(0), 1))
+        var = outputs[:, 1].reshape((outputs.size(0), 1))
+        parameters = (mean, var)
+        loss = None
+        if self.mean_only:
+            loss_function = nn.MSELoss()
+            loss = loss_function(mean, targets)
+        else:
+            loss = self.loss(parameters, targets)
+        return loss
 
     def predict(self, x):
         logits = self.forward(x)
