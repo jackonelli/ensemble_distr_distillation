@@ -21,8 +21,8 @@ class Metric:
         return "{}: {:.3f}".format(self.name, self.mean())
 
     def update(self, targets, outputs):
-        self.running_value += self.function(
-            outputs, targets).detach()  # Do this to save memory
+        with torch.no_grad():
+            self.running_value += self.function(outputs, targets)
         self.counter += 1
 
     def mean(self):
@@ -332,6 +332,25 @@ def error(predicted_distribution, true_labels):
     return (true_labels != predicted_labels).sum().item() / number_of_elements
 
 
+def root_mean_squared_error(predictions, targets):
+    """ Root mean squared error
+    Calls square root on `mean_squared_error` below
+    B = Batch size
+    N = Sample size
+    D = Output dimension
+
+    Args:
+        targets: torch.tensor(B, N, D)
+        predictions: (torch.tensor(B, D)),
+            regression estimate
+
+    Returns:
+        Error: float
+    """
+
+    return torch.sqrt(mean_squared_error(predictions, targets))
+
+
 def mean_squared_error(predictions, targets):
     """ Mean squared error
     Replaces squared_error below
@@ -348,12 +367,12 @@ def mean_squared_error(predictions, targets):
         Error: float
     """
 
-    B, N, D = targets.size()
-    total_loss = 0.0
+    B, N, _ = targets.size()
+    sum_squared_errors = 0.0
     for n in np.arange(N):
         target = targets[:, n, :]
-        total_loss += ((target - predictions)**2).sum()
-    return total_loss / (B * N)
+        sum_squared_errors += ((target - predictions)**2).sum()
+    return sum_squared_errors / (B * N)
 
 
 def squared_error(predictions, targets):

@@ -64,7 +64,6 @@ class UCIData(torch.utils.data.Dataset):
             90% of samples in training set.
         """
         full_data = self.load_full_data()
-        np.random.shuffle(full_data)
         total_size = full_data.shape[0]
         training_set_size = int(total_size * training_samples_ratio)
 

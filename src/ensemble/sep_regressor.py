@@ -45,6 +45,9 @@ class SepRegressor(ensemble.EnsembleMember):
                                          lr=self.learning_rate,
                                          momentum=0.9)
         self.to(self.device)
+        self.active_network = "mu"
+        self.switch_active_network(self.active_network)
+        self.variance_lower_bound = 0.001
 
     def forward(self, x):
         mu = self.mu_network.forward(x)
@@ -58,18 +61,42 @@ class SepRegressor(ensemble.EnsembleMember):
         # var = torch.exp(logits[:, int((self.output_size / 2)):])
 
         outputs = logits
-        outputs[:, 1] = torch.log(1 + torch.exp(outputs[:, 1]))
+        outputs[:, 1] = torch.log(
+            1 + torch.exp(outputs[:, 1])) + self.variance_lower_bound
 
         return outputs
+
+    def switch_active_network(self, network):
+        if network == "mu":
+            self.active_network = "mu"
+            for param in self.mu_network.parameters():
+                param.requires_grad = True
+            for param in self.sigma_sq_network.parameters():
+                param.requires_grad = False
+
+        elif network == "sigma_sq":
+            self.active_network = "sigma_sq"
+            for param in self.mu_network.parameters():
+                param.requires_grad = False
+            for param in self.sigma_sq_network.parameters():
+                param.requires_grad = True
+
+        elif network == "both":
+            self.active_network = "both"
+            for param in self.mu_network.parameters():
+                param.requires_grad = True
+            for param in self.sigma_sq_network.parameters():
+                param.requires_grad = True
+        else:
+            raise ValueError("Inconsistent network")
 
     def calculate_loss(self, outputs, targets):
         mean = outputs[:, 0].reshape((outputs.size(0), 1))
         var = outputs[:, 1].reshape((outputs.size(0), 1))
         parameters = (mean, var)
         loss = None
-        if self.mean_only:
-            loss_function = nn.MSELoss()
-            loss = loss_function(mean, targets)
+        if self.active_network == "mu":
+            loss = custom_loss.mse(mean, targets)
         else:
             loss = self.loss(parameters, targets)
         return loss

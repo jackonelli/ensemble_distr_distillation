@@ -71,5 +71,6 @@ class SimpleRegressor(ensemble.EnsembleMember):
     def predict(self, x):
         logits = self.forward(x)
         x = self.transform_logits(logits)
+        print("x", x.shape)
 
         return x

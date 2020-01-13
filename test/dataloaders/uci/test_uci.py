@@ -28,12 +28,12 @@ class TestBostonData(unittest.TestCase):
             0.7)
 
     def test_num_samples(self):
-        self.assertEqual(len(self.training_set), 1119)
-        self.assertEqual(len(self.validation_set), 1599 - 1119)
+        self.assertEqual(len(self.training_set), 354)
+        self.assertEqual(len(self.validation_set), 506 - 354)
 
     def test_dim(self):
         input_, target = self.training_set[0]
-        self.assertEqual(input_.shape[0], 11)
+        self.assertEqual(input_.shape[0], 13)
         self.assertIsInstance(target, np.float32)
 
 

@@ -19,7 +19,7 @@ class MeanRegressor(ensemble.EnsembleMember):
                  learning_rate=0.001):
 
         super().__init__(output_size=layer_sizes[-1],
-                         loss_function=nn.MSELoss(),
+                         loss_function=custom_loss.mse,
                          device=device)
 
         self.learning_rate = learning_rate

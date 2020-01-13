@@ -2,6 +2,9 @@
 import torch
 import numpy as np
 import torch.distributions.multivariate_normal as torch_mvn
+import logging
+
+LOGGER = logging.getLogger(__name__)
 
 
 def cross_entropy_soft_targets(predictions, soft_targets):
@@ -122,18 +125,42 @@ def gaussian_neg_log_likelihood_unopt(parameters, target, scale=None):
 
 
 def mse(mean, target):
-    """Squared loss
-    B = batch size, D = dimension of target (num classes), N = ensemble size
+    """Mean squared loss (torch built-in wrapper)
+    B = batch size, D = dimension of target, N = number of samples
 
     Args:
-        parameters (torch.tensor((B, D))):
+        mean (torch.tensor((B, D))):
             mean values of y|x for every x in
             batch (and for every ensemble member).
-        target (torch.tensor((B, N, D))): sample from the normal
-            distribution, if not an ensemble prediction N=1.
+        target (torch.tensor((B, N, D))): Ground truth sample
+            (if not an ensemble prediction N=1.)
+    """
+
+    _, N, _ = target.size()
+    loss_function = torch.nn.MSELoss(reduction="mean")
+    total_loss = 0
+    for sample_ind in np.arange(N):
+        sample = target[:, sample_ind, :]
+        total_loss += loss_function(sample, mean)
+
+    return total_loss / N
+
+
+def efficient_mse(mean, target):
+    """Mean squared loss on a matrix form
+    B = batch size, D = dimension of target, N = number of samples
+
+    Args:
+        mean (torch.tensor((B, D))):
+            mean values of y|x for every x in
+            batch (and for every ensemble member).
+        target (torch.tensor((B, N, D))): Ground truth sample
+            (if not an ensemble prediction N=1.)
     """
 
     # This should only happen when we have only one target (i.e. N=1)
+    # TODO: I think I fixed this by always reshaping targets to a 3 dimensions
+
     if target.dim() == 2:
         target = torch.unsqueeze(target, dim=1)
 
@@ -147,8 +174,6 @@ def mse(mean, target):
                                    dim2=-2),
                     dim=[0, 1])
 
-    return ll
-
 
 def inverse_wishart_neg_log_likelihood(parameters, target):
     """Negative log likelihood loss for the inverse-Wishart distribution
@@ -158,7 +183,8 @@ def inverse_wishart_neg_log_likelihood(parameters, target):
         parameters (torch.tensor((B, D)), torch.tensor((B, 1))):
             diagonal of psi and degrees-of-freedom, nu > D - 1, of the
             inverse-Wishart distribution for every x in batch.
-        target (torch.tensor((B, N, D))): variance (diagonal of covariance matrix)
+        target (torch.tensor((B, N, D))): variance
+            (diagonal of covariance matrix)
             as output by N ensemble members.
             """
 

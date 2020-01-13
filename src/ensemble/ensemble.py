@@ -129,6 +129,7 @@ class Ensemble():
         """
         batch_size = inputs.size(0)
         predictions = torch.zeros((batch_size, self.size, self.output_size))
+        print("predictions", predictions.shape)
         for member_ind, member in enumerate(self.members):
             if t is None:
                 predictions[:, member_ind, :] = member.predict(inputs)
@@ -232,6 +233,7 @@ class EnsembleMember(nn.Module, ABC):
 
             logits = self.forward(inputs)
             outputs = self.transform_logits(logits)
+
             # num_samples is different from batch size,
             # the loss expects a target with shape
             # (B, N, D), so that it can handle a full ensemble pred.
@@ -240,6 +242,7 @@ class EnsembleMember(nn.Module, ABC):
             batch_size = targets.size(0)
             targets = targets.reshape(
                 (batch_size, num_samples, self.target_size))
+
             loss = self.calculate_loss(outputs, targets)
             loss.backward()
             self.optimizer.step()
@@ -270,8 +273,10 @@ class EnsembleMember(nn.Module, ABC):
                 valid_targets = valid_targets.reshape(
                     (batch_size, num_samples, self.target_size))
 
-                running_loss += self.calculate_loss(valid_outputs,
-                                                    valid_targets)
+                tmp_loss = self.calculate_loss(valid_outputs, valid_targets)
+                # print(valid_outputs, valid_targets)
+                # print(tmp_loss)
+                running_loss += tmp_loss
                 self._update_metrics(valid_outputs, valid_targets)
 
             return running_loss / batch_count

@@ -20,5 +20,4 @@ class BostonData(UCIData):
         """Load csv data into np array"""
         return np.genfromtxt(self.file_path,
                              dtype=np.float32,
-                             delimiter=" ",
                              skip_header=0)
