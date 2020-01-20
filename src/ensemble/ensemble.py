@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 import torch.optim as torch_optim
 import src.metrics as metrics
+import src.utils as utils
 
 
 # TODO: I added the option in the ensemble-members to be able to calculate metrics on new data, maybe we should have a similar ensemble-level option
@@ -176,16 +177,22 @@ class EnsembleMember(nn.Module, ABC):
               train_loader,
               num_epochs,
               validation_loader=None,
-              metrics=list()):
+              metrics=list(),
+              reshape_targets=True):
         """Common train method for all ensemble member classes
         Should NOT be overridden!
         """
 
-        scheduler = torch_optim.lr_scheduler.StepLR(self.optimizer,
-                                                    step_size=10,
-                                                    gamma=0.1)
+        #scheduler = torch_optim.lr_scheduler.StepLR(self.optimizer,
+        #                                            step_size=1,
+        #                                            gamma=0.1)
+
+        clr = utils.adapted_lr(c=0.7)
+        scheduler = torch.optim.lr_scheduler.LambdaLR(
+            self.optimizer, [clr])
+
         for epoch_number in range(1, num_epochs + 1):
-            loss = self._train_epoch(train_loader, validation_loader)
+            loss = self._train_epoch(train_loader, validation_loader, reshape_targets=reshape_targets)
             self._print_epoch(epoch_number, loss)
             if self._learning_rate_condition(epoch_number):
                 scheduler.step()
@@ -193,7 +200,8 @@ class EnsembleMember(nn.Module, ABC):
     def _train_epoch(self,
                      train_loader,
                      validation_loader=None,
-                     metrics=list()):
+                     metrics=list(),
+                     reshape_targets=True):
         """Common train epoch method for all ensemble member classes
         Should NOT be overridden!
         """
@@ -214,8 +222,10 @@ class EnsembleMember(nn.Module, ABC):
             # Here, we use a single sample N = 1.
             num_samples = 1
             batch_size = targets.size(0)
-            targets = targets.reshape(
-                (batch_size, num_samples, self.output_size // 2))
+
+            if reshape_targets:  # TODO: Does this really concerna  all cases?
+                targets = targets.reshape(
+                    (batch_size, num_samples, self.output_size // 2))
             loss = self.calculate_loss(outputs, targets)
             loss.backward()
             self.optimizer.step()
@@ -227,6 +237,7 @@ class EnsembleMember(nn.Module, ABC):
         if validation_loader is not None:
             for valid_batch in validation_loader:
                 valid_inputs, valid_labels = valid_batch
+                valid_inputs, valid_targets = valid_inputs.to(self.device), valid_targets.to(self.device)
                 valid_logits = self.forward(valid_inputs)
                 valid_outputs = self.transform_logits(valid_logits)
                 self._update_metrics(valid_outputs, valid_labels)

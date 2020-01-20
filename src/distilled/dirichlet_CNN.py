@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.optim as torch_optim
-import loss as custom_loss
-import distilled.distilled_network as distilled_network
+import src.loss as custom_loss
+import src.distilled.distilled_network as distilled_network
 
 
 class DirichletCNN(distilled_network.DistilledNet):

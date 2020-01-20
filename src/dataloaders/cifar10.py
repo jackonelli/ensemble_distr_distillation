@@ -5,6 +5,7 @@ import torchvision
 import torchvision.transforms as transforms
 import numpy as np
 import matplotlib.pyplot as plt
+from PIL import Image
 
 
 class Cifar10Data:
@@ -21,21 +22,50 @@ class Cifar10Data:
                                              num_workers=2)
     """
 
-    def __init__(self, root="./data", train=True):
+    def __init__(self, root="./data", train=True, normalize=True):
         self._log = logging.getLogger(self.__class__.__name__)
-        transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-        ])
+
+        if normalize:
+            self.transform = transforms.Compose([
+                 transforms.ToTensor(),
+                 transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+            ])
+        else:
+            self.transform = transforms.Compose([
+                 transforms.ToTensor()])
+
         self.set = torchvision.datasets.CIFAR10(root=root,
                                                 train=train,
-                                                download=True,
-                                                transform=transform)
+                                                download=True)
 
-        self.input_size = None
+        self.input_size = self.set.data.shape[0]
         self.classes = ("plane", "car", "bird", "cat", "deer", "dog", "frog",
                         "horse", "ship", "truck")
         self.num_classes = len(self.classes)
+
+    def __len__(self):
+        return self.input_size
+
+    def __getitem__(self, index):
+        """
+        Args:
+            index (int): Index
+
+        Returns:
+            tuple: (image, ensemble_preds, ensemble_logits, target) where target is index of the target class.
+        """
+        img, target = self.set.data[index], self.set.targets[index]
+
+        # doing this so that it is consistent with all other datasets
+        # to return a PIL Image
+        img = Image.fromarray(img)
+
+        if self.transform is not None:
+            img = self.transform(img)
+
+        target = torch.tensor(target)
+
+        return img, target
 
 
 def main():

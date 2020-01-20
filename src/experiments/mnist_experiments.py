@@ -20,6 +20,8 @@ from src.distilled import logits_matching
 from src.distilled import cross_entropy_soft_labels
 from src.distilled import softmax_matching
 from src.distilled import vanilla_distill
+import torch.nn as nn
+
 
 import src.loss as custom_loss
 
@@ -41,10 +43,9 @@ def create_distilled_model(output_size,
     hidden_size_1 = 54
     hidden_size_2 = 32
 
-    distilled_model = class_type(input_size,
-                                 hidden_size_1,
-                                 hidden_size_2,
-                                 output_size,
+    layers_sizes = [input_size, hidden_size_1, hidden_size_2, output_size]
+
+    distilled_model = class_type(layers_sizes,
                                  prob_ensemble,
                                  learning_rate=args.lr*0.01,
                                  scale_teacher_logits=True)
@@ -60,7 +61,7 @@ def create_distilled_model(output_size,
     distilled_model.add_metric(var_metric)
 
 #    distilled_model = torch.load(filepath)
-    distilled_model.train(train_loader, num_epochs=100)  #args.num_epochs, validation_loader
+    distilled_model.train(train_loader, num_epochs=300)  #args.num_epochs, validation_loader
     #torch.save(distilled_model, filepath)
 
     #LOGGER.info("Distilled model accuracy on test data: {}".format(
@@ -279,9 +280,9 @@ def get_histogram(distilled_model, test_loader, obj_fun, label):
 
     num_bins = 100
 
-    fig, axes = plt.subplots(np.int(np.ceil(distilled_model_metric.shape[-1]/2)), 2)
+    fig, axis = plt.subplots(np.int(np.ceil(distilled_model_metric.shape[-1]/2)), 2)
 
-    for i, ax in enumerate(axes.reshape(-1)):
+    for i, ax in enumerate(axis.reshape(-1)):
         if i < distilled_model_metric.shape[-1]:
             ax.hist(ensemble_metric[:, i], bins=num_bins, alpha=0.5, density=True)
             ax.hist(distilled_model_metric[:, i], bins=num_bins, alpha=0.5, density=True)
@@ -307,7 +308,6 @@ def plot_data_set(data_set):
 
 
 def get_accuracy(distilled_model, data_loader, label='test'):
-    # SKA KANSKE INTE VARA EN EGEN METOD; EV. SKICKA IN METRIC
     prob_ensemble = distilled_model.teacher
 
     inputs, labels = next(iter(data_loader))
@@ -316,9 +316,9 @@ def get_accuracy(distilled_model, data_loader, label='test'):
     teacher_acc = metrics.accuracy(teacher_distribution, labels)
     LOGGER.info("Ensemble model accuracy on {} data {}".format(label, teacher_acc))
 
-    student_distribution = torch.mean(distilled_model.predict(inputs), dim=1)
-    student_distribution = torch.cat((student_distribution,
-         1 - torch.sum(student_distribution, dim=-1, keepdim=True)), dim=-1)
+    student_distribution = distilled_model.predict(inputs)
+    student_distribution = torch.mean(torch.cat((student_distribution,
+         1 - torch.sum(student_distribution, dim=-1, keepdim=True)), dim=-1), dim=1)
     student_acc = metrics.accuracy(student_distribution, labels)
     LOGGER.info("Distilled model accuracy on {} data {}".format(label, student_acc))
 
@@ -446,10 +446,10 @@ def distillation(class_type, distilled_output_dim, ensemble_filepath, distilled_
 
     # prob_ensemble.calc_metrics(test_loader)
 
-    #distilled_model = create_distilled_model(distilled_output_dim, train_loader, valid_loader, test_loader, args,
-    #                                         prob_ensemble, distilled_model_filepath, class_type)
+    distilled_model = create_distilled_model(distilled_output_dim, train_loader, valid_loader, test_loader, args,
+                                             prob_ensemble, distilled_model_filepath, class_type)
 
-    distilled_model = torch.load(distilled_model_filepath)
+    #distilled_model = torch.load(distilled_model_filepath)
 
     #get_var(distilled_model, train_loader_full, 'train')
     #get_var(distilled_model, valid_loader_full, 'validation')

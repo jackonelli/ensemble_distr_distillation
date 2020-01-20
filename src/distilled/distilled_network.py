@@ -32,9 +32,14 @@ class DistilledNet(nn.Module, ABC):
         """ Common train method for all distilled networks
         Should NOT be overridden!
         """
-        scheduler = self.get_scheduler(step_size=5 * len(train_loader),
-                                       cyclical=False)
-        #scheduler = torch_optim.lr_scheduler.CyclicLR(self.optimizer, 1e-7, 0.1, step_size_up=100)
+
+        # Note that we step every iteration (as opposed to every epoch) NOT TRUE ANYMORE
+        #scheduler = self.get_scheduler(step_size=5 * len(train_loader),
+        #                               cyclical=False)
+
+        clr = utils.adapted_lr(c=0.5)
+        scheduler = torch.optim.lr_scheduler.LambdaLR(
+            self.optimizer, [clr])
 
         self.use_hard_labels = False  # VILL VI HA DENNA?
 
@@ -52,8 +57,8 @@ class DistilledNet(nn.Module, ABC):
                                      validation_loader=validation_loader,
                                      scheduler=scheduler)
             self._print_epoch(epoch_number, loss)
-            #if self._learning_rate_condition(epoch_number):
-            #    scheduler.step()
+            if self._learning_rate_condition(epoch_number):
+                scheduler.step()
 
         self._reset_metrics()  # For storing purposes
 
@@ -67,13 +72,24 @@ class DistilledNet(nn.Module, ABC):
         if no labels are available.
         """
         running_loss = 0
+        print(scheduler.get_lr())
 
         self._reset_metrics()
 
         for batch in train_loader:
             self.optimizer.zero_grad()
             inputs, labels = batch
-            inputs, labels = inputs.to(self.device), labels.to(self.device)
+
+            # Need this for a special case
+            if isinstance(inputs, list):
+                for i in range(len(inputs)):
+                    inputs[i] = inputs[i].to(self.device)
+
+                labels = labels.to(self.device)
+
+            else:
+                inputs, labels = inputs.to(self.device), labels.to(self.device)
+
             teacher_predictions = self._generate_teacher_predictions(
                 inputs).detach()
 
@@ -95,8 +111,8 @@ class DistilledNet(nn.Module, ABC):
                 )  # BUT THIS DOES NOT WORK FOR EG ACCURACY
                 # USE EITHER METRICS.ACCURACY_SOFT_LABELS OR METRICS.ACCURACY_LOGITS
 
-            if self._learning_rate_condition():
-                scheduler.step()
+            #if self._learning_rate_condition():
+            #    scheduler.step()
 
         if validation_loader is not None:
             # We will compare here with the teacher predictions
@@ -108,7 +124,16 @@ class DistilledNet(nn.Module, ABC):
         for batch in data_loader:
             # self._reset_metrics()
             inputs, labels = batch
-            inputs, labels = inputs.to(self.device), labels.to(self.device)
+
+            if isinstance(inputs, list):
+                for i in range(len(inputs)):
+                    inputs[i] = inputs[i].to(self.device)
+
+                labels = labels.to(self.device)
+
+            else:
+                inputs, labels = inputs.to(self.device), labels.to(self.device)
+
             outputs = self.forward(inputs)
             teacher_predictions = self._generate_teacher_predictions(inputs)
             teacher_predictions = teacher_predictions.to(self.device)
@@ -153,7 +178,7 @@ class DistilledNet(nn.Module, ABC):
         else:
             scheduler = torch_optim.lr_scheduler.StepLR(self.optimizer,
                                                         step_size=step_size,
-                                                        gamma=0.7)
+                                                        gamma=0.9)
 
         return scheduler
 

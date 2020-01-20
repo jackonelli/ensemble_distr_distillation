@@ -18,28 +18,19 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
                          loss_function=custom_loss.gaussian_neg_log_likelihood,
                          device=device)
 
-        #self.input_size = input_size
-        #self.hidden_size_1 = hidden_size_1  # Or make a list or something
-        #self.hidden_size_2 = hidden_size_2
-        #self.hidden_size_3 = hidden_size_3
-        #self.output_size = output_size
-
         self.use_hard_labels = use_hard_labels
         self.learning_rate = learning_rate
         self.scale_teacher_logits = scale_teacher_logits
 
         self.layers = nn.ModuleList()
         for i in range(len(layer_sizes) - 1):
-            self.layers.append(nn.Linear(layer_sizes[i], layer_sizes[i+1]))
+            self.layers.append(nn.Linear(layer_sizes[i], layer_sizes[i + 1]))
 
         # Ad-hoc fix zero variance.
-
         self.variance_lower_bound = 0.001
         if self.variance_lower_bound > 0.0:
             self._log.warning("Non-zero variance lower bound set ({})".format(
                 self.variance_lower_bound))
-
-        #self.layers = layers #[self.fc1, self.fc2, self.fc3, self.fc4]
 
         self.optimizer = torch_optim.Adam(self.parameters(),
                                           lr=self.learning_rate)
@@ -50,11 +41,6 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
         """Estimate parameters of distribution
         """
 
-        #x = nn.functional.relu(self.fc1(x))
-        #x = nn.functional.relu(self.fc2(x))
-        #x = nn.functional.relu(self.fc3(x))
-        #x = self.fc4(x)
-
         for layer in self.layers[:-1]:
             x = nn.functional.relu(layer(x))
 
@@ -64,7 +50,7 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
         mean = x[:, :mid]
         var_z = x[:, mid:]
 
-        var = torch.log(1 + torch.exp(var_z) + self.variance_lower_bound)
+        var = torch.log(1 + torch.exp(var_z)) + self.variance_lower_bound
         #var = torch.exp(var_z)
 
         return mean, var

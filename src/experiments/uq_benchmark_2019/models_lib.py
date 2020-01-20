@@ -61,6 +61,7 @@ class ModelOptions(object):
 
 def load_model(model_dir):
   model_opts = experiment_utils.load_config(model_dir + '/model_options.json')
+  model_opts['num_resnet_filters'] = 16  # OBS HAR LAGT TILL DETTA
   model_opts = ModelOptions(**model_opts)
   logging.info('Loaded model options: %s', model_opts)
 

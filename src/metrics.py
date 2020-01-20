@@ -21,8 +21,12 @@ class Metric:
         return "{}: {}".format(self.name, self.mean())
 
     def update(self, targets, outputs):
-        self.running_value += self.function(
-            outputs, targets).detach()  # Do this to save memory
+        value = self.function(outputs, targets)
+
+        if not type(value).__module__ == np.__name__:
+            value = value.detach()  # Do this to save memory
+
+        self.running_value += value
         self.counter += 1
 
     def mean(self):
@@ -218,7 +222,7 @@ def accuracy(predicted_distribution, true_labels):
 
     if number_of_elements == 0:
         number_of_elements = 1
-    return (true_labels == predicted_labels.int()
+    return (true_labels == predicted_labels
             ).sum().item() / number_of_elements
 
 

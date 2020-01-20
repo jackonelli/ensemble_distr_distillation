@@ -82,8 +82,7 @@ def gaussian_neg_log_likelihood(parameters, target):
     if target.dim() == 2:
         target = torch.unsqueeze(target, dim=1)
 
-    cov_mat = torch.stack(
-        [torch.diag(var[b, :]) for b in np.arange(target.size(0))])
+    cov_mat = [torch.diag(var[b, :]) for b in np.arange(target.size(0))]
 
     loss = 0
     for b, cov_mat_b in enumerate(cov_mat):

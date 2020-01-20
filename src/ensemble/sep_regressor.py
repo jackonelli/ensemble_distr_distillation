@@ -10,14 +10,20 @@ import src.loss as custom_loss
 class SepRegressor(ensemble.EnsembleMember):
     """SepRegressor
     Network that predicts the parameters of a normal distribution
+
+    Args:
+        layer_sizes (list(int)): Defines the (equal) subnetworks,
+            i.e. the last element (output_size) is D
+        device (torch.Device)
+        learning_rate (float)
     """
     def __init__(self,
                  layer_sizes,
-                 output_size,
                  device=torch.device("cpu"),
                  learning_rate=0.001):
 
-        super().__init__(output_size=output_size,
+        # The actual output the output of the combined subnetworks
+        super().__init__(output_size=layer_sizes[-1] * 2,
                          loss_function=custom_loss.gaussian_neg_log_likelihood,
                          device=device)
 
@@ -50,8 +56,6 @@ class SepRegressor(ensemble.EnsembleMember):
         # mean = logits[:, :int((self.output_size / 2))]
         # var = torch.exp(logits[:, int((self.output_size / 2)):])
 
-        self._log.debug("Transform logits")
-        self._log.debug(logits.shape)
         outputs = logits
         outputs[:, 1] = torch.log(1 + torch.exp(outputs[:, 1]))
 
