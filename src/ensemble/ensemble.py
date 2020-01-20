@@ -183,13 +183,13 @@ class EnsembleMember(nn.Module, ABC):
         Should NOT be overridden!
         """
 
-        #scheduler = torch_optim.lr_scheduler.StepLR(self.optimizer,
-        #                                            step_size=1,
-        #                                            gamma=0.1)
+        scheduler = torch_optim.lr_scheduler.StepLR(self.optimizer,
+                                                    step_size=1,
+                                                    gamma=0.1)
 
-        clr = utils.adapted_lr(c=0.7)
-        scheduler = torch.optim.lr_scheduler.LambdaLR(
-            self.optimizer, [clr])
+        #clr = utils.adapted_lr(c=0.7)
+        #scheduler = torch.optim.lr_scheduler.LambdaLR(
+        #    self.optimizer, [clr])
 
         for epoch_number in range(1, num_epochs + 1):
             loss = self._train_epoch(train_loader, validation_loader, reshape_targets=reshape_targets)

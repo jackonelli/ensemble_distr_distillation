@@ -34,12 +34,12 @@ class DistilledNet(nn.Module, ABC):
         """
 
         # Note that we step every iteration (as opposed to every epoch) NOT TRUE ANYMORE
-        #scheduler = self.get_scheduler(step_size=5 * len(train_loader),
-        #                               cyclical=False)
+        scheduler = self.get_scheduler(step_size=5 * len(train_loader),
+                                       cyclical=False)
 
-        clr = utils.adapted_lr(c=0.5)
-        scheduler = torch.optim.lr_scheduler.LambdaLR(
-            self.optimizer, [clr])
+        #clr = utils.adapted_lr(c=0.5)
+        #scheduler = torch.optim.lr_scheduler.LambdaLR(
+        #    self.optimizer, [clr])
 
         self.use_hard_labels = False  # VILL VI HA DENNA?
 
