@@ -79,7 +79,6 @@ def gaussian_neg_log_likelihood(parameters, target):
     loss = 0
     for batch_index, (mean_b, cov_b) in enumerate(zip(mean, var)):
         cov_mat_b = torch.diag(cov_b)
-        torch.diag(var[batch_index, :])
         distr = torch_mvn.MultivariateNormal(mean_b, cov_mat_b)
 
         log_prob = distr.log_prob(target[batch_index, :, :])
