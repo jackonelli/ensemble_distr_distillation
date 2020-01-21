@@ -14,7 +14,8 @@ class UCIData(torch.utils.data.Dataset):
         self._log = logging.getLogger(self.__class__.__name__)
         self.data = None
         self.num_samples = None
-        self.dim = None
+        self.input_dim = None
+        self.output_dim = 1
 
     def __len__(self):
         if self.num_samples is not None:
@@ -52,7 +53,8 @@ class UCIData(torch.utils.data.Dataset):
         """
 
         self.data = data
-        self.num_samples, self.dim = self.data.shape
+        self.num_samples, self.input_dim = self.data.shape
+        self.input_dim -= self.output_dim  #  Shape gives all dimnensions
 
     def create_train_val_split(self, training_samples_ratio):
         """Create two separate dataloaders

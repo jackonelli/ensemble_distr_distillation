@@ -18,6 +18,4 @@ class BostonData(UCIData):
 
     def load_full_data(self):
         """Load csv data into np array"""
-        return np.genfromtxt(self.file_path,
-                             dtype=np.float32,
-                             skip_header=0)
+        return np.genfromtxt(self.file_path, dtype=np.float32, skip_header=0)

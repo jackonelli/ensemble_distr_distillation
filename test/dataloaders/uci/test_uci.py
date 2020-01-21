@@ -3,6 +3,8 @@ import numpy as np
 import src.dataloaders.uci.wine as uci_wine
 import src.dataloaders.uci.bost as uci_bost
 
+NUM_DECIMALS = 5
+
 
 class TestWineData(unittest.TestCase):
     def setUp(self):
@@ -34,6 +36,12 @@ class TestBostonData(unittest.TestCase):
     def test_dim(self):
         input_, target = self.training_set[0]
         self.assertEqual(input_.shape[0], 13)
+        self.assertIsInstance(target, np.float32)
+
+    def test_first_row(self):
+        input_, target = self.training_set[0]
+        self.assertAlmostEqual(input_[0].item(), 0.00632, places=NUM_DECIMALS)
+        self.assertAlmostEqual(target, 24.00, places=NUM_DECIMALS)
         self.assertIsInstance(target, np.float32)
 
 
