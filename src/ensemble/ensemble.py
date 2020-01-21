@@ -88,7 +88,7 @@ class Ensemble():
     def transform_logits(self, logits, transformation=None):
         """Ensemble predictions from logits
         Returns the predictions of all individual ensemble members,
-        by applying the logits 'transformation' to the logits.
+	    by applying the logits 'transformation' to the logits.
         B = batch size, K = num output params, N = ensemble size
 
         Args:
@@ -129,7 +129,6 @@ class Ensemble():
         """
         batch_size = inputs.size(0)
         predictions = torch.zeros((batch_size, self.size, self.output_size))
-        print("predictions", predictions.shape)
         for member_ind, member in enumerate(self.members):
             if t is None:
                 predictions[:, member_ind, :] = member.predict(inputs)
@@ -175,7 +174,8 @@ class EnsembleMember(nn.Module, ABC):
                  output_size,
                  loss_function,
                  target_size=None,
-                 device=torch.device("cpu")):
+                 device=torch.device("cpu"),
+                 grad_norm_bound=None):
         super().__init__()
 
         self._log = logging.getLogger(self.__class__.__name__)
@@ -189,6 +189,7 @@ class EnsembleMember(nn.Module, ABC):
         self.loss = loss_function
         self.metrics = dict()
         self.optimizer = None
+        self.grad_norm_bound = grad_norm_bound
         self._log.info("Moving model to device: {}".format(device))
         self.device = device
 
@@ -245,6 +246,9 @@ class EnsembleMember(nn.Module, ABC):
 
             loss = self.calculate_loss(outputs, targets)
             loss.backward()
+            if self.grad_norm_bound is not None:
+                nn.utils.clip_grad_norm(self.parameters(),
+                                        self.grad_norm_bound)
             self.optimizer.step()
             running_loss += loss.item()
 

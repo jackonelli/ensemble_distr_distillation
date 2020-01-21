@@ -3,6 +3,7 @@ import torch.optim as torch_optim
 import torch.nn as nn
 from src.ensemble import ensemble
 import src.loss as custom_loss
+import src.utils as utils
 
 
 class SimpleRegressor(ensemble.EnsembleMember):
@@ -12,7 +13,8 @@ class SimpleRegressor(ensemble.EnsembleMember):
     def __init__(self,
                  layer_sizes,
                  device=torch.device("cpu"),
-                 learning_rate=0.001):
+                 learning_rate=0.001,
+                 variance_transform=utils.variance_linear_asymptote):
 
         super().__init__(output_size=layer_sizes[-1] // 2,
                          loss_function=custom_loss.gaussian_neg_log_likelihood,
@@ -20,12 +22,9 @@ class SimpleRegressor(ensemble.EnsembleMember):
 
         self.learning_rate = learning_rate
         self.mean_only = False
-
-        # Ad-hoc fix zero variance.
-        self.variance_lower_bound = 0.001
-        if self.variance_lower_bound > 0.0:
-            self._log.warning("Non-zero variance lower bound set ({})".format(
-                self.variance_lower_bound))
+        self.variance_transform = variance_transform
+        self._log.info("Using variance transform: {}".format(
+            self.variance_transform.__name__))
 
         self.layers = nn.ModuleList()
         for i in range(len(layer_sizes) - 1):
@@ -47,12 +46,17 @@ class SimpleRegressor(ensemble.EnsembleMember):
         return x
 
     def transform_logits(self, logits):
-        # mean = logits[:, :int((self.output_size / 2))]
-        # var = torch.exp(logits[:, int((self.output_size / 2)):])
+        """Transform logits for the simple regressor
+
+        Maps half of the "logits" from unbounded to positive real numbers.
+        TODO: Only works for one-dim output.
+
+        Args:
+            logits (torch.Tensor(B, D)):
+        """
 
         outputs = logits
-        outputs[:, 1] = torch.log(
-            1 + torch.exp(outputs[:, 1])) + self.variance_lower_bound
+        outputs[:, 1] = self.variance_transform(outputs[:, 1])
 
         return outputs
 
@@ -71,6 +75,13 @@ class SimpleRegressor(ensemble.EnsembleMember):
     def predict(self, x):
         logits = self.forward(x)
         x = self.transform_logits(logits)
-        print("x", x.shape)
 
         return x
+
+    def _output_to_metric_domain(self, outputs):
+        """Transform output for metric calculation
+
+        Extract expected value parameter from outputs
+        """
+        B, D = outputs.shape
+        return outputs[:, 0].reshape((B, D // 2))
