@@ -161,8 +161,11 @@ def tensor_argmax(input_tensor):
 
 
 def cyclical_lr(stepsize, min_lr=3e-4, max_lr=3e-3):
-    # the torch_optim.lr_scheduler.CycleLR does not work with Adam so I copied this one from here:
-    # https://towardsdatascience.com/adaptive-and-cyclical-learning-rates-using-pytorch-2bf904d18dee
+    """ Cyclical learning rate
+    the torch_optim.lr_scheduler.CycleLR does not work with Adam,
+    instead I copied this one from here:
+    https://towardsdatascience.com/adaptive-and-cyclical-learning-rates-using-pytorch-2bf904d18dee
+    """
 
     # Scaler: we can adapt this if we do not want the triangular CLR
     scaler = lambda x: 1.
@@ -178,3 +181,27 @@ def cyclical_lr(stepsize, min_lr=3e-4, max_lr=3e-3):
 
     return lr_lambda
 
+
+def variance_linear_asymptote(input_):
+    """Variance transform
+    Element-wise map of input_ input to positive real axis
+
+    Asymptotically linear in input for large inputs
+    """
+    return torch.log(1 + torch.exp(input_))
+
+
+def variance_exponential(input_):
+    """Variance transform
+    Element-wise map of input_ input to positive real axis
+    """
+    return torch.exp(input_)
+
+
+def variance_moberg(input_, epsilon=1e-3):
+    """Variance transform
+    Element-wise map of input_ input to positive real axis
+    As used in John Moberg's thesis
+    """
+
+    return torch.log(1 + torch.exp(input_) + epsilon) + epsilon
