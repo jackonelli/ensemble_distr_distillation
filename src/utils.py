@@ -182,13 +182,13 @@ def cyclical_lr(stepsize, min_lr=3e-4, max_lr=3e-3):
     return lr_lambda
 
 
-def variance_linear_asymptote(input_):
+def variance_linear_asymptote(input_, epsilon=1e-6):
     """Variance transform
     Element-wise map of input_ input to positive real axis
 
     Asymptotically linear in input for large inputs
     """
-    return torch.log(1 + torch.exp(input_))
+    return torch.log(1 + torch.exp(input_)) + epsilon
 
 
 def variance_exponential(input_):
