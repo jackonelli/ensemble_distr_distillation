@@ -30,9 +30,8 @@ class SimpleRegressor(ensemble.EnsembleMember):
         for i in range(len(layer_sizes) - 1):
             self.layers.append(nn.Linear(layer_sizes[i], layer_sizes[i + 1]))
 
-        self.optimizer = torch_optim.SGD(self.parameters(),
-                                         lr=self.learning_rate,
-                                         momentum=0.9)
+        self.optimizer = torch_optim.Adam(self.parameters(),
+                                          lr=self.learning_rate)
         self.to(self.device)
 
     def forward(self, x):

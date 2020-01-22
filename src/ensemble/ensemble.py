@@ -202,6 +202,7 @@ class EnsembleMember(nn.Module, ABC):
         """Common train method for all ensemble member classes
         Should NOT be overridden!
         """
+        store_loss = {"Train": list(), "Validation": list()}
 
         scheduler = torch_optim.lr_scheduler.StepLR(self.optimizer,
                                                     step_size=10,
@@ -209,11 +210,14 @@ class EnsembleMember(nn.Module, ABC):
         for epoch_number in range(1, num_epochs + 1):
             loss = self._train_epoch(train_loader, validation_loader)
             self._print_epoch(epoch_number, loss, "Train")
+            store_loss["Train"].append(loss)
             if validation_loader is not None:
                 loss = self._validate_epoch(validation_loader)
                 self._print_epoch(epoch_number, loss, "Validation")
+                store_loss["Validation"].append(loss)
             if self._learning_rate_condition(epoch_number):
                 scheduler.step()
+        return store_loss
 
     def _train_epoch(self, train_loader, validation_loader=None):
         """Common train epoch method for all ensemble member classes

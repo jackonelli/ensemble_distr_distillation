@@ -198,10 +198,16 @@ def variance_exponential(input_):
     return torch.exp(input_)
 
 
-def variance_moberg(input_, epsilon=1e-3):
+def variance_moberg(input_, epsilon=1e-6):
     """Variance transform
     Element-wise map of input_ input to positive real axis
     As used in John Moberg's thesis
     """
 
     return torch.log(1 + torch.exp(input_) + epsilon) + epsilon
+
+
+def gradient_analysis(model):
+    """Extracts some gradient characteristics from a training model"""
+    gradients = [param.grad for param in model.layers[-1].parameters()]
+    return gradients
