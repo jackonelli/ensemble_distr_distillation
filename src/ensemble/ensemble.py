@@ -229,8 +229,7 @@ class EnsembleMember(nn.Module, ABC):
         self._reset_metrics()
         running_loss = 0.0
         batch_count = 0
-        for batch in train_loader:
-            batch_count += 1
+        for (batch_count, batch) in enumerate(train_loader):
             self.optimizer.zero_grad()
             inputs, targets = batch
 
@@ -258,7 +257,7 @@ class EnsembleMember(nn.Module, ABC):
 
             self._update_metrics(outputs, targets)
 
-        return running_loss / batch_count
+        return running_loss / (batch_count + 1)
 
     def _validate_epoch(self, validation_loader):
         """Common validate epoch method for all ensemble member classes
