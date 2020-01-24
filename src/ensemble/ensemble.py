@@ -259,7 +259,8 @@ class EnsembleMember(nn.Module, ABC):
 
         return running_loss / (batch_count + 1)
 
-    def _validate_epoch(self, validation_loader):
+    def _validate_epoch(self, validation_loader,
+                        inverse_y_transformation=None):
         """Common validate epoch method for all ensemble member classes
         Should NOT be overridden!
         """
