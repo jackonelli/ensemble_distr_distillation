@@ -7,7 +7,7 @@ from src.ensemble import ensemble
 class Resnet20(ensemble.EnsembleMember):
     def __init__(self,
                  features_list,
-                 device=torch.device("cuda"),
+                 device=torch.device("cpu"),
                  learning_rate=0.001):
 
         super().__init__(output_size=10, loss_function=nn.NLLLoss(), device=device)

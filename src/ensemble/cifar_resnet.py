@@ -10,6 +10,7 @@ import torch.nn.functional as F
 from src.ensemble import ensemble
 import torch.optim as torch_optim
 
+
 class BasicBlock(nn.Module):
     expansion = 1
 
@@ -63,7 +64,7 @@ class Bottleneck(nn.Module):
         return out
 
 
-class ResNet(ensemble.EnsembleMember):  # Change of inheritence
+class ResNet(ensemble.EnsembleMember):  # Change of inheritance
     def __init__(self, block, num_blocks, learning_rate=0.001, num_classes=10):
         super().__init__(output_size=10, loss_function=nn.NLLLoss(), device=torch.device("cpu"))
         self.learning_rate = learning_rate
@@ -120,21 +121,46 @@ class ResNet(ensemble.EnsembleMember):  # Change of inheritence
     def _learning_rate_condition(self, epoch):
         return True
 
+    def eval_mode(self, train=False):
+        # Setting layers to eval mode
+
+        if train:
+            # Not sure this is the way to go
+            self.conv1.train()
+            self.bn1.train()
+            self.layer1.train()
+            self.layer2.train()
+            self.layer3.train()
+            self.layer4.train()
+            self.linear.train()
+        else:
+            self.conv1.eval()
+            self.bn1.eval()
+            self.layer1.eval()
+            self.layer2.eval()
+            self.layer3.eval()
+            self.layer4.eval()
+            self.linear.eval()
+
 
 def ResNet18():
-    return ResNet(BasicBlock, [2,2,2,2])
+    return ResNet(BasicBlock, [2, 2, 2, 2])
+
 
 def ResNet34():
-    return ResNet(BasicBlock, [3,4,6,3])
+    return ResNet(BasicBlock, [3, 4, 6, 3])
+
 
 def ResNet50():
-    return ResNet(Bottleneck, [3,4,6,3])
+    return ResNet(Bottleneck, [3, 4, 6, 3])
+
 
 def ResNet101():
-    return ResNet(Bottleneck, [3,4,23,3])
+    return ResNet(Bottleneck, [3, 4, 23, 3])
+
 
 def ResNet152():
-    return ResNet(Bottleneck, [3,8,36,3])
+    return ResNet(Bottleneck, [3, 8, 36, 3])
 
 
 def test():

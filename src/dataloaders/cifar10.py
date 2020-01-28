@@ -38,6 +38,10 @@ class Cifar10Data:
                                                 train=train,
                                                 download=True)
 
+        target = np.array(self.set.targets)
+        plt.plot(np.arange(0, target.shape[0]), target)
+        plt.show()
+
         self.input_size = self.set.data.shape[0]
         self.classes = ("plane", "car", "bird", "cat", "deer", "dog", "frog",
                         "horse", "ship", "truck")
@@ -75,7 +79,7 @@ def main():
     loader = torch.utils.data.DataLoader(data.set,
                                          batch_size=4,
                                          shuffle=True,
-                                         num_workers=2)
+                                         num_workers=0)
     dataiter = iter(loader)
     images, labels = dataiter.next()
 

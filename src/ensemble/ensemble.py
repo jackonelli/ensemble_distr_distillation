@@ -223,7 +223,7 @@ class EnsembleMember(nn.Module, ABC):
             num_samples = 1
             batch_size = targets.size(0)
 
-            if reshape_targets:  # TODO: Does this really concerna  all cases?
+            if reshape_targets:  # TODO: Does this really concern  all cases?
                 targets = targets.reshape(
                     (batch_size, num_samples, self.output_size // 2))
             loss = self.calculate_loss(outputs, targets)
@@ -235,12 +235,15 @@ class EnsembleMember(nn.Module, ABC):
                 self._update_metrics(outputs, targets)
 
         if validation_loader is not None:
-            for valid_batch in validation_loader:
-                valid_inputs, valid_labels = valid_batch
-                valid_inputs, valid_targets = valid_inputs.to(self.device), valid_targets.to(self.device)
-                valid_logits = self.forward(valid_inputs)
-                valid_outputs = self.transform_logits(valid_logits)
-                self._update_metrics(valid_outputs, valid_labels)
+            # TODO: should we do model.eval() here or would it just waste our time?
+            with torch.no_grad():
+                for valid_batch in validation_loader:
+                    # TODO: Use calc_metrics here?
+                    valid_inputs, valid_labels = valid_batch
+                    valid_inputs, valid_targets = valid_inputs.to(self.device), valid_targets.to(self.device)
+                    valid_logits = self.forward(valid_inputs)
+                    valid_outputs = self.transform_logits(valid_logits)
+                    self._update_metrics(valid_outputs, valid_labels)
 
                 # Will automatically call
 

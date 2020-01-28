@@ -17,7 +17,6 @@ import matplotlib.pyplot as plt
 import torch
 from scipy.stats import multivariate_normal as scipy_mvn
 from scipy.stats import norm as scipy_norm
-import scipy.interpolate
 from src.experiments.shifted_cmap import shifted_color_map
 import matplotlib
 from src.distilled import logits_matching

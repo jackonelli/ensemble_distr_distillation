@@ -6,6 +6,8 @@ import torch.nn as nn
 import torch.optim as torch_optim
 import math
 import src.utils as utils
+import os
+import numpy as np
 
 
 class DistilledNet(nn.Module, ABC):
@@ -34,12 +36,12 @@ class DistilledNet(nn.Module, ABC):
         """
 
         # Note that we step every iteration (as opposed to every epoch) NOT TRUE ANYMORE
-        scheduler = self.get_scheduler(step_size=5 * len(train_loader),
-                                       cyclical=False)
+        #scheduler = self.get_scheduler(step_size=5 * len(train_loader),
+         #                              cyclical=False)
 
-        #clr = utils.adapted_lr(c=0.5)
-        #scheduler = torch.optim.lr_scheduler.LambdaLR(
-        #    self.optimizer, [clr])
+        clr = utils.adapted_lr(c=0.7)
+        scheduler = torch.optim.lr_scheduler.LambdaLR(
+            self.optimizer, [clr])
 
         self.use_hard_labels = False  # VILL VI HA DENNA?
 
@@ -60,6 +62,18 @@ class DistilledNet(nn.Module, ABC):
             if self._learning_rate_condition(epoch_number):
                 scheduler.step()
 
+            if os.path.isfile("model_data/par_adam.npy"):
+                par_arr = np.load("model_data/par_adam.npy", allow_pickle=True)
+                par_arr = np.concatenate((par_arr, self.par.detach().numpy()))
+                grad_arr = np.load("model_data/grad_adam.npy", allow_pickle=True)
+                grad_arr = np.concatenate((grad_arr, self.par.grad.detach().numpy()))
+            else:
+                par_arr = self.par.detach().numpy()
+                grad_arr = self.par.grad.detach().numpy()
+
+            np.save("model_data/par_adam.npy", par_arr)
+            np.save("model_data/grad_adam.npy", grad_arr)
+
         self._reset_metrics()  # For storing purposes
 
     def _train_epoch(self,
@@ -72,7 +86,6 @@ class DistilledNet(nn.Module, ABC):
         if no labels are available.
         """
         running_loss = 0
-        print(scheduler.get_lr())
 
         self._reset_metrics()
 
@@ -105,18 +118,20 @@ class DistilledNet(nn.Module, ABC):
                 break
 
             if validation_loader is None:
-                #self._reset_metrics()
-                self._update_metrics(
-                    outputs, teacher_predictions
-                )  # BUT THIS DOES NOT WORK FOR EG ACCURACY
-                # USE EITHER METRICS.ACCURACY_SOFT_LABELS OR METRICS.ACCURACY_LOGITS
+                    #self._reset_metrics()
+                    self._update_metrics(
+                        outputs, teacher_predictions
+                    )  # BUT THIS DOES NOT WORK FOR EG ACCURACY
+                    # USE EITHER METRICS.ACCURACY_SOFT_LABELS OR METRICS.ACCURACY_LOGITS
 
             #if self._learning_rate_condition():
             #    scheduler.step()
 
         if validation_loader is not None:
+            # TODO: should we do model.eval() here or would it just waste our time?
+            with torch.no_grad():
             # We will compare here with the teacher predictions
-            self.calculate_metric_dataloader(validation_loader)
+                self.calculate_metric_dataloader(validation_loader)
 
         return running_loss
 
@@ -152,7 +167,7 @@ class DistilledNet(nn.Module, ABC):
         logits = self.teacher.get_logits(inputs)
         return self.teacher.transform_logits(logits)
 
-    def calc_metrics(self, data_loader):
+    def calc_metrics(self, data_loader): #TODO: How does this differ from calc_metric_dataloader except for the reset_metrics call?
         self._reset_metrics()
 
         for batch in data_loader:

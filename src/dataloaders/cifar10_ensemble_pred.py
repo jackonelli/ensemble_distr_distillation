@@ -46,7 +46,7 @@ class Cifar10Data:
                 self.set.data = (self.set.data[split:, :, :, :], ensemble_preds[split:, :, :], ensemble_logits[split:, :, :])
                 self.set.targets = self.set.targets[split:]
             else:
-                self.set.data = (self.set.data[:1, :, :, :], ensemble_preds[:10, :, :], ensemble_logits[:1, :, :])
+                self.set.data = (self.set.data[:1, :, :, :], ensemble_preds[:1, :, :], ensemble_logits[:1, :, :])
                 self.set.targets = self.set.targets[:1]
         else:
             ensemble_preds = np.load(data_dir + "cifar10_ensemble_test_predictions.npy")

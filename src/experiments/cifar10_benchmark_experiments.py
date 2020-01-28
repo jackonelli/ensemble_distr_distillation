@@ -5,7 +5,6 @@ import src.ensemble.tensorflow_ensemble as tensorflow_ensemble
 import tensorflow as tf
 import torch.nn as nn
 import src.distilled.logits_teacher_from_file as logits_teacher_from_file
-import src.distilled.dummy_logits_probability_distribution as dummy_logits_probability_distribution
 import src.ensemble.resnet20 as resnet20
 import torch
 import src.dataloaders.cifar10_ensemble_pred as cifar10_ensemble_pred
@@ -102,13 +101,14 @@ def ensemble_predictions_corrupted_data():
     models_dir = 'models/cifar-0508-ensemble_50/r'
     ensemble.load_ensemble(models_dir, num_members=50)
 
-    # Load data, ["brightness", "contrast", "defocus_blur", "elastic_transform"
-    corruption_list = ["fog", "frost",
-                       "gaussian_blur", "gaussian_noise", "glass_blur", "impulse_noise", "motion_blur",
+    # Load data, ["brightness", "contrast", "defocus_blur", "elastic_transform", "fog", "frost", "gaussian_blur",
+    # "gaussian_noise", "glass_blur"
+    corruption_list = ["impulse_noise", "motion_blur",
                        "pixelate", "saturate", "shot_noise", "snow", "spatter", "speckle_noise",
                        "zoom_blur"]
 
     data_dir = "../dataloaders/data/ensemble_predictions/"
+    file_dir = "../dataloaders/data"
     targets = []
     for i, corruption in enumerate(corruption_list):
         print(i)
@@ -123,8 +123,7 @@ def ensemble_predictions_corrupted_data():
         for batch in dataloader:
             inputs, labels = batch
 
-            if i == 0:
-                targets.append(labels)
+            targets.append(labels)
 
             inputs = tf.convert_to_tensor(inputs.data.numpy())
             logits, preds = ensemble.predict(inputs)
@@ -133,8 +132,22 @@ def ensemble_predictions_corrupted_data():
         predictions = tf.concat(predictions, axis=0)
         np.save(data_dir + corruption, predictions.numpy())
 
+        targets = tf.concat(targets, axis=0)
+
+        # Check accuracy
+        new_preds = np.argmax(predictions, axis=-1)
+        for j in np.arange(0, 5):
+            saved_predictions = \
+                cifar10_benchmark_model_predictions.Cifar10Data("ensemble", corruption, intensity=j, rep=0,  # Will just compare with one of the replications for now
+                                                                filedir=file_dir)
+            saved_preds = np.argmax(saved_predictions.set.predictions, axis=-1)
+            saved_acc = np.mean(saved_preds == saved_predictions.set.labels)
+            print("Previous prediction acc is {}".format(saved_acc))
+
+            new_acc = np.mean(new_preds[j * 10000:(j + 1) * 10000] == targets[j * 10000:(j + 1) * 10000])
+            print("New acc is {}".format(new_acc))
+
         if i == 0:
-            targets = tf.concat(targets, axis=0)
             np.save(data_dir + "labels", targets.numpy())
 
 
@@ -235,70 +248,6 @@ def get_resnet_layers(softmax=False):
     return resnet_features
 
 
-def dummy_test():
-    # example output part of the model
-    args = utils.parse_args()
-
-    log_file = Path("{}.log".format(datetime.now().strftime('%Y%m%d_%H%M%S')))
-    utils.setup_logger(log_path=Path.cwd() / args.log_dir / log_file,
-                       log_level=args.log_level)
-
-    train_set = cifar10_ensemble_pred.Cifar10Data()
-    valid_set = cifar10_ensemble_pred.Cifar10Data(validation=True)
-
-    train_loader = torch.utils.data.DataLoader(train_set,
-                                               batch_size=1,
-                                               shuffle=True,
-                                               num_workers=0)
-
-    valid_loader = torch.utils.data.DataLoader(valid_set,
-                                               batch_size=100,
-                                               shuffle=True,
-                                               num_workers=0)
-
-    ensemble = tensorflow_ensemble.TensorflowEnsemble(output_size=10)
-    # models_dir = 'models/cifar-0508-ensemble_50/r'
-    # ensemble.load_ensemble(models_dir, num_members=50)
-
-    distilled_model = dummy_logits_probability_distribution.DummyLogitsProbabilityDistribution(ensemble,
-                                                                                               learning_rate=args.lr*5,
-                                                                                               scale_teacher_logits=True)
-
-    loss_metric = metrics.Metric(name="Mean loss", function=distilled_model.calculate_loss)
-    distilled_model.add_metric(loss_metric)
-
-    distilled_dir = Path("models/distilled_model_cifar10_dummy")
-    distilled_model.train(train_loader, num_epochs=30, validation_loader=valid_loader)
-    torch.save(distilled_model, distilled_dir)
-
-
-def check_dummy_test():
-
-    train_set = cifar10_ensemble_pred.Cifar10Data()
-
-    input_data = (torch.tensor(train_set.set.data[0]), torch.tensor(train_set.set.data[1]),
-                  torch.tensor(train_set.set.data[2]))
-
-    distilled_filepath = Path("models/distilled_model_cifar10_dummy")
-    distilled_model = torch.load(distilled_filepath)
-
-    # Look at logits
-    dummy_input = torch.ones(1, 1)
-    distilled_mean, distilled_var = distilled_model.forward(dummy_input)
-
-    ensemble_logits = distilled_model._generate_teacher_predictions(input_data)
-    ensemble_logits = ensemble_logits.reshape(ensemble_logits.size(0)*ensemble_logits.size(1), ensemble_logits.size(-1))  # Blir detta rätt?
-    ensemble_mean, ensemble_var = np.mean(ensemble_logits.data.numpy(), axis=0), \
-                                  np.var(ensemble_logits.data.numpy(), axis=0)
-
-    #LOGGER.info
-    print("Distilled model logits mean is {} and variance is {}".format(distilled_mean.data.numpy(),
-                                                                        distilled_var.data.numpy()))
-    print("Ensemble logits mean is {} and variance is {}".format(ensemble_mean, ensemble_var))
-
-    # Good estimation of mean, variance seems to be underestimated
-
-
 def test_downloaded_resnet_network():
 
     # example output part of the model
@@ -359,9 +308,9 @@ def test_resnet_network():
     train_set = cifar10.Cifar10Data(normalize=False)
 
     train_loader = torch.utils.data.DataLoader(train_set,
-                                               batch_size=100,
+                                               batch_size=32,
                                                shuffle=True,
-                                               num_workers=2)
+                                               num_workers=0)
 
     features_list = get_resnet_layers()
 
@@ -455,7 +404,7 @@ def train_distilled_network():
     loss_metric = metrics.Metric(name="Mean loss", function=distilled_model.calculate_loss)
     distilled_model.add_metric(loss_metric)
 
-    distilled_dir = Path("distilled_model_cifar10")
+    distilled_dir = Path("models/distilled_model_cifar10")
     distilled_model.train(train_loader, num_epochs=100, validation_loader=valid_loader)
     torch.save(distilled_model, distilled_dir)
 
@@ -665,8 +614,6 @@ def repeat_acc_ece_exp():
 
 if __name__ == "__main__":
     #train_distilled_network()
-    #dummy_test()
-    #check_dummy_test()
     #check_trained_model()
     #repeat_acc_ece_exp()
     ensemble_predictions_corrupted_data()

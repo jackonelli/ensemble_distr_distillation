@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.optim as torch_optim
 import src.loss as custom_loss
 import src.distilled.distilled_network as distilled_network
+import numpy as np
+import os
 
 
 class DummyLogitsProbabilityDistribution(distilled_network.DistilledNet):
@@ -23,11 +25,11 @@ class DummyLogitsProbabilityDistribution(distilled_network.DistilledNet):
         self.scale_teacher_logits = scale_teacher_logits
 
         #self.features = features
-        self.par = nn.Parameter(torch.zeros((1, 27)))
+        self.par = nn.Parameter(torch.zeros((1, 18)))
 
         self.optimizer = torch_optim.SGD(self.parameters(),
-                                         lr=self.learning_rate,
-                                         momentum=0.9)
+                                          lr=self.learning_rate,
+                                          momentum=0.9)
 
         self.to(self.device)
 
@@ -45,7 +47,7 @@ class DummyLogitsProbabilityDistribution(distilled_network.DistilledNet):
         x = self.par[:, :18].repeat(x.shape[0], 1)
         mid = int(x.shape[-1] / 2)
         mean = x[:, :mid]
-        var = torch.log(1 + torch.exp(x[:, mid:])) + nn.ReLU()(self.par[:, 18:])
+        var = torch.log(1 + torch.exp(x[:, mid:])) + 0.001 #+ nn.ReLU()(self.par[:, 18:])
 
         return mean, var
 
@@ -94,10 +96,11 @@ class DummyLogitsProbabilityDistribution(distilled_network.DistilledNet):
         """Calculate loss function
         Wrapper function for the loss function.
         """
+
         return self.loss(outputs, teacher_predictions)
 
     def _learning_rate_condition(self, epoch=None):
-        if (epoch%5) == 0 and epoch <= 20:
+        if (epoch%10) == 0 and epoch <= 50:
             return True
         else:
             return False
