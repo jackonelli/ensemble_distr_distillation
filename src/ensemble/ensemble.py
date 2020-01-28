@@ -1,4 +1,4 @@
-"""Ensemble class"""
+"""Ensemble"""
 import logging
 from abc import ABC, abstractmethod
 import torch
@@ -8,14 +8,23 @@ import src.metrics as metrics
 import src.utils as utils
 
 
-# TODO: I added the option in the ensemble-members to be able to calculate metrics on new data, maybe we should have a similar ensemble-level option
+# TODO: I added the option in the ensemble-members to be able to
+# calculate metrics on new data,
+# maybe we should have a similar ensemble-level option
 class Ensemble():
+    """Ensemble base class
+    The ensemble member needs to track the size
+    of the output of the ensemble
+    This can be automatically inferred but it would look ugly
+    and this now works as a sanity check as well
+
+    Instance variables:
+        output_size (int): Represents the actual output size
+            i.e. the number of predicted parameters.
+            e.g. if we model D-dimensional target with a Gaussian
+            with mean and diagonal covariance, the output size would be 2D.
+    """
     def __init__(self, output_size):
-        """The ensemble member needs to track the size
-        of the output of the ensemble
-        This can be automatically inferred but it would look ugly
-        and this now works as a sanity check as well
-        """
         self.members = list()
         self._log = logging.getLogger(self.__class__.__name__)
         self.output_size = output_size
@@ -80,7 +89,7 @@ class Ensemble():
     def transform_logits(self, logits, transformation=None):
         """Ensemble predictions from logits
         Returns the predictions of all individual ensemble members,
-        by applying the logits 'transformation' to the logits.
+	    by applying the logits 'transformation' to the logits.
         B = batch size, K = num output params, N = ensemble size
 
         Args:
@@ -157,14 +166,31 @@ class Ensemble():
 
 
 class EnsembleMember(nn.Module, ABC):
-    """Parent class for keeping common logic in one place"""
-    def __init__(self, output_size, loss_function, device=torch.device("cpu")):
+    """Parent class for keeping common logic in one place
+    Instance variables:
+        output_size (int): Represents the actual output size
+            i.e number of dimensions D, or number of classes K
+    """
+    def __init__(self,
+                 output_size,
+                 loss_function,
+                 target_size=None,
+                 device=torch.device("cpu"),
+                 grad_norm_bound=None):
         super().__init__()
+
         self._log = logging.getLogger(self.__class__.__name__)
+
         self.output_size = output_size
+        if target_size is None:
+            self.target_size = self.output_size
+        else:
+            self.target_size = target_size
+
         self.loss = loss_function
         self.metrics = dict()
         self.optimizer = None
+        self.grad_norm_bound = grad_norm_bound
         self._log.info("Moving model to device: {}".format(device))
         self.device = device
 
@@ -179,9 +205,11 @@ class EnsembleMember(nn.Module, ABC):
               validation_loader=None,
               metrics=list(),
               reshape_targets=True):
+
         """Common train method for all ensemble member classes
         Should NOT be overridden!
         """
+        store_loss = {"Train": list(), "Validation": list()}
 
         scheduler = torch_optim.lr_scheduler.StepLR(self.optimizer,
                                                     step_size=1,
@@ -192,23 +220,34 @@ class EnsembleMember(nn.Module, ABC):
         #    self.optimizer, [clr])
 
         for epoch_number in range(1, num_epochs + 1):
-            loss = self._train_epoch(train_loader, validation_loader, reshape_targets=reshape_targets)
-            self._print_epoch(epoch_number, loss)
+            loss = self._train_epoch(train_loader, validation_loader)
+            self._print_epoch(epoch_number, loss, "Train")
+            store_loss["Train"].append(loss)
+            if validation_loader is not None:
+                loss = self._validate_epoch(validation_loader)
+                self._print_epoch(epoch_number, loss, "Validation")
+                store_loss["Validation"].append(loss)
             if self._learning_rate_condition(epoch_number):
                 scheduler.step()
+        return store_loss
+
 
     def _train_epoch(self,
                      train_loader,
                      validation_loader=None,
                      metrics=list(),
                      reshape_targets=True):
+
         """Common train epoch method for all ensemble member classes
         Should NOT be overridden!
+
+        TODO: (Breaking change) Validation loader should be removed
         """
 
         self._reset_metrics()
         running_loss = 0.0
-        for batch in train_loader:
+        batch_count = 0
+        for (batch_count, batch) in enumerate(train_loader):
             self.optimizer.zero_grad()
             inputs, targets = batch
 
@@ -216,6 +255,7 @@ class EnsembleMember(nn.Module, ABC):
 
             logits = self.forward(inputs)
             outputs = self.transform_logits(logits)
+
             # num_samples is different from batch size,
             # the loss expects a target with shape
             # (B, N, D), so that it can handle a full ensemble pred.
@@ -226,30 +266,50 @@ class EnsembleMember(nn.Module, ABC):
             if reshape_targets:  # TODO: Does this really concern  all cases?
                 targets = targets.reshape(
                     (batch_size, num_samples, self.output_size // 2))
+
             loss = self.calculate_loss(outputs, targets)
             loss.backward()
+            if self.grad_norm_bound is not None:
+                nn.utils.clip_grad_norm(self.parameters(),
+                                        self.grad_norm_bound)
             self.optimizer.step()
             running_loss += loss.item()
 
-            if validation_loader is None:
-                self._update_metrics(outputs, targets)
+            self._update_metrics(outputs, targets)
 
-        if validation_loader is not None:
-            # TODO: should we do model.eval() here or would it just waste our time?
-            with torch.no_grad():
-                for valid_batch in validation_loader:
-                    # TODO: Use calc_metrics here?
-                    valid_inputs, valid_labels = valid_batch
-                    valid_inputs, valid_targets = valid_inputs.to(self.device), valid_targets.to(self.device)
-                    valid_logits = self.forward(valid_inputs)
-                    valid_outputs = self.transform_logits(valid_logits)
-                    self._update_metrics(valid_outputs, valid_labels)
+        return running_loss / (batch_count + 1)
 
-                # Will automatically call
+    def _validate_epoch(self, validation_loader):
+        """Common validate epoch method for all ensemble member classes
+        Should NOT be overridden!
+        """
 
-        return running_loss
+        with torch.no_grad():
+            self._reset_metrics()
+            running_loss = 0.0
+            batch_count = 0
+            for valid_batch in validation_loader:
+                batch_count += 1
+
+                valid_inputs, valid_targets = valid_batch
+                valid_logits = self.forward(valid_inputs)
+                valid_outputs = self.transform_logits(valid_logits)
+
+                num_samples = 1
+                batch_size = valid_targets.size(0)
+                valid_targets = valid_targets.reshape(
+                    (batch_size, num_samples, self.target_size))
+
+                tmp_loss = self.calculate_loss(valid_outputs, valid_targets)
+                # print(valid_outputs, valid_targets)
+                # print(tmp_loss)
+                running_loss += tmp_loss
+                self._update_metrics(valid_outputs, valid_targets)
+
+            return running_loss / batch_count
 
     def calc_metrics(self, data_loader):
+        """Calculate all metrics"""
         self._reset_metrics()
 
         for batch in data_loader:
@@ -286,8 +346,9 @@ class EnsembleMember(nn.Module, ABC):
         for metric in self.metrics.values():
             metric.reset()
 
-    def _print_epoch(self, epoch_number, loss):
-        epoch_string = "Epoch {}: Loss: {}".format(epoch_number, loss)
+    def _print_epoch(self, epoch_number, loss, type_="Train"):
+        epoch_string = "{} - Epoch {}: Loss: {:.3f}".format(
+            type_, epoch_number, loss)
         for metric in self.metrics.values():
             epoch_string += " {}".format(metric)
         self._log.info(epoch_string)

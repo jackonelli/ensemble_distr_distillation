@@ -3,12 +3,12 @@ Gaussian with sinus wave mean, variance increasing in x
 
 Taken from paper: "https://arxiv.org/abs/1906.01620"
 """
+import logging
 from pathlib import Path
 import csv
 import numpy as np
 import torch.utils.data
 import matplotlib.pyplot as plt
-import logging
 
 
 class GaussianSinus(torch.utils.data.Dataset):

@@ -17,16 +17,13 @@ class Metric:
         self.counter = 0
         self.memory = []  # So that we can go back an look at the data
 
-    def __str__(self):
-        return "{}: {}".format(self.name, self.mean())
+    def __str__(self, decimal_places=3):
+        return "{}: {:.3f}".format(self.name, self.mean())
 
     def update(self, targets, outputs):
-        value = self.function(outputs, targets)
 
-        if not type(value).__module__ == np.__name__:
-            value = value.detach()  # Do this to save memory
-
-        self.running_value += value
+        with torch.no_grad():
+            self.running_value += self.function(outputs, targets)
         self.counter += 1
 
     def mean(self):
@@ -69,7 +66,8 @@ def entropy(predicted_distribution, true_labels, correct_nan=False):
         # FRÅGAN ÄR OM DET SKULLE VARA LOGISKT ATT UTESLUTA DESSA ISTÄLLET
         entr = -torch.sum(entr, dim=-1)
     else:
-        entr = -torch.sum(predicted_distribution * torch.log(predicted_distribution), dim=-1)
+        entr = -torch.sum(
+            predicted_distribution * torch.log(predicted_distribution), dim=-1)
 
     return entr
 
@@ -123,7 +121,9 @@ def uncertainty_separation_variance(predicted_distribution, true_labels):
     return total_uncertainty, epistemic_uncertainty, aleatoric_uncertainty
 
 
-def uncertainty_separation_entropy(predicted_distribution, true_labels, logits=False):
+def uncertainty_separation_entropy(predicted_distribution,
+                                   true_labels,
+                                   logits=False):
     """Total, epistemic and aleatoric uncertainty based on entropy of categorical distribution
 
     B = batch size, C = num classes, N = num predictions
@@ -148,7 +148,9 @@ def uncertainty_separation_entropy(predicted_distribution, true_labels, logits=F
         torch.tensor(predicted_distribution.size(-1)).float())
 
     if logits:
-        log_sum_exp_logits = torch.logsumexp(predicted_distribution, dim=-1, keepdim=True)
+        log_sum_exp_logits = torch.logsumexp(predicted_distribution,
+                                             dim=-1,
+                                             keepdim=True)
         p = torch.exp(predicted_distribution) / torch.exp(log_sum_exp_logits)
         mean_predicted_distribution = torch.mean(p, dim=1)
 
@@ -156,9 +158,11 @@ def uncertainty_separation_entropy(predicted_distribution, true_labels, logits=F
             (predicted_distribution.size(1) * max_entropy)
     else:
         mean_predicted_distribution = torch.mean(predicted_distribution, dim=1)
-        aleatoric_uncertainty = torch.mean(entropy(predicted_distribution, None), dim=1) / max_entropy
+        aleatoric_uncertainty = torch.mean(
+            entropy(predicted_distribution, None), dim=1) / max_entropy
 
-    total_uncertainty = entropy(mean_predicted_distribution, None) / max_entropy
+    total_uncertainty = entropy(mean_predicted_distribution,
+                                None) / max_entropy
     epistemic_uncertainty = total_uncertainty - aleatoric_uncertainty
 
     return total_uncertainty, epistemic_uncertainty, aleatoric_uncertainty
@@ -259,7 +263,10 @@ def accuracy_soft_labels(predicted_distribution, target_distribution):
             ).sum().item() / number_of_elements
 
 
-def accuracy_logits(logits_distr_par, targets, label_targets=False, num_samples=50):
+def accuracy_logits(logits_distr_par,
+                    targets,
+                    label_targets=False,
+                    num_samples=50):
     """ Accuracy given that the inputs are parameters of the normal distribution over logits.
 
     B = batch size
@@ -278,25 +285,24 @@ def accuracy_logits(logits_distr_par, targets, label_targets=False, num_samples=
     mean = logits_distr_par[0]
     var = logits_distr_par[1]
 
-    samples = torch.zeros(
-        [mean.size(0), num_samples, mean.size(-1)])
+    samples = torch.zeros([mean.size(0), num_samples, mean.size(-1)])
     for i in range(mean.size(0)):
         rv = torch.distributions.multivariate_normal.MultivariateNormal(
             loc=mean[i, :], covariance_matrix=torch.diag(var[i, :]))
         samples[i, :, :] = rv.rsample([num_samples])
 
-    predicted_distribution = torch.mean((torch.nn.Softmax(dim=-1))(torch.cat((samples, torch.zeros(mean.size(0),
-                                                                                                   num_samples, 1)),
-                                                                             dim=-1)), dim=1)
+    predicted_distribution = torch.mean((torch.nn.Softmax(dim=-1))(torch.cat(
+        (samples, torch.zeros(mean.size(0), num_samples, 1)), dim=-1)),
+                                        dim=1)
     predicted_labels, _ = utils.tensor_argmax(predicted_distribution)
 
     if label_targets:
         target_labels = targets
 
     else:
-        target_distribution = torch.mean((torch.nn.Softmax(dim=-1))(torch.cat((targets,
-                                                                    torch.zeros(mean.size(0),
-                                                                                targets.size(1), 1)),  dim=-1)), dim=1)
+        target_distribution = torch.mean((torch.nn.Softmax(dim=-1))(torch.cat(
+            (targets, torch.zeros(mean.size(0), targets.size(1), 1)), dim=-1)),
+                                         dim=1)
 
         target_labels, _ = utils.tensor_argmax(target_distribution)
 
@@ -327,6 +333,25 @@ def error(predicted_distribution, true_labels):
     return (true_labels != predicted_labels).sum().item() / number_of_elements
 
 
+def root_mean_squared_error(predictions, targets):
+    """ Root mean squared error
+    Calls square root on `mean_squared_error` below
+    B = Batch size
+    N = Sample size
+    D = Output dimension
+
+    Args:
+        targets: torch.tensor(B, N, D)
+        predictions: (torch.tensor(B, D)),
+            regression estimate
+
+    Returns:
+        Error: float
+    """
+
+    return torch.sqrt(mean_squared_error(predictions, targets))
+
+
 def mean_squared_error(predictions, targets):
     """ Mean squared error
     Replaces squared_error below
@@ -343,12 +368,12 @@ def mean_squared_error(predictions, targets):
         Error: float
     """
 
-    B, N, D = targets.size()
-    total_loss = 0.0
+    B, N, _ = targets.size()
+    sum_squared_errors = 0.0
     for n in np.arange(N):
         target = targets[:, n, :]
-        total_loss += ((target - predictions)**2).sum()
-    return total_loss / (B * N)
+        sum_squared_errors += ((target - predictions)**2).sum()
+    return sum_squared_errors / (B * N)
 
 
 def squared_error(predictions, targets):

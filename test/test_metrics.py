@@ -4,6 +4,8 @@ import torch_testing as tt
 from src import utils
 from src import metrics
 
+NUM_DECIMALS = 5
+
 
 class TestMetrics(unittest.TestCase):
     def test_entropy(self):
@@ -50,7 +52,8 @@ class TestMetrics(unittest.TestCase):
     def test_accuracy_soft_labels(self):
         predicted_distribution = torch.tensor([[0.3, 0.6]])
         target_distribution = torch.tensor([[0.2, 0.7]])
-        acc = metrics.accuracy_soft_labels(predicted_distribution, target_distribution)
+        acc = metrics.accuracy_soft_labels(predicted_distribution,
+                                           target_distribution)
         self.assertAlmostEqual(acc, 1)
 
     def test_accuracy_batch(self):
@@ -65,6 +68,22 @@ class TestMetrics(unittest.TestCase):
         predictions = torch.tensor([[0.9, 2.1, 1.7, 0.0, 0.0, 0.0]])
         squared_error = metrics.squared_error(predictions, targets)
         self.assertAlmostEqual(squared_error, 0.02)
+
+    def test_mean_squared_error(self):
+        B, N, D = 1, 3, 1
+        targets = torch.tensor([0.9, 1, 1.1]).reshape((B, N, D))
+        regression_estimate = torch.tensor([1]).reshape((B, D))
+        mse = metrics.mean_squared_error(regression_estimate, targets)
+        self.assertAlmostEqual(mse.item(), 0.02 / 3)
+
+    def test_root_mean_squared_error(self):
+        B, N, D = 2, 1, 1
+        targets = torch.tensor([6, 6]).reshape((B, N, D))
+        regression_estimate = torch.tensor([3.0402, 2.6091]).reshape((B, D))
+        rmse = metrics.root_mean_squared_error(regression_estimate, targets)
+        self.assertAlmostEqual(rmse.item(),
+                               3.1826576041101244,
+                               places=NUM_DECIMALS)
 
     def test_uncertainty_separation_entropy(self):
         predictions = torch.tensor([[[0.8, 0.2], [0.6, 0.4]]])

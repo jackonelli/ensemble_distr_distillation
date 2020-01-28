@@ -19,7 +19,7 @@ class MeanRegressor(ensemble.EnsembleMember):
                  learning_rate=0.001):
 
         super().__init__(output_size=layer_sizes[-1],
-                         loss_function=nn.MSELoss(),
+                         loss_function=custom_loss.mse,
                          device=device)
 
         self.learning_rate = learning_rate
@@ -28,13 +28,11 @@ class MeanRegressor(ensemble.EnsembleMember):
         for i in range(len(layer_sizes) - 1):
             self.layers.append(nn.Linear(layer_sizes[i], layer_sizes[i + 1]))
 
-        self.optimizer = torch_optim.SGD(self.parameters(),
-                                         lr=self.learning_rate,
-                                         momentum=0.9)
+        self.optimizer = torch_optim.Adam(self.parameters(),
+                                          lr=self.learning_rate)
         self.to(self.device)
 
     def forward(self, x):
-
         for layer in self.layers[:-1]:
             x = nn.functional.relu(layer(x))
 
@@ -47,7 +45,6 @@ class MeanRegressor(ensemble.EnsembleMember):
         return logits
 
     def calculate_loss(self, outputs, targets):
-        self._log.warning("Using sub-networks loss function")
         return self.loss(outputs, targets)
 
     def predict(self, x):
