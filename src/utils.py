@@ -182,29 +182,38 @@ def cyclical_lr(stepsize, min_lr=3e-4, max_lr=3e-3):
     return lr_lambda
 
 
-def variance_linear_asymptote(input_, epsilon=1e-6):
+def variance_linear_asymptote(epsilon=0.0):
     """Variance transform
     Element-wise map of input_ input to positive real axis
 
     Asymptotically linear in input for large inputs
+
+    Args:
+        epsilon (float): Small positive offset for numerical stability
     """
-    return torch.log(1 + torch.exp(input_)) + epsilon
+    return lambda input_: torch.log(1 + torch.exp(input_)) + epsilon
 
 
-def variance_exponential(input_):
+def variance_exponential(epsilon=0.0):
     """Variance transform
     Element-wise map of input_ input to positive real axis
+
+    Args:
+        epsilon (float): Small positive offset for numerical stability
     """
-    return torch.exp(input_)
+    return lambda input_: torch.exp(input_) + epsilon
 
 
-def variance_moberg(input_, epsilon=1e-6):
+def variance_moberg(epsilon=0.0):
     """Variance transform
     Element-wise map of input_ input to positive real axis
     As used in John Moberg's thesis
+
+    Args:
+        epsilon (float): Small positive offset for numerical stability
     """
 
-    return torch.log(1 + torch.exp(input_) + epsilon) + epsilon
+    return lambda input_: torch.log(1 + torch.exp(input_) + epsilon) + epsilon
 
 
 def gradient_analysis(model):
