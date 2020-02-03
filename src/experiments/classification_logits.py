@@ -17,8 +17,6 @@ import matplotlib.pyplot as plt
 import torch
 from scipy.stats import multivariate_normal as scipy_mvn
 from scipy.stats import norm as scipy_norm
-import scipy.interpolate
-from src.experiments.shifted_cmap import shifted_color_map
 import matplotlib
 from src.distilled import logits_matching
 from src.distilled import dummy_logits_probability_distribution
@@ -53,7 +51,6 @@ def get_accuracy_test(distilled_model):
     LOGGER.info("Ensemble model accuracy on {} data {}".format(label, teacher_acc))
 
     student_distribution = torch.mean(distilled_model.predict(test_inputs), dim=1)
-    student_distribution = torch.cat((student_distribution, 1 - student_distribution), dim=1)
     student_acc = metrics.accuracy(student_distribution, test_labels)
     LOGGER.info("Distilled model accuracy on {} data {}".format(label, student_acc))
 
@@ -124,7 +121,7 @@ def uncertainty_plots(distilled_model):
     var_max = np.maximum(ens_var.max(), dist_var.max())
 
     orig_cmap = matplotlib.cm.viridis
-    shifted_cmap = shifted_color_map(orig_cmap, midpoint=0.05, name='shifted')
+    shifted_cmap = utils.shifted_color_map(orig_cmap, midpoint=0.05, name='shifted')
     ens_var = ax[1, 0].imshow(ens_var.reshape(num_points, num_points), cmap=shifted_cmap, vmin=var_min, vmax=var_max,
                            extent=[inputs[:, 0].min(), inputs[:, 0].max(), inputs[:, 1].min(), inputs[:, 1].max()])
     ax[1, 0].set_title('Ensemble model logits variance')

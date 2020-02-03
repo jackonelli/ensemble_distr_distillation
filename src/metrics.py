@@ -21,6 +21,7 @@ class Metric:
         return "{}: {:.3f}".format(self.name, self.mean())
 
     def update(self, targets, outputs):
+
         with torch.no_grad():
             self.running_value += self.function(outputs, targets)
         self.counter += 1
@@ -167,47 +168,6 @@ def uncertainty_separation_entropy(predicted_distribution,
     return total_uncertainty, epistemic_uncertainty, aleatoric_uncertainty
 
 
-# DENNA KAN VI TA BORT?
-def nll(predicted_distribution, true_labels):
-    """Negative log likelihood
-
-    B = batch size, C = num classes
-    Labels as one hot vectors
-    Note: if a batch with B samples is given,
-    then the output is a tensor with B values
-
-    Args:
-        true_labels: torch.tensor((B, C))
-        predicted_distribution: torch.tensor((B, C))
-
-    Returns:
-        nll(s): torch.tensor(B,)
-    """
-
-    true_labels_float = true_labels.float()
-    return -torch.sum(true_labels_float * torch.log(predicted_distribution),
-                      dim=-1)
-
-
-# DENNA KAN VI TA BORT?
-def brier_score(predicted_distribution, true_labels):
-    """Brier score
-
-    B = batch size, C = num classes
-    Labels as one hot vectors
-    Note: if a batch with B samples is given,
-    then the output is a tensor with B values
-
-    Args:
-        true_labels: torch.tensor((B, C))
-        predicted_distribution: torch.tensor((B, C))
-
-    Returns:
-        Brier score(s): torch.tensor(B,)
-    """
-    true_labels_float = true_labels.float()
-
-
 def accuracy(predicted_distribution, true_labels):
     """ Accuracy
     B = batch size
@@ -225,41 +185,7 @@ def accuracy(predicted_distribution, true_labels):
 
     if number_of_elements == 0:
         number_of_elements = 1
-    return (true_labels == predicted_labels.int()
-            ).sum().item() / number_of_elements
-
-
-# DENNA BEHÖVER VI EVENTUELLT INTE LÄNGRE; BEHÖVDE DEN INNAN FÖR ATT KOLLA PÅ ACC UNDER TRÄNING FÖR TESTFALL
-def accuracy_soft_labels(predicted_distribution, target_distribution):
-    """ Accuracy
-    B = batch size
-    K = number of classes
-
-    Args:
-        target_distribution: torch.tensor(B, K-1)
-        predicted_distribution: torch.tensor(B, K-1)
-
-    Returns:
-        Accuracy: float
-    """
-
-    predicted_distribution = torch.cat(
-        (predicted_distribution,
-         1 - torch.sum(predicted_distribution, dim=1, keepdim=True)),
-        dim=1)
-    target_distribution = torch.cat(
-        (target_distribution,
-         1 - torch.sum(target_distribution, dim=1, keepdim=True)),
-        dim=1)
-
-    predicted_labels, _ = utils.tensor_argmax(predicted_distribution)
-    target_labels, _ = utils.tensor_argmax(target_distribution)
-    number_of_elements = np.prod(target_labels.size(0))
-
-    if number_of_elements == 0:
-        number_of_elements = 1
-    return (target_labels.int() == predicted_labels.int()
-            ).sum().item() / number_of_elements
+    return (true_labels == predicted_labels).sum().item() / number_of_elements
 
 
 def accuracy_logits(logits_distr_par,
@@ -290,8 +216,11 @@ def accuracy_logits(logits_distr_par,
             loc=mean[i, :], covariance_matrix=torch.diag(var[i, :]))
         samples[i, :, :] = rv.rsample([num_samples])
 
+    # samples = samples.to.(torch.device("cuda")) if using gpu
+    last_dim = torch.zeros(mean.size(0), num_samples,
+                           1)  # to.(torch.device("cuda")) if using gpu
     predicted_distribution = torch.mean((torch.nn.Softmax(dim=-1))(torch.cat(
-        (samples, torch.zeros(mean.size(0), num_samples, 1)), dim=-1)),
+        (samples, last_dim), dim=-1)),
                                         dim=1)
     predicted_labels, _ = utils.tensor_argmax(predicted_distribution)
 
@@ -299,8 +228,10 @@ def accuracy_logits(logits_distr_par,
         target_labels = targets
 
     else:
+        torch.zeros(mean.size(0), targets.size(1),
+                    1)  # to.(torch.device("cuda")) if using gpu
         target_distribution = torch.mean((torch.nn.Softmax(dim=-1))(torch.cat(
-            (targets, torch.zeros(mean.size(0), targets.size(1), 1)), dim=-1)),
+            (targets, last_dim), dim=-1)),
                                          dim=1)
 
         target_labels, _ = utils.tensor_argmax(target_distribution)

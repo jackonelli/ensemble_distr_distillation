@@ -24,9 +24,9 @@ from absl import logging
 import attr
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-import src.experiments.uq_benchmark_2019.experiment_utils as experiment_utils
-import src.experiments.uq_benchmark_2019.uq_utils as uq_utils
-import src.experiments.uq_benchmark_2019.resnet as resnet
+import src.experiments.cifar10.uq_benchmark_2019.experiment_utils as experiment_utils
+import src.experiments.cifar10.uq_benchmark_2019.uq_utils as uq_utils
+import src.experiments.cifar10.uq_benchmark_2019.resnet as resnet
 
 keras = tf.keras
 tfd = tfp.distributions
@@ -61,6 +61,7 @@ class ModelOptions(object):
 
 def load_model(model_dir):
   model_opts = experiment_utils.load_config(model_dir + '/model_options.json')
+  model_opts['num_resnet_filters'] = 16  # OBS HAR LAGT TILL DETTA
   model_opts = ModelOptions(**model_opts)
   logging.info('Loaded model options: %s', model_opts)
 

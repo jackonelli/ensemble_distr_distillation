@@ -5,7 +5,7 @@ import src.loss as custom_loss
 import src.distilled.distilled_network as distilled_network
 from src import utils
 
-
+# TODO: Remove?
 class SoftmaxMatching(distilled_network.DistilledNet):
     """We match only the mean of the logits"""
     def __init__(self,
