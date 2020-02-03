@@ -6,21 +6,20 @@ import src.loss as custom_loss
 import src.utils as utils
 
 
-class SimpleRegressor(ensemble.EnsembleMember):
-    """SimpleRegressor
+class Model(ensemble.EnsembleMember):
+    """Simple regressor model
     Network that predicts the parameters of a normal distribution
     """
     def __init__(self,
                  layer_sizes,
+                 loss_function,
                  device=torch.device("cpu"),
-                 learning_rate=0.001,
                  variance_transform=utils.variance_linear_asymptote):
 
         super().__init__(output_size=layer_sizes[-1] // 2,
-                         loss_function=custom_loss.gaussian_neg_log_likelihood,
+                         loss_function=loss_function,
                          device=device)
 
-        self.learning_rate = learning_rate
         self.mean_only = False
         self.variance_transform = variance_transform
         self._log.info("Using variance transform: {}".format(
@@ -30,8 +29,7 @@ class SimpleRegressor(ensemble.EnsembleMember):
         for i in range(len(layer_sizes) - 1):
             self.layers.append(nn.Linear(layer_sizes[i], layer_sizes[i + 1]))
 
-        self.optimizer = torch_optim.Adam(self.parameters(),
-                                          lr=self.learning_rate)
+        self.optimizer = None
         self.to(self.device)
 
     def forward(self, x):
@@ -40,8 +38,6 @@ class SimpleRegressor(ensemble.EnsembleMember):
             x = nn.functional.relu(layer(x))
 
         x = self.layers[-1](x)
-        # Add normalise here?
-
         return x
 
     def transform_logits(self, logits):
@@ -55,7 +51,7 @@ class SimpleRegressor(ensemble.EnsembleMember):
         """
 
         outputs = logits
-        outputs[:, 1] = self.variance_transform(outputs[:, 1])
+        outputs[:, 1:] = self.variance_transform(outputs[:, 1:])
 
         return outputs
 

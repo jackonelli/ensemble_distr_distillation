@@ -233,7 +233,8 @@ class EnsembleMember(nn.Module, ABC):
             self.optimizer.zero_grad()
             inputs, targets = batch
 
-            inputs, targets = inputs.to(self.device), targets.to(self.device)
+            inputs, targets = inputs.float().to(
+                self.device), targets.float().to(self.device)
 
             logits = self.forward(inputs)
             outputs = self.transform_logits(logits)
@@ -272,6 +273,8 @@ class EnsembleMember(nn.Module, ABC):
                 batch_count += 1
 
                 valid_inputs, valid_targets = valid_batch
+                valid_inputs, valid_targets = valid_inputs.float(),\
+                    valid_targets.float()
                 valid_logits = self.forward(valid_inputs)
                 valid_outputs = self.transform_logits(valid_logits)
 
