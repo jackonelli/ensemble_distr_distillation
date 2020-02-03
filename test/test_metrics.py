@@ -19,42 +19,19 @@ class TestMetrics(unittest.TestCase):
         tt.assert_almost_equal(entropy,
                                torch.tensor([0.61086430205, 0.61086430205]))
 
-    def test_nll(self):
-        true_label = torch.tensor(1)
-        num_classes = 2
-        true_one_hot = utils.to_one_hot(true_label, num_classes)
-        predictions = torch.tensor([0.5, 0.5])
-        nll = metrics.nll(predictions, true_one_hot)
-        self.assertAlmostEqual(nll.item(), 0.69314718)
-
-    def test_nll_batch(self):
-        true_label = torch.tensor([1, 1])
-        num_classes = 2
-        true_one_hot = utils.to_one_hot(true_label, num_classes)
-        predictions = torch.tensor([[0.5, 0.5], [0.5, 0.5]])
-        nll = metrics.nll(predictions, true_one_hot)
-        tt.assert_almost_equal(nll, 0.69314718 * torch.ones((2)))
-
     def test_accuracy(self):
         true_label = torch.tensor(0).int()
         predictions = torch.tensor([0.9, 0.1])
         acc = metrics.accuracy(predictions, true_label)
         self.assertAlmostEqual(acc, 1)
 
-    def test_accuracy_logits(self):
-        mean = torch.tensor([[1, 10]]).float()
-        var = torch.tensor([[1, 1]]).float()
-        distr_par = (mean, var)
-        target_logits = torch.tensor([[[2, 5]]]).float()
-        acc = metrics.accuracy_logits(distr_par, target_logits)
-        self.assertAlmostEqual(acc, 1)
-
-    def test_accuracy_soft_labels(self):
-        predicted_distribution = torch.tensor([[0.3, 0.6]])
-        target_distribution = torch.tensor([[0.2, 0.7]])
-        acc = metrics.accuracy_soft_labels(predicted_distribution,
-                                           target_distribution)
-        self.assertAlmostEqual(acc, 1)
+    #def test_accuracy_logits(self):
+    #    mean = torch.tensor([[1, 10]]).float()
+    #    var = torch.tensor([[1, 1]]).float()
+    #    distr_par = (mean, var)
+    #    target_logits = torch.tensor([[[2, 5]]]).float()
+    #    acc = metrics.accuracy_logits(distr_par, target_logits)
+    #    self.assertAlmostEqual(acc, 1)
 
     def test_accuracy_batch(self):
         true_label = torch.tensor([1, 0, 2, 0]).int()

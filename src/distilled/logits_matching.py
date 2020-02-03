@@ -4,7 +4,7 @@ import torch.optim as torch_optim
 import src.loss as custom_loss
 import src.distilled.distilled_network as distilled_network
 
-
+# TODO: Remove?
 class LogitsMatching(distilled_network.DistilledNet):
     """We match only the mean of the logits"""
     def __init__(self,

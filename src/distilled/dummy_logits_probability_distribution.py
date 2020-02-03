@@ -3,15 +3,17 @@ import torch.nn as nn
 import torch.optim as torch_optim
 import src.loss as custom_loss
 import src.distilled.distilled_network as distilled_network
+import numpy as np
+import os
 
 
 class DummyLogitsProbabilityDistribution(distilled_network.DistilledNet):
     """We do "dummy" distillation and make the output independent of the input"""
     def __init__(self,
-                 layer_sizes,
                  teacher,
                  device=torch.device('cpu'),
                  use_hard_labels=False,
+                 scale_teacher_logits=False,
                  learning_rate=0.001):
         super().__init__(
             teacher=teacher,
@@ -20,16 +22,14 @@ class DummyLogitsProbabilityDistribution(distilled_network.DistilledNet):
 
         self.use_hard_labels = use_hard_labels
         self.learning_rate = learning_rate
+        self.scale_teacher_logits = scale_teacher_logits
 
-        self.fc1 = nn.Linear(self.input_size, self.hidden_size_1)
-        self.fc2 = nn.Linear(self.hidden_size_1, self.hidden_size_2)
-        self.fc3 = nn.Linear(self.hidden_size_2, self.output_size)
-
-        self.layers = [self.fc1, self.fc2, self.fc3]
+        #self.features = features
+        self.par = nn.Parameter(torch.zeros((1, 18)))
 
         self.optimizer = torch_optim.SGD(self.parameters(),
-                                         lr=self.learning_rate,
-                                         momentum=0.9)
+                                          lr=self.learning_rate,
+                                          momentum=0.9)
 
         self.to(self.device)
 
@@ -37,16 +37,17 @@ class DummyLogitsProbabilityDistribution(distilled_network.DistilledNet):
         """Estimate parameters of distribution
         """
 
+        if isinstance(x, list) or isinstance(x, tuple):
+            x = x[0]
+
         # We make the output independent of the input
-        x = torch.ones(x.size())
-        for layer in self.layers[:-1]:
-            x = nn.functional.relu(layer(x))
+        #y = self.features(torch.ones((1, 1)))
+        #x = y.repeat(x[0].shape[0], 1)
 
-        x = self.layers[-1](x)
-
+        x = self.par[:, :18].repeat(x.shape[0], 1)
         mid = int(x.shape[-1] / 2)
         mean = x[:, :mid]
-        var = torch.exp(x[:, mid:])
+        var = torch.log(1 + torch.exp(x[:, mid:])) + 0.001 #+ nn.ReLU()(self.par[:, 18:])
 
         return mean, var
 
@@ -62,32 +63,45 @@ class DummyLogitsProbabilityDistribution(distilled_network.DistilledNet):
 
         logits = self.teacher.get_logits(inputs)
 
-        scaled_logits = logits - torch.stack([logits[:, :, -1]], axis=-1)
+        if self.scale_teacher_logits:
+            scaled_logits = logits - torch.stack([logits[:, :, -1]], axis=-1)
+            logits = scaled_logits[:, :, 0:-1]
 
-        return scaled_logits[:, :, 0:-1]
+        return logits
 
     def predict(self, input_, num_samples=None):
         """Predict parameters
         Wrapper function for the forward function.
         """
 
+        if isinstance(input_, list) or isinstance(input_, tuple):
+            input_ = input_[0]
+
         if num_samples is None:
             num_samples = len(self.teacher.members)
 
         mean, var = self.forward(input_)
 
-        samples = torch.zeros([input_.size(0), num_samples, int(self.output_size / 2)])
+        samples = torch.zeros([input_.size(0), num_samples, int(mean.size(-1))])
         for i in range(input_.size(0)):
             rv = torch.distributions.multivariate_normal.MultivariateNormal(loc=mean[i, :],
                                                                             covariance_matrix=torch.diag(var[i, :]))
             samples[i, :, :] = rv.rsample([num_samples])
 
-        softmax_samples = torch.exp(samples) / (torch.sum(torch.exp(samples), dim=-1, keepdim=True) + 1)
+        if self.scale_teacher_logits:
+            samples = torch.cat((samples, torch.zeros(samples.size(0), num_samples, 1)))
 
-        return softmax_samples
+        return nn.Softmax(dim=-1)(samples)
 
     def calculate_loss(self, outputs, teacher_predictions, labels=None):
         """Calculate loss function
         Wrapper function for the loss function.
         """
+
         return self.loss(outputs, teacher_predictions)
+
+    def _learning_rate_condition(self, epoch=None):
+        if (epoch%10) == 0 and epoch <= 50:
+            return True
+        else:
+            return False

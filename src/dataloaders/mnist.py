@@ -18,17 +18,14 @@ class MnistData():
                                              num_workers=1)
     """
 
-    def __init__(self, root="./data", train=True, data_set='train'):
+    def __init__(self, train=True, data_set="train", root="./data"):
         self._log = logging.getLogger(self.__class__.__name__)
 
         self.transform = torchvision.transforms.Compose([
-            torchvision.transforms.ToTensor(),
-            utils.ScaleTransform(255),
-            #torchvision.transforms.Normalize((0.1307,), (0.3081,)),
-            utils.ReshapeTransform((-1,))
+            torchvision.transforms.ToTensor()
         ])
 
-        self.set = torchvision.datasets.MNIST('./data',
+        self.set = torchvision.datasets.MNIST(root=root,
                                               train=train,
                                               download=True,
                                               transform=self.transform)
@@ -50,8 +47,8 @@ class MnistData():
         return self.n_samples
 
     def __getitem__(self, index):
-        x = self.data[index]
-        x = self.transform(np.array(x, dtype=np.float32))
+        x = self.transform(np.array(self.data[index], dtype=np.float32))
+        x = x.reshape(-1) / 255
         y = np.array(self.targets[index], dtype=np.long)
 
         return x, y

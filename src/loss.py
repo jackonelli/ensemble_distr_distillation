@@ -76,6 +76,9 @@ def gaussian_neg_log_likelihood(parameters, target):
     mean = parameters[0]
     var = parameters[1]
 
+    #if target.dim() == 2:
+    #    target = torch.unsqueeze(target, dim=1)
+
     loss = 0
     for batch_index, (mean_b, cov_b) in enumerate(zip(mean, var)):
         cov_mat_b = torch.diag(cov_b)

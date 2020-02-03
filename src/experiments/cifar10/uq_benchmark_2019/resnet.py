@@ -30,7 +30,7 @@ from absl import logging
 from six.moves import range
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-import src.experiments.uq_benchmark_2019.uq_utils as uq_utils
+import src.experiments.cifar10.uq_benchmark_2019.uq_utils as uq_utils
 keras = tf.keras
 tfd = tfp.distributions
 

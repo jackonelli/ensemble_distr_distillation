@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 import torch.optim as torch_optim
 import src.metrics as metrics
+import src.utils as utils
 
 
 # TODO: I added the option in the ensemble-members to be able to
@@ -198,15 +199,26 @@ class EnsembleMember(nn.Module, ABC):
 
             raise ValueError("Must assign proper loss function to child.loss.")
 
-    def train(self, train_loader, num_epochs, validation_loader=None):
+    def train(self,
+              train_loader,
+              num_epochs,
+              validation_loader=None,
+              metrics=list(),
+              reshape_targets=True):
+
         """Common train method for all ensemble member classes
         Should NOT be overridden!
         """
         store_loss = {"Train": list(), "Validation": list()}
 
         scheduler = torch_optim.lr_scheduler.StepLR(self.optimizer,
-                                                    step_size=10,
+                                                    step_size=1,
                                                     gamma=0.1)
+
+        #clr = utils.adapted_lr(c=0.7)
+        #scheduler = torch.optim.lr_scheduler.LambdaLR(
+        #    self.optimizer, [clr])
+
         for epoch_number in range(1, num_epochs + 1):
             loss = self._train_epoch(train_loader, validation_loader)
             self._print_epoch(epoch_number, loss, "Train")
@@ -219,7 +231,13 @@ class EnsembleMember(nn.Module, ABC):
                 scheduler.step()
         return store_loss
 
-    def _train_epoch(self, train_loader, validation_loader=None):
+
+    def _train_epoch(self,
+                     train_loader,
+                     validation_loader=None,
+                     metrics=list(),
+                     reshape_targets=True):
+
         """Common train epoch method for all ensemble member classes
         Should NOT be overridden!
 
@@ -245,8 +263,10 @@ class EnsembleMember(nn.Module, ABC):
             # Here, we use a single sample N = 1.
             num_samples = 1
             batch_size = targets.size(0)
-            targets = targets.reshape(
-                (batch_size, num_samples, self.target_size))
+
+            if reshape_targets:  # TODO: Does this really concern  all cases?
+                targets = targets.reshape(
+                    (batch_size, num_samples, self.output_size // 2))
 
             loss = self.calculate_loss(outputs, targets)
             loss.backward()
