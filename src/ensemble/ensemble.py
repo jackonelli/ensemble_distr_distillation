@@ -243,7 +243,6 @@ class EnsembleMember(nn.Module, ABC):
 
         self._reset_metrics()
         running_loss = 0.0
-        batch_count = 0
         for (batch_count, batch) in enumerate(train_loader):
             self.optimizer.zero_grad()
             inputs, targets = batch
