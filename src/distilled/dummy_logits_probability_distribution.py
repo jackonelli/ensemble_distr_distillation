@@ -88,9 +88,10 @@ class DummyLogitsProbabilityDistribution(distilled_network.DistilledNet):
                                                                             covariance_matrix=torch.diag(var[i, :]))
             samples[i, :, :] = rv.rsample([num_samples])
 
-        softmax_samples = torch.exp(samples) / (torch.sum(torch.exp(samples), dim=-1, keepdim=True) + 1)
+        if self.scale_teacher_logits:
+            samples = torch.cat((samples, torch.zeros(samples.size(0), num_samples, 1)))
 
-        return softmax_samples
+        return nn.Softmax(dim=-1)(samples)
 
     def calculate_loss(self, outputs, teacher_predictions, labels=None):
         """Calculate loss function

@@ -24,9 +24,9 @@ from absl import logging
 import attr
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-import src.experiments.uq_benchmark_2019.experiment_utils as experiment_utils
-import src.experiments.uq_benchmark_2019.uq_utils as uq_utils
-import src.experiments.uq_benchmark_2019.resnet as resnet
+import src.experiments.cifar10.uq_benchmark_2019.experiment_utils as experiment_utils
+import src.experiments.cifar10.uq_benchmark_2019.uq_utils as uq_utils
+import src.experiments.cifar10.uq_benchmark_2019.resnet as resnet
 
 keras = tf.keras
 tfd = tfp.distributions

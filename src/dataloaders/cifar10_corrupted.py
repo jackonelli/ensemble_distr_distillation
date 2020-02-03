@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 
-class Cifar10Data:
+class Cifar10DataCorrupted:
     """CIFAR data with corruptions, wrapper
     """
 
@@ -71,29 +71,21 @@ class CustomSet:
 def main():
     """Entry point for debug visualisation"""
     # get some random training images
-    data = Cifar10Data(corruption="brightness")
+    data = Cifar10DataCorrupted(corruption="brightness")
     loader = torch.utils.data.DataLoader(data.set,
                                          batch_size=4,
                                          shuffle=False,
                                          num_workers=0)
     dataiter = iter(loader)
-    inputs, labels = dataiter.next()
-
-    img = inputs[0]
+    img, labels = dataiter.next()
 
     # show images
-    imshow(torchvision.utils.make_grid(img))
+    plt.imshow(np.transpose(torchvision.utils.make_grid(img).numpy(), (1, 2, 0)))
+    plt.show()
+
     # print labels
     print(" ".join("%5s" % data.classes[labels[j]] for j in range(4)))
 
-
-def imshow(img):
-    """Imshow helper
-    TODO: Move to utils
-    """
-    npimg = img.numpy()
-    plt.imshow(np.transpose(npimg, (1, 2, 0)))
-    plt.show()
 
 
 if __name__ == "__main__":

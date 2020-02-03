@@ -7,66 +7,14 @@ Reference:
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from src.ensemble import ensemble
 import torch.optim as torch_optim
-
-
-class BasicBlock(nn.Module):
-    expansion = 1
-
-    def __init__(self, in_planes, planes, stride=1):
-        super(BasicBlock, self).__init__()
-        self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(planes)
-        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=1, padding=1, bias=False)
-        self.bn2 = nn.BatchNorm2d(planes)
-
-        self.shortcut = nn.Sequential()
-        if stride != 1 or in_planes != self.expansion*planes:
-            self.shortcut = nn.Sequential(
-                nn.Conv2d(in_planes, self.expansion*planes, kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(self.expansion*planes)
-            )
-
-    def forward(self, x):
-        out = F.relu(self.bn1(self.conv1(x)))
-        out = self.bn2(self.conv2(out))
-        out += self.shortcut(x)
-        out = F.relu(out)
-        return out
-
-
-class Bottleneck(nn.Module):
-    expansion = 4
-
-    def __init__(self, in_planes, planes, stride=1):
-        super(Bottleneck, self).__init__()
-        self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(planes)
-        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
-        self.bn2 = nn.BatchNorm2d(planes)
-        self.conv3 = nn.Conv2d(planes, self.expansion*planes, kernel_size=1, bias=False)
-        self.bn3 = nn.BatchNorm2d(self.expansion*planes)
-
-        self.shortcut = nn.Sequential()
-        if stride != 1 or in_planes != self.expansion*planes:
-            self.shortcut = nn.Sequential(
-                nn.Conv2d(in_planes, self.expansion*planes, kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(self.expansion*planes)
-            )
-
-    def forward(self, x):
-        out = F.relu(self.bn1(self.conv1(x)))
-        out = F.relu(self.bn2(self.conv2(out)))
-        out = self.bn3(self.conv3(out))
-        out += self.shortcut(x)
-        out = F.relu(out)
-        return out
+from src.ensemble import ensemble
+from src import resnet_utils
 
 
 class ResNet(ensemble.EnsembleMember):  # Change of inheritance
     def __init__(self, block, num_blocks, learning_rate=0.001, num_classes=10):
-        super().__init__(output_size=10, loss_function=nn.NLLLoss(), device=torch.device("cpu"))
+        super().__init__(output_size=10, loss_function=nn.CrossEntropyLoss(), device=torch.device("cpu"))
         self.learning_rate = learning_rate
 
         self.in_planes = 64
@@ -103,23 +51,23 @@ class ResNet(ensemble.EnsembleMember):  # Change of inheritance
 
     # Added functions
     def transform_logits(self, logits):
-        """Should this be log softmax?"""  # Men vi har lagt det i calculate_loss istället
-        return (nn.Softmax(dim=-1))(logits)
+        return logits
 
     def calculate_loss(self, outputs, labels):
-        log_outputs = torch.log(outputs)
-        # Removing this since it gives nan loss
-
-        return self.loss(log_outputs, labels)
+        return self.loss(outputs, labels)
 
     def predict(self, x, t=1):
         x = self.forward(x)
-        x = self.transform_logits(x)
+        x = (nn.Softmax(dim=-1))(x)
 
         return x
 
     def _learning_rate_condition(self, epoch):
-        return True
+        step_epochs = [80, 120, 160, 180]
+        if epoch in step_epochs:
+            return True
+        else:
+            return False
 
     def eval_mode(self, train=False):
         # Setting layers to eval mode
@@ -144,26 +92,26 @@ class ResNet(ensemble.EnsembleMember):  # Change of inheritance
 
 
 def ResNet18():
-    return ResNet(BasicBlock, [2, 2, 2, 2])
+    return ResNet(resnet_utils.BasicBlock, [2, 2, 2, 2])
 
 
 def ResNet34():
-    return ResNet(BasicBlock, [3, 4, 6, 3])
+    return ResNet(resnet_utils.BasicBlock, [3, 4, 6, 3])
 
 
 def ResNet50():
-    return ResNet(Bottleneck, [3, 4, 6, 3])
+    return ResNet(resnet_utils.Bottleneck, [3, 4, 6, 3])
 
 
 def ResNet101():
-    return ResNet(Bottleneck, [3, 4, 23, 3])
+    return ResNet(resnet_utils.Bottleneck, [3, 4, 23, 3])
 
 
 def ResNet152():
-    return ResNet(Bottleneck, [3, 8, 36, 3])
+    return ResNet(resnet_utils.Bottleneck, [3, 8, 36, 3])
 
 
 def test():
     net = ResNet18()
-    y = net(torch.randn(1,3,32,32))
+    y = net(torch.randn(1, 3, 32, 32))
     print(y.size())

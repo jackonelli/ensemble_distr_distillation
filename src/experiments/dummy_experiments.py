@@ -10,14 +10,11 @@ import numpy as np
 import logging
 import matplotlib
 import matplotlib.pyplot as plt
-from src.experiments.shifted_cmap import shifted_color_map
 
 LOGGER = logging.getLogger(__name__)
 
 
 def loss_test():
-    # OBSERVATION: MIN LOSS SEEMS TO LAY AROUND TRUE ENSEMBLE LOGITS MEAN AND VARIANCE IN ALL DIMENSIONS
-
     args = utils.parse_args()
 
     log_file = Path("{}.log".format(datetime.now().strftime('%Y%m%d_%H%M%S')))
@@ -44,7 +41,7 @@ def loss_test():
     max_var = [7, 9, 15, 35, 12, 25, 80, 12, 9]
 
     orig_cmap = matplotlib.cm.viridis
-    shifted_cmap = shifted_color_map(orig_cmap, midpoint=0.001, name='shifted')
+    shifted_cmap = utils.shifted_color_map(orig_cmap, midpoint=0.001, name='shifted')
 
     fig, ax = plt.subplots(2, 5)
 

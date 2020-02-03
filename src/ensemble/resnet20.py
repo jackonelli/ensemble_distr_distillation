@@ -71,20 +71,20 @@ class Resnet20(ensemble.EnsembleMember):
         return x
 
     def transform_logits(self, logits):
-        """Should this be log softmax?"""  # Men vi har lagt det i calculate_loss istället
-        return (nn.Softmax(dim=-1))(logits)
+        return logits
 
     def calculate_loss(self, outputs, labels):
-        log_outputs = torch.log(outputs)
-        # Removing this since it gives nan loss
-
-        return self.loss(log_outputs, labels.type(torch.LongTensor))
+        return self.loss(outputs, labels.type(torch.LongTensor))
 
     def predict(self, x, t=1):
         x = self.forward(x)
-        x = self.transform_logits(x)
+        x = (nn.Softmax(dim=-1))(x)
 
         return x
 
     def _learning_rate_condition(self, epoch):
-        return True
+        step_epochs = [80, 120, 160, 180]
+        if epoch in step_epochs:
+            return True
+        else:
+            return False

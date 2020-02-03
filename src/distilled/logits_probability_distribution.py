@@ -71,25 +71,9 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
         Wrapper function for the forward function.
         """
 
-        if num_samples is None:
-            num_samples = 50
+        samples = self.predict_logits(input_)
 
-        mean, var = self.forward(input_)
-
-        samples = torch.zeros(
-            [input_.size(0), num_samples,
-             int(self.output_size / 2)])
-        for i in range(input_.size(0)):
-
-            rv = torch.distributions.multivariate_normal.MultivariateNormal(
-                loc=mean[i, :], covariance_matrix=torch.diag(var[i, :]))
-
-            samples[i, :, :] = rv.rsample([num_samples])
-
-        softmax_samples = torch.exp(samples) / (
-            torch.sum(torch.exp(samples), dim=-1, keepdim=True) + 1)
-
-        return softmax_samples
+        return nn.Softmax(dim=-1)(samples)
 
     def predict_logits(self, input_, num_samples=None):
         """Predict parameters
@@ -110,6 +94,9 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
                 loc=mean[i, :], covariance_matrix=torch.diag(var[i, :]))
 
             samples[i, :, :] = rv.rsample([num_samples])
+
+        if self.scale_teacher_logits:
+            samples = torch.cat((samples, torch.zeros(samples.size(0), num_samples, 1)))
 
         return samples
 

@@ -4,7 +4,7 @@ import torch.optim as torch_optim
 import src.loss as custom_loss
 import src.distilled.distilled_network as distilled_network
 
-
+# TODO: what's the difference between this class and the one in dirichlet_probability_distribution
 class DirichletCNN(distilled_network.DistilledNet):
     def __init__(self,
                  layer_sizes,

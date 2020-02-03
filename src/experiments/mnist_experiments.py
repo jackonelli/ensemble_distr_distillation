@@ -193,9 +193,7 @@ def noise_effect_on_entropy(distilled_model, data_loader):
             ensemble_member_entropy[i, j] += torch.mean(metrics.entropy(ensemble_member_prediction, None))
 
         distilled_model_prediction = distilled_model.predict(input_perturbed)
-        distilled_model_prediction = torch.mean(torch.cat((distilled_model_prediction,
-                                                1- torch.sum(distilled_model_prediction, dim=-1, keepdim=True)),
-                                                dim=-1), dim=1)
+        distilled_model_prediction = torch.mean(distilled_model_prediction, dim=1)
 
         distilled_model_entropy[i] += torch.mean(metrics.entropy(distilled_model_prediction, None, correct_nan=True))
 
@@ -317,8 +315,7 @@ def get_accuracy(distilled_model, data_loader, label='test'):
     LOGGER.info("Ensemble model accuracy on {} data {}".format(label, teacher_acc))
 
     student_distribution = distilled_model.predict(inputs)
-    student_distribution = torch.mean(torch.cat((student_distribution,
-         1 - torch.sum(student_distribution, dim=-1, keepdim=True)), dim=-1), dim=1)
+    student_distribution = torch.mean(student_distribution, dim=1)
     student_acc = metrics.accuracy(student_distribution, labels)
     LOGGER.info("Distilled model accuracy on {} data {}".format(label, student_acc))
 
@@ -342,8 +339,6 @@ def get_entropy(distilled_model, data_loader, label='test'):
                                  ensemble_entropy[2].data.numpy()), axis=1)
 
     student_distribution = distilled_model.predict_logits(inputs)
-    student_distribution = torch.cat((student_distribution,
-                                      torch.ones([inputs.shape[0], student_distribution.shape[1], 1])), dim=-1)
     distilled_model_entropy = metrics.uncertainty_separation_entropy(student_distribution, None, logits=True)
     distilled_model_entropy = np.stack((distilled_model_entropy[0].data.numpy(),
                                         distilled_model_entropy[1].data.numpy(),

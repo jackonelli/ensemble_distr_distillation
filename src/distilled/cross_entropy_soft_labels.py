@@ -5,7 +5,7 @@ import src.loss as custom_loss
 import src.distilled.distilled_network as distilled_network
 from src import utils
 
-
+# TODO: Remove? Was just a test and not really relevant anymore
 class XCSoftLabels(distilled_network.DistilledNet):
     """We match only the mean of the logits"""
 
