@@ -205,7 +205,6 @@ class EnsembleMember(nn.Module, ABC):
               validation_loader=None,
               metrics=list(),
               reshape_targets=True):
-
         """Common train method for all ensemble member classes
         Should NOT be overridden!
         """
@@ -231,13 +230,11 @@ class EnsembleMember(nn.Module, ABC):
                 scheduler.step()
         return store_loss
 
-
     def _train_epoch(self,
                      train_loader,
                      validation_loader=None,
                      metrics=list(),
                      reshape_targets=True):
-
         """Common train epoch method for all ensemble member classes
         Should NOT be overridden!
 
@@ -266,7 +263,7 @@ class EnsembleMember(nn.Module, ABC):
 
             if reshape_targets:  # TODO: Does this really concern  all cases?
                 targets = targets.reshape(
-                    (batch_size, num_samples, self.output_size // 2))
+                    (batch_size, num_samples, self.output_size))
 
             loss = self.calculate_loss(outputs, targets)
             loss.backward()

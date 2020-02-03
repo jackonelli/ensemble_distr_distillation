@@ -50,21 +50,19 @@ class Model(ensemble.EnsembleMember):
             logits (torch.Tensor(B, D)):
         """
 
-        outputs = logits
-        outputs[:, 1:] = self.variance_transform(outputs[:, 1:])
+        mean = logits[:, :1]
+        var = self.variance_transform(logits[:, 1:])
 
-        return outputs
+        return (mean, var)
 
     def calculate_loss(self, outputs, targets):
-        mean = outputs[:, 0].reshape((outputs.size(0), 1))
-        var = outputs[:, 1].reshape((outputs.size(0), 1))
-        parameters = (mean, var)
+        (mean, var) = outputs
         loss = None
         if self.mean_only:
             loss_function = nn.MSELoss()
             loss = loss_function(mean, targets)
         else:
-            loss = self.loss(parameters, targets)
+            loss = self.loss((mean, var), targets)
         return loss
 
     def predict(self, x):
