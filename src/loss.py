@@ -61,6 +61,26 @@ def _dirichlet_sufficient_statistics(target_distribution):
     return torch.mean(torch.log(target_distribution), 1)
 
 
+def gaussian_neg_log_likelihood_1d(parameters, target):
+    """Negative log likelihood loss for the Gaussian distribution
+    B = batch size, D = dimension of target (always 1), N = ensemble size
+
+    Args:
+        parameters (torch.tensor((B, D)), torch.tensor((B, D))):
+            mean values and variances of y|x for every x in
+            batch.
+
+        target (torch.tensor((B, N, D))): sample from the normal
+            distribution, if not an ensemble prediction N=1.
+    """
+    mean, var = parameters
+    target = target.reshape((target.size(0), 1))
+    exponent = -0.5 * (target - mean)**2 / var
+    log_coeff = -1 / 2 * torch.log(var) - 0.5 * 1 * np.log(2 * np.pi)
+
+    return -(log_coeff + exponent).sum()
+
+
 def gaussian_neg_log_likelihood(parameters, target):
     """Negative log likelihood loss for the Gaussian distribution
     B = batch size, D = dimension of target (num classes), N = ensemble size

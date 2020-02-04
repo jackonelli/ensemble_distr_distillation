@@ -253,14 +253,13 @@ class EnsembleMember(nn.Module, ABC):
             logits = self.forward(inputs)
             outputs = self.transform_logits(logits)
 
-            # num_samples is different from batch size,
-            # the loss expects a target with shape
-            # (B, N, D), so that it can handle a full ensemble pred.
-            # Here, we use a single sample N = 1.
-            num_samples = 1
-            batch_size = targets.size(0)
-
             if reshape_targets:  # TODO: Does this really concern  all cases?
+                # num_samples is different from batch size,
+                # the loss expects a target with shape
+                # (B, N, D), so that it can handle a full ensemble pred.
+                # Here, we use a single sample N = 1.
+                num_samples = 1
+                batch_size = targets.size(0)
                 targets = targets.reshape(
                     (batch_size, num_samples, self.output_size))
 
