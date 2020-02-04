@@ -13,7 +13,6 @@ class UCIData():
         self._log = logging.getLogger(self.__class__.__name__)
         self.file_path = self._validate_file_path(file_path)
         self.data = None
-        self.num_samples = None
         self.input_dim = None
         self.output_dim = 1
         self.seed = seed

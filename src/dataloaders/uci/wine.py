@@ -20,7 +20,7 @@ class WineData(UCIData):
     def load_full_data(self, shuffle=False):
         """Load csv data into np array"""
         np.random.seed(self.seed)
-        data = pd.read_csv(self.file_path, header=1, delimiter=';').values
+        data = pd.read_csv(self.file_path, header=0, delimiter=';').values
         if shuffle:
             self.data = data[np.random.permutation(np.arange(len(data)))]
         else:
