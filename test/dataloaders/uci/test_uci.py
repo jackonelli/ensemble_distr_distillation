@@ -12,7 +12,6 @@ class TestWineData(unittest.TestCase):
     def setUp(self):
         base = uci_wine.WineData(
             "~/doktor/datasets/UCI/wine/winequality-red.csv")
-        base.load_full_data()
         self.wine_data = uci_base._UCIDataset(base.data[:, :-1],
                                               base.data[:, -1:])
 
@@ -29,7 +28,6 @@ class TestWineData(unittest.TestCase):
 class TestBostonData(unittest.TestCase):
     def setUp(self):
         base = uci_bost.BostonData("~/doktor/datasets/UCI/bost/housing.data")
-        base.load_full_data()
         self.bost_data = uci_base._UCIDataset(base.data[:, :-1],
                                               base.data[:, -1:])
 
