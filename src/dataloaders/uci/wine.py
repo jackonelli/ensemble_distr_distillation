@@ -7,6 +7,8 @@ import numpy as np
 import pandas as pd
 from src.dataloaders.uci.uci_base import UCIData
 
+URL = "https://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-red.csv"
+
 
 class WineData(UCIData):
     """Dataloader for wine data
@@ -14,8 +16,8 @@ class WineData(UCIData):
     Args:
         file_path (str / pathlib.Path)
     """
-    def __init__(self, file_path="winequality-red.csv"):
-        super().__init__(file_path=file_path)
+    def __init__(self, file_path="winequality-red.csv", url=URL):
+        super().__init__(file_path=file_path, url=url)
 
     def load_full_data(self, shuffle=False):
         """Load csv data into np array"""
