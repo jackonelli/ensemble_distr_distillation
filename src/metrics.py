@@ -32,7 +32,7 @@ class Metric:
         else:
             mean = float("nan")
             LOGGER.warning("Trying to calculate mean on unpopulated metric.")
-        return mean
+        return mean.item()
 
     def reset(self):
         self.memory.append(self.mean())

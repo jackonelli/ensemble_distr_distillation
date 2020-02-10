@@ -284,27 +284,60 @@ class EnsembleMember(nn.Module, ABC):
             self._reset_metrics()
             running_loss = 0.0
             batch_count = 0
-            for valid_batch in validation_loader:
+            for batch in validation_loader:
                 batch_count += 1
 
-                valid_inputs, valid_targets = valid_batch
-                valid_inputs, valid_targets = valid_inputs.float(),\
-                    valid_targets.float()
-                valid_logits = self.forward(valid_inputs)
-                valid_outputs = self.transform_logits(valid_logits)
+                inputs, targets = batch
+                inputs, targets = inputs.float(),\
+                    targets.float()
+                logits = self.forward(inputs)
+                outputs = self.transform_logits(logits)
 
                 num_samples = 1
-                batch_size = valid_targets.size(0)
-                valid_targets = valid_targets.reshape(
+                batch_size = targets.size(0)
+                targets = targets.reshape(
                     (batch_size, num_samples, self.target_size))
 
-                tmp_loss = self.calculate_loss(valid_outputs, valid_targets)
-                # print(valid_outputs, valid_targets)
+                tmp_loss = self.calculate_loss(outputs, targets)
+                # print(outputs, targets)
                 # print(tmp_loss)
                 running_loss += tmp_loss
-                self._update_metrics(valid_outputs, valid_targets)
+                self._update_metrics(outputs, targets)
 
             return running_loss / batch_count
+
+    def test(self, test_loader, metrics, loss_function):
+        """Common test method for all ensemble member classes
+        Should NOT be overridden!
+        """
+        for metric in metrics:
+            metric.reset()
+
+        with torch.no_grad():
+            running_loss = 0.0
+            batch_count = 0
+            for batch in test_loader:
+                batch_count += 1
+
+                inputs, targets = batch
+                inputs, targets = inputs.float().to(self.device),\
+                    targets.float().to(self.device)
+                logits = self.forward(inputs)
+                outputs = self.transform_logits(logits)
+
+                num_samples = 1
+                batch_size = targets.size(0)
+                targets = targets.reshape(
+                    (batch_size, num_samples, self.target_size))
+
+                tmp_loss = loss_function(outputs, targets)
+                running_loss += tmp_loss
+                for metric in metrics:
+                    metric_output = self._output_to_metric_domain(
+                        metric, outputs)
+                    metric.update(targets, metric_output)
+
+            return metrics, running_loss / batch_count
 
     def calc_metrics(self, data_loader):
         """Calculate all metrics"""
@@ -324,7 +357,7 @@ class EnsembleMember(nn.Module, ABC):
     def _add_metric(self, metric):
         self.metrics[metric.name] = metric
 
-    def _output_to_metric_domain(self, outputs):
+    def _output_to_metric_domain(self, metric, outputs):
         """Transform output for metric calculation
         Output distribution parameters are not necessarily
         exact representation for metrics calculation.

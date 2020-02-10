@@ -71,10 +71,21 @@ class Model(ensemble.EnsembleMember):
 
         return x
 
-    def _output_to_metric_domain(self, outputs):
+    def _output_to_metric_domain(self, metric, outputs):
         """Transform output for metric calculation
 
         Extract expected value parameter from outputs
         """
-        B, D = outputs.shape
-        return outputs[:, 0].reshape((B, D // 2))
+        metric_output = None
+        if metric.name is not None:
+            if metric.name == "MSE":
+                metric_output = outputs[0]
+            else:
+                self._log.error(
+                    "Metric transform not implemented for: {}".format(
+                        metric.name))
+        else:
+            self._log.error(
+                "Metric: {} has no 'name' attribute".format(metric))
+
+        return metric_output
