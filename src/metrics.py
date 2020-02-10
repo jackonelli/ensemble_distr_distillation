@@ -13,30 +13,39 @@ class Metric:
     def __init__(self, name, function):
         self.name = name
         self.function = function
-        self.running_value = 0.0
         self.counter = 0
-        self.memory = []  # So that we can go back an look at the data
+        self.memory = list()
 
     def __str__(self, decimal_places=3):
         return "{}: {:.3f}".format(self.name, self.mean())
 
     def update(self, targets, outputs):
-
+        """Update metric"""
         with torch.no_grad():
-            self.running_value += self.function(outputs, targets)
+            self.memory.append(self.function(outputs, targets))
         self.counter += 1
 
     def mean(self):
-        if self.counter > 0:
-            mean = self.running_value / self.counter
-        else:
-            mean = float("nan")
+        """Calculate mean of metric
+
+        Returns: mean (float): NaN if self.memory is empty
+        """
+        if not self.memory:
             LOGGER.warning("Trying to calculate mean on unpopulated metric.")
-        return mean.item()
+        return torch.tensor(self.memory).mean().item()
+
+    def std(self):
+        """Calculate std of metric
+
+        Returns: std (float): NaN if len(self.memory) < 2
+        """
+
+        if not self.memory:
+            LOGGER.warning("Trying to calculate std on unpopulated metric.")
+        return torch.tensor(self.memory).std().item()
 
     def reset(self):
-        self.memory.append(self.mean())
-        self.running_value = 0.0
+        self.memory = list()
         self.counter = 0
 
 
