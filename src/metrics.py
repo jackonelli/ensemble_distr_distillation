@@ -22,7 +22,8 @@ class Metric:
     def update(self, targets, outputs):
         """Update metric"""
         with torch.no_grad():
-            self.memory.append(self.function(outputs, targets))
+            new_observation = self.function(outputs, targets)
+            self.memory.append(new_observation)
         self.counter += 1
 
     def mean(self):
@@ -288,7 +289,8 @@ def root_mean_squared_error(predictions, targets):
         Error: float
     """
 
-    return torch.sqrt(mean_squared_error(predictions, targets))
+    rmse = torch.sqrt(mean_squared_error(predictions, targets))
+    return rmse
 
 
 def mean_squared_error(predictions, targets):
@@ -312,7 +314,8 @@ def mean_squared_error(predictions, targets):
     for n in np.arange(N):
         target = targets[:, n, :]
         sum_squared_errors += ((target - predictions)**2).sum()
-    return sum_squared_errors / (B * N)
+    mse = sum_squared_errors / (B * N)
+    return mse
 
 
 def squared_error(predictions, targets):

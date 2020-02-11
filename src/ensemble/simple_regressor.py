@@ -80,6 +80,8 @@ class Model(ensemble.EnsembleMember):
         if metric.name is not None:
             if metric.name == "MSE":
                 metric_output = outputs[0]
+            elif metric.name == "RMSE":
+                metric_output = outputs[0]
             else:
                 self._log.error(
                     "Metric transform not implemented for: {}".format(

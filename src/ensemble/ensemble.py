@@ -310,8 +310,6 @@ class EnsembleMember(nn.Module, ABC):
         """Common test method for all ensemble member classes
         Should NOT be overridden!
         """
-        for metric in metrics:
-            metric.reset()
 
         with torch.no_grad():
             running_loss = 0.0
