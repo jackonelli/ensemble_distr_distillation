@@ -368,7 +368,7 @@ class EnsembleMember(nn.Module, ABC):
 
     def _update_metrics(self, outputs, targets):
         for metric in self.metrics.values():
-            metric_output = self._output_to_metric_domain(outputs)
+            metric_output = self._output_to_metric_domain(metric, outputs)
             metric.update(targets=targets, outputs=metric_output)
 
     def _reset_metrics(self):
