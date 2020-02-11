@@ -70,6 +70,25 @@ class UCIData():
             test = uci_dataloader(x_test, y_test, y_test.shape[0])
             yield train, test
 
+    def create_train_val_split(self, split_ratio):
+        """Create simple data split
+
+        Args:
+            split_ratio (float): train / val ratio.
+        """
+        if self.data is None:
+            self._log.error("Data is not loaded for {}".format(self))
+            return None
+        indices = np.arange(0, self.num_samples)
+        np.random.shuffle(indices)
+        num_train_samples = int(split_ratio * self.num_samples)
+        train_data = self.data[:num_train_samples, :]
+        val_data = self.data[num_train_samples:, :]
+
+        x_train, y_train = train_data[:, :-1], train_data[:, -1:]
+        x_val, y_val = val_data[:, :-1], val_data[:, -1:]
+        return x_train, y_train, x_val, y_val
+
 
 class _UCIDataset(torch_data.Dataset):
     """Internal representation of a subset of UCI data"""
