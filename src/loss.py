@@ -78,10 +78,7 @@ def gaussian_neg_log_likelihood_1d(parameters, target):
     exponent = -0.5 * (target - mean)**2 / var
     log_coeff = -1 / 2 * torch.log(var) - 0.5 * 1 * np.log(2 * np.pi)
 
-    nll = -(log_coeff + exponent)
-    # print(nll.sum().item() / target.size(0), nll.mean().item())
-
-    return nll.sum()
+    return -(log_coeff + exponent).mean()
 
 
 def gaussian_neg_log_likelihood(parameters, target):
