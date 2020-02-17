@@ -1,26 +1,26 @@
 import torch
 import torch.optim as torch_optim
 import torch.nn as nn
-from src.ensemble import ensemble
+import src.distilled.distilled_network as distilled_network
 import src.loss as custom_loss
 import src.utils as utils
 
 
-class Model(ensemble.EnsembleMember):
+class Model(distilled_network.DistilledNet):
     """Simple regressor model
     Network that predicts the parameters of a normal distribution
     """
     def __init__(self,
                  layer_sizes,
                  loss_function,
+                 teacher,
                  device=torch.device("cpu"),
-                 variance_transform=utils.variance_linear_asymptote):
+                 variance_transform=utils.variance_linear_asymptote()):
 
-        super().__init__(output_size=layer_sizes[-1] // 2,
+        super().__init__(teacher=teacher,
                          loss_function=loss_function,
                          device=device)
 
-        self.mean_only = False
         self.variance_transform = variance_transform
         self._log.info("Using variance transform: {}".format(
             self.variance_transform.__name__))
@@ -37,8 +37,8 @@ class Model(ensemble.EnsembleMember):
         for layer in self.layers[:-1]:
             x = nn.functional.relu(layer(x))
 
-        x = self.layers[-1](x)
-        return x
+        logits = self.layers[-1](x)
+        return self.transform_logits(logits)
 
     def transform_logits(self, logits):
         """Transform logits for the simple regressor
@@ -55,15 +55,8 @@ class Model(ensemble.EnsembleMember):
 
         return (mean, var)
 
-    def calculate_loss(self, outputs, targets):
-        (mean, var) = outputs
-        loss = None
-        if self.mean_only:
-            loss_function = nn.MSELoss()
-            loss = loss_function(mean, targets)
-        else:
-            loss = self.loss((mean, var), targets)
-        return loss
+    def calculate_loss(self, outputs, targets, _labels):
+        return self.loss(outputs, targets)
 
     def predict(self, x):
         x = x.to(self.device)
@@ -73,6 +66,14 @@ class Model(ensemble.EnsembleMember):
             (mean.size(0), self.output_size * 2))
 
         return output
+
+    def _generate_teacher_predictions(self, inputs):
+        """Generate teacher predictions"""
+
+        predictions = self.teacher.predict(inputs)
+        mean, var = predictions[:, :, 0].to(
+            self.device), predictions[:, :, 1].to(self.device)
+        return mean, var
 
     def _output_to_metric_domain(self, metric, outputs):
         """Transform output for metric calculation

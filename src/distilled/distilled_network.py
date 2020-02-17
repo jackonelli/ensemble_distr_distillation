@@ -1,10 +1,10 @@
 """Distilled net base module"""
 import logging
 from abc import ABC, abstractmethod
+import math
 import torch
 import torch.nn as nn
 import torch.optim as torch_optim
-import math
 import src.utils as utils
 import os
 import numpy as np
@@ -35,13 +35,13 @@ class DistilledNet(nn.Module, ABC):
         Should NOT be overridden!
         """
 
-        # Note that we step every iteration (as opposed to every epoch) NOT TRUE ANYMORE
-        #scheduler = self.get_scheduler(step_size=5 * len(train_loader),
-         #                              cyclical=False)
+        # Note that we step every iteration (as opposed to every epoch)
+        # NOT TRUE ANYMORE
+        # scheduler = self.get_scheduler(step_size=5 * len(train_loader),
+        #                              cyclical=False)
 
         clr = utils.adapted_lr(c=0.7)
-        scheduler = torch.optim.lr_scheduler.LambdaLR(
-            self.optimizer, [clr])
+        scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, [clr])
 
         self.use_hard_labels = False  # VILL VI HA DENNA?
 
@@ -59,20 +59,24 @@ class DistilledNet(nn.Module, ABC):
                                      validation_loader=validation_loader,
                                      scheduler=scheduler)
             self._print_epoch(epoch_number, loss)
-            if self._learning_rate_condition(epoch_number):
-                scheduler.step()
+            # if self._learning_rate_condition(epoch_number):
+            #     scheduler.step()
 
-            if os.path.isfile("model_data/par_adam.npy"):
-                par_arr = np.load("model_data/par_adam.npy", allow_pickle=True)
-                par_arr = np.concatenate((par_arr, self.par.detach().numpy()))
-                grad_arr = np.load("model_data/grad_adam.npy", allow_pickle=True)
-                grad_arr = np.concatenate((grad_arr, self.par.grad.detach().numpy()))
-            else:
-                par_arr = self.par.detach().numpy()
-                grad_arr = self.par.grad.detach().numpy()
+            # if os.path.isfile("model_data/par_adam.npy"):
+            # par_arr = np.load("model_data/par_adam.npy",
+            #                   allow_pickle=True)
+            #     par_arr = np.concatenate((par_arr,
+            #                               self.par.detach().numpy()))
+            #     grad_arr = np.load("model_data/grad_adam.npy",
+            #                        allow_pickle=True)
+            #     grad_arr = np.concatenate(
+            #         (grad_arr, self.par.grad.detach().numpy()))
+            # else:
+            #     par_arr = self.par.detach().numpy()
+            #     grad_arr = self.par.grad.detach().numpy()
 
-            np.save("model_data/par_adam.npy", par_arr)
-            np.save("model_data/grad_adam.npy", grad_arr)
+            # np.save("model_data/par_adam.npy", par_arr)
+            # np.save("model_data/grad_adam.npy", grad_arr)
 
         self._reset_metrics()  # For storing purposes
 
@@ -89,7 +93,7 @@ class DistilledNet(nn.Module, ABC):
 
         self._reset_metrics()
 
-        for batch in train_loader:
+        for (batch_ind, batch) in enumerate(train_loader):
             self.optimizer.zero_grad()
             inputs, labels = batch
 
@@ -101,10 +105,10 @@ class DistilledNet(nn.Module, ABC):
                 labels = labels.to(self.device)
 
             else:
-                inputs, labels = inputs.to(self.device), labels.to(self.device)
+                inputs, labels = inputs.float().to(
+                    self.device), labels.float().to(self.device)
 
-            teacher_predictions = self._generate_teacher_predictions(
-                inputs).detach()
+            teacher_predictions = self._generate_teacher_predictions(inputs)
 
             outputs = self.forward(inputs)
 
@@ -118,19 +122,19 @@ class DistilledNet(nn.Module, ABC):
                 break
 
             if validation_loader is None:
-                    #self._reset_metrics()
-                    self._update_metrics(
-                        outputs, teacher_predictions
-                    )  # BUT THIS DOES NOT WORK FOR EG ACCURACY
-                    # USE EITHER METRICS.ACCURACY_SOFT_LABELS OR METRICS.ACCURACY_LOGITS
+                # self._reset_metrics()
+                self._update_metrics(
+                    outputs, teacher_predictions
+                )  # BUT THIS DOES NOT WORK FOR EG ACCURACY
+                # USE EITHER METRICS.ACCURACY_SOFT_LABELS OR METRICS.ACCURACY_LOGITS
 
-            #if self._learning_rate_condition():
-            #    scheduler.step()
+            # if self._learning_rate_condition():
+            #     scheduler.step()
 
         if validation_loader is not None:
             # TODO: should we do model.eval() here or would it just waste our time?
             with torch.no_grad():
-            # We will compare here with the teacher predictions
+                # We will compare here with the teacher predictions
                 self.calculate_metric_dataloader(validation_loader)
 
         return running_loss
@@ -139,6 +143,7 @@ class DistilledNet(nn.Module, ABC):
         for batch in data_loader:
             # self._reset_metrics()
             inputs, labels = batch
+            inputs, labels = inputs.to(self.device), labels.to(self.device)
 
             if isinstance(inputs, list):
                 for i in range(len(inputs)):
@@ -147,11 +152,11 @@ class DistilledNet(nn.Module, ABC):
                 labels = labels.to(self.device)
 
             else:
-                inputs, labels = inputs.to(self.device), labels.to(self.device)
+                inputs, labels = inputs.float().to(
+                    self.device), labels.float().to(self.device)
 
             outputs = self.forward(inputs)
             teacher_predictions = self._generate_teacher_predictions(inputs)
-            teacher_predictions = teacher_predictions.to(self.device)
             self._update_metrics(outputs, teacher_predictions)
 
     def _generate_teacher_predictions(self, inputs):
@@ -167,7 +172,9 @@ class DistilledNet(nn.Module, ABC):
         logits = self.teacher.get_logits(inputs)
         return self.teacher.transform_logits(logits)
 
-    def calc_metrics(self, data_loader): #TODO: How does this differ from calc_metric_dataloader except for the reset_metrics call?
+    def calc_metrics(
+            self, data_loader
+    ):  #TODO: How does this differ from calc_metric_dataloader except for the reset_metrics call?
         self._reset_metrics()
 
         for batch in data_loader:

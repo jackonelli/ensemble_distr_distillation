@@ -24,11 +24,15 @@ class Ensemble():
             e.g. if we model D-dimensional target with a Gaussian
             with mean and diagonal covariance, the output size would be 2D.
     """
-    def __init__(self, output_size):
+    def __init__(self, output_size, device=torch.device("cpu")):
         self.members = list()
         self._log = logging.getLogger(self.__class__.__name__)
         self.output_size = output_size
+        self.device = device
         self.size = 0
+
+    def __len__(self):
+        return self.size
 
     def add_member(self, new_member):
         if issubclass(type(new_member), EnsembleMember) or True:
@@ -80,7 +84,8 @@ class Ensemble():
         """
 
         batch_size = inputs.size(0)
-        logits = torch.zeros((batch_size, self.size, self.output_size))
+        logits = torch.zeros((batch_size, self.size, self.output_size),
+                             device=self.device)
         for member_ind, member in enumerate(self.members):
             logits[:, member_ind, :] = member.forward(inputs)
 

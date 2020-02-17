@@ -213,10 +213,29 @@ def variance_moberg(epsilon=0.0):
     return lambda input_: torch.log(1 + torch.exp(input_) + epsilon) + epsilon
 
 
-def gradient_analysis(model):
-    """Extracts some gradient characteristics from a training model"""
-    gradients = [param.grad for param in model.layers[-1].parameters()]
-    return gradients
+def generate_order(arr, descending=True):
+    """Generate order based on array"""
+    sorted_indices = np.argsort(arr)
+    if descending:
+        sorted_indices = sorted_indices[::-1]
+    return sorted_indices.reshape((len(arr), ))
+
+
+def moving_average(arr, window):
+    """Moving average"""
+    ret = np.cumsum(arr, dtype=float)
+    ret[window:] = ret[window:] - ret[:-window]
+    return ret[window - 1:] / window
+
+
+def plot_error_curve(ax, y_true, y_pred, uncert_meas, label, window_size=10):
+    """Plot errors sorted according to uncertainty measure"""
+    error = (y_true - y_pred)**2
+    error, uncert_meas = np.array(error), np.array(uncert_meas)
+    sorted_inds = generate_order(uncert_meas)
+    sorted_error = error[sorted_inds]
+    smooth_error = moving_average(sorted_error, window_size)
+    ax.plot(np.arange(len(smooth_error)), smooth_error, label=label)
 
 
 def shifted_color_map(cmap,
@@ -271,3 +290,55 @@ def shifted_color_map(cmap,
     plt.register_cmap(cmap=newcmap)
 
     return newcmap
+
+
+def gaussian_mixture_moments(mus, sigma_sqs):
+    """Estimate moments of a gaussian mixture model
+
+    B - number of observations/samples
+    N - number of components in mixture
+
+    Args:
+        mus torch.tensor((B, N)): Collection of mu-values
+        sigma_sqs torch.tensor((B, N)): Collection of sigma_sq-values
+    """
+
+    with torch.no_grad():
+        mu = torch.mean(mus, dim=1)
+        sigma_sq = torch.mean(sigma_sqs + mus**2, dim=1) - mu**2
+
+    return mu, sigma_sq
+
+
+def torch_cov(arr, rowvar=False):
+    """Estimate a covariance matrix given data.
+
+    Covariance indicates the level to which two variables vary together.
+    If we examine N-dimensional samples, `X = [x_1, x_2, ... x_N]^T`,
+    then the covariance matrix element `C_{ij}` is the covariance of
+    `x_i` and `x_j`. The element `C_{ii}` is the variance of `x_i`.
+
+    Args:
+        arr: A 1-D or 2-D array containing multiple variables and observations.
+            Each row of `arr` represents a variable, and each column a single
+            observation of all those variables.
+        rowvar: If `rowvar` is True, then each row represents a
+            variable, with observations in the columns. Otherwise, the
+            relationship is transposed: each column represents a variable,
+            while the rows contain observations.
+
+    Returns:
+        The covariance matrix of the variables.
+    """
+
+    if arr.dim() > 2:
+        raise ValueError('arr has more than 2 dimensions')
+    if arr.dim() < 2:
+        arr = arr.view(1, -1)
+    if not rowvar and arr.size(0) != 1:
+        arr = arr.t()
+    # arr = arr.type(torch.double)  # uncomment this line if desired
+    fact = 1.0 / (arr.size(1) - 1)
+    arr -= torch.mean(arr, dim=1, keepdim=True)
+    arr_transposed = arr.t()  # if complex: mt = m.t().conj()
+    return fact * arr.matmul(arr_transposed).squeeze()

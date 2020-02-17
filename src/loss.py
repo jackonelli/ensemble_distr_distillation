@@ -93,11 +93,7 @@ def gaussian_neg_log_likelihood(parameters, target):
         target (torch.tensor((B, N, D))): sample from the normal
             distribution, if not an ensemble prediction N=1.
     """
-    mean = parameters[0]
-    var = parameters[1]
-
-    #if target.dim() == 2:
-    #    target = torch.unsqueeze(target, dim=1)
+    mean, var = parameters
 
     loss = 0
     for batch_index, (mean_b, cov_b) in enumerate(zip(mean, var)):
@@ -108,6 +104,40 @@ def gaussian_neg_log_likelihood(parameters, target):
         loss -= torch.mean(log_prob) / target.size(0)
 
     return loss
+
+
+def gaussian_neg_log_likelihood_diag(parameters, target):
+    """Negative log likelihood loss for the Gaussian distribution
+    B = batch size, D = dimension of target (num classes), N = ensemble size
+
+    Args:
+        parameters (torch.tensor((B, D)), torch.tensor((B, D))):
+            mean values and variances of y|x for every x in
+            batch.
+
+        target (torch.tensor((B, N, D))): sample from the normal
+            distribution, if not an ensemble prediction N=1.
+    """
+    B, N, _ = target.size()
+    mu, sigma_sq = parameters
+
+    prec = sigma_sq.pow(-1)
+
+    nll = 0.0
+    for mu_b, prec_b, target_b in zip(mu, prec, target):
+        sample_var = (target_b - mu_b).var(dim=0)
+        trace_term = (prec_b * sample_var).sum() * N / 2
+        nll += trace_term - N / 2 * prec_b.prod()
+
+    return nll / B
+
+
+def _sample_cov(x, mu):
+    N, D = x.size()
+    diff = (x - mu)
+    if D < 2:
+        diff = diff.view(1, -1)
+    return diff.matmul(diff.t()).squeeze() / (N - 1)
 
 
 def gaussian_neg_log_likelihood_unopt(parameters, target, scale=None):
@@ -144,6 +174,44 @@ def gaussian_neg_log_likelihood_unopt(parameters, target, scale=None):
         raise Exception("Negative nll")
 
     return torch.mean(average_nll)  # Mean over batch
+
+
+def kl_div_gauss_and_mixture_of_gauss(parameters, targets):
+    """KL divergence between a single gaussian and a mixture of M gaussians
+
+    for derivation details, see paper.
+
+    Note: The loss is only correct up to a constant w.r.t. the parameters.
+
+    TODO: Support multivarate
+
+    TODO: Support weighted mixture
+
+    B = batch size, N = ensemble size
+
+    Args:
+        parameters (torch.tensor((B, 1)), torch.tensor((B, 1))):
+            mean values and variances of y|x for every x in
+            batch.
+        target ((torch.tensor((B, N)), (torch.tensor((B, N)))):
+            means and variances of the mixture components
+    """
+
+    mu_gauss = parameters[0]
+    sigma_sq_gauss = parameters[1]
+
+    mus_mixture = targets[0]
+    sigma_sqs_mixture = targets[1]
+
+    mu_bar = mus_mixture.mean(dim=1, keepdim=True)
+    term_1 = torch.mean(
+        sigma_sqs_mixture +
+        (mus_mixture - mu_bar)**2, dim=1, keepdim=True) / sigma_sq_gauss
+    term_2 = (mu_bar - mu_gauss)**2
+    term_3 = torch.log(sigma_sq_gauss) / 2
+
+    loss = torch.mean(term_1 + term_2 + term_3, dim=0)
+    return loss
 
 
 def mse(mean, target):
@@ -249,30 +317,38 @@ def inverse_wishart_neg_log_likelihood(parameters, target):
     return torch.mean(normalizer + ll)  # Mean over batch
 
 
-def gaussian_inv_wishart_neg_log_likelihood(parameters,
-                                            targets,
-                                            true_targets=None):
-    """Negative log likelihood loss for the Gaussian inverse-Wishart distribution
-        B = batch size, D = target dimension, N = ensemble size
+def gaussian_inv_wishart_neg_log_likelihood(parameters, targets):
+    """NLL loss for the Gaussian inverse-Wishart distribution:
 
-        Args:
-        parameters (torch.tensor((B, D)), torch.tensor((B, D)),
-             torch.tensor((B, D)), torch.tensor((B, D)): parameters of the normal distribution (mu_0, scale)
+    https://en.wikipedia.org/wiki/Normal-inverse-Wishart_distribution
+
+    B = batch size, D = target dimension, N = ensemble size
+
+    Args:
+
+        parameters (torch.tensor((B, D)), torch.Variable,
+             torch.tensor((B, D)), torch.Variable:
+
+             Tuple order: (mu_0, lambda, psi, nu)
+             parameters of the normal distribution (mu_0, lambda)
              and of the inverse-Wishart distribution (psi, nu)
-        targets (torch.tensor((B, N, D)), torch.tensor((B, N, D))): mean and variance (diagonal of covariance
+
+        targets (torch.tensor((B, N, D)), torch.tensor((B, N, D))):
+             mean and variance (diagonal of covariance
              matrix) as output by N ensemble members.
-        true_targets (torch.tensor(B, D)): true output of the training data
-        """
+    """
 
     mu_0 = parameters[0]
-    scale = parameters[1]
+    lambda_ = parameters[1]
     psi = parameters[2]
     nu = parameters[3]
-    mu = targets[0]
-    var = targets[1]
 
-    nll_gaussian = gaussian_neg_log_likelihood_unopt((mu_0, var), mu, scale)
-    nll_inverse_wishart = inverse_wishart_neg_log_likelihood((psi, nu), var)
+    mu = targets[0]
+    var_diag = targets[1]
+
+    nll_gaussian = gaussian_neg_log_likelihood((mu_0, var_diag / lambda_), mu)
+    nll_inverse_wishart = inverse_wishart_neg_log_likelihood((psi, nu),
+                                                             var_diag)
 
     return nll_gaussian + nll_inverse_wishart
 

@@ -3,12 +3,14 @@ import torch.nn as nn
 import torch.optim as torch_optim
 import src.loss as custom_loss
 import src.distilled.distilled_network as distilled_network
+from src import utils
 
 
 class LogitsProbabilityDistribution(distilled_network.DistilledNet):
     def __init__(self,
                  layer_sizes,
                  teacher,
+                 variance_transform=utils.variance_linear_asymptote(),
                  device=torch.device('cpu'),
                  use_hard_labels=False,
                  learning_rate=0.001,
@@ -26,12 +28,7 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
         for i in range(len(layer_sizes) - 1):
             self.layers.append(nn.Linear(layer_sizes[i], layer_sizes[i + 1]))
 
-        # Ad-hoc fix zero variance.
-        self.variance_lower_bound = 0.001
-        if self.variance_lower_bound > 0.0:
-            self._log.warning("Non-zero variance lower bound set ({})".format(
-                self.variance_lower_bound))
-
+        self.variance_transform = variance_transform
         self.optimizer = torch_optim.Adam(self.parameters(),
                                           lr=self.learning_rate)
 
@@ -50,8 +47,9 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
         mean = x[:, :mid]
         var_z = x[:, mid:]
 
-        var = torch.log(1 + torch.exp(var_z)) + self.variance_lower_bound
-        #var = torch.exp(var_z)
+        var = self.variance_transform(var_z)
+        if torch.isinf(var).sum() > 0:
+            raise ValueError("Got NaN")
 
         return mean, var
 
@@ -96,7 +94,8 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
             samples[i, :, :] = rv.rsample([num_samples])
 
         if self.scale_teacher_logits:
-            samples = torch.cat((samples, torch.zeros(samples.size(0), num_samples, 1)))
+            samples = torch.cat(
+                (samples, torch.zeros(samples.size(0), num_samples, 1)))
 
         return samples
 
