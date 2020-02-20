@@ -7,7 +7,7 @@ import logging
 LOGGER = logging.getLogger(__name__)
 
 
-def cross_entropy_soft_targets(predictions, soft_targets):
+def cross_entropy_soft_targets(predicted_distribution, target_distribution):
     """Cross entropy loss with soft targets.
     B = batch size, D = dimension of target (num classes), N = ensemble size
 
@@ -16,13 +16,7 @@ def cross_entropy_soft_targets(predictions, soft_targets):
         soft_target (torch.tensor((B, D - 1))): target distribution
     """
 
-    predicted_distribution = torch.cat(
-        (predictions, 1 - torch.sum(predictions, dim=1, keepdim=True)), dim=1)
-    target_distribution = torch.cat(
-        (soft_targets, 1 - torch.sum(soft_targets, dim=1, keepdim=True)),
-        dim=1)
-
-    return torch.sum(-target_distribution * torch.log(predicted_distribution))
+    return torch.mean(-target_distribution * torch.log(predicted_distribution))
 
 
 def dirichlet_neg_log_likelihood(alphas, target_distribution):

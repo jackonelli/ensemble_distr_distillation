@@ -96,7 +96,7 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
             samples[i, :, :] = rv.rsample([num_samples])
 
         if self.scale_teacher_logits:
-            samples = torch.cat((samples, torch.zeros(samples.size(0), num_samples, 1)))
+            samples = torch.cat((samples, torch.zeros(samples.size(0), num_samples, 1)), dim=-1)
 
         return samples
 

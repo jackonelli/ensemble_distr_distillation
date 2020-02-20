@@ -16,52 +16,57 @@ LOGGER = logging.getLogger(__name__)
 
 def ensemble_predictions():
     # Will load ensemble, make and save predictions here
-    train_set = cifar10.Cifar10Data(transpose=True)
-    test_set = cifar10.Cifar10Data(train=False, transpose=True)
+    train_set = cifar10.Cifar10Data(torch=False)
+    test_set = cifar10.Cifar10Data(train=False, torch=False)
 
     ensemble = tensorflow_ensemble.TensorflowEnsemble(output_size=10)
 
     models_dir = "../models/cifar-0508-ensemble_50/r"
     ensemble.load_ensemble(models_dir, num_members=50)
+    ensemble.eval_mode()  # This do not seem to make a difference
 
-    data_list = [train_set, test_set]
-    labels = ["train",  "test"]
+    data_list = [test_set]#, train_set]
+    labels = ["test"]#, "train"]
 
     data_dir = "../../dataloaders/data/ensemble_predictions/"
-    hf = h5py.File(data_dir + 'ensemble_predictions.h5', 'w')
+    hf = h5py.File(data_dir + 'ensemble_predictions_test.h5', 'w')
 
     for data_set, label in zip(data_list, labels):
         data, logits, predictions, targets = [], [], [], []
 
         data_loader = torch.utils.data.DataLoader(data_set,
-                                                  batch_size=32,
+                                                  batch_size=100,
                                                   shuffle=False,
                                                   num_workers=0)
 
+        counter = 0
         for batch in data_loader:
+            print(counter)
+            counter += 1
             inputs, labels = batch
+            inputs = tf.convert_to_tensor(inputs.data.numpy())
             data.append(inputs)
-            targets.append(labels)
+            targets.append(tf.convert_to_tensor(labels.data.numpy()))
 
-            logs, preds = ensemble.predict(tf.convert_to_tensor(inputs.data.numpy()))
+            logs, preds = ensemble.predict(inputs)
             logits.append(logs)
             predictions.append(preds)
 
-        data = tf.concat(data, axis=0)
-        logits = tf.concat(logits, axis=0)
-        predictions = tf.concat(predictions, axis=0)
-        targets = tf.concat(targets, axis=0)
+        data = tf.concat(data, axis=0).numpy()
+        logits = tf.concat(logits, axis=0).numpy()
+        predictions = tf.concat(predictions, axis=0).numpy()
+        targets = tf.concat(targets, axis=0).numpy()
 
-        # Some kind of sanity check
-        preds = np.argmax(np.mean(predictions.numpy(), axis=1), axis=-1)
+        # Check accuracy
+        preds = np.argmax(np.mean(predictions, axis=1), axis=-1)
         acc = np.mean(preds == np.array(data_set.set.targets))
         LOGGER.info("Accuracy on {} data set is: {}".format(label, acc))
 
         grp = hf.create_group(label)
-        grp.create_dataset("data", data.numpy())
-        grp.create_dataset("logits", logits.numpy())
-        grp.create_dataset("predictions", predictions.numpy())
-        grp.create_dataset("targets", targets.numpy())
+        grp.create_dataset("data", data=data)
+        grp.create_dataset("logits", data=logits)
+        grp.create_dataset("predictions", data=predictions)
+        grp.create_dataset("targets", data=targets)
 
     return logits, predictions
 
@@ -80,14 +85,14 @@ def ensemble_predictions_corrupted_data():
     data_set_size = 10000
 
     data_dir = "../../dataloaders/data/ensemble_predictions/"
-    hf = h5py.File(data_dir + 'ensemble_predictions.h5', 'w')
+    hf = h5py.File(data_dir + 'ensemble_predictions.h5', 'a')
 
     for i, corruption in enumerate(corruption_list):
-        corr_grp = hf.create_group(corruption)
+        corr_grp = hf[corruption] #hf.create_group(corruption)
 
         # Load the data
-        data = cifar10_corrupted.Cifar10DataCorrupted(corruption=corruption, data_dir="../dataloaders/data/CIFAR-10-C/",
-                                                      torch=False)
+        data = cifar10_corrupted.Cifar10DataCorrupted(corruption=corruption,
+                                                      data_dir="../../dataloaders/data/CIFAR-10-C/", torch=False)
         dataloader = torch.utils.data.DataLoader(data.set,
                                                  batch_size=100,
                                                  shuffle=False,
@@ -95,6 +100,7 @@ def ensemble_predictions_corrupted_data():
 
         data = []
         predictions = []
+        logits = []
         targets = []
         intensity = 1
         for j, batch in enumerate(dataloader):
@@ -104,20 +110,24 @@ def ensemble_predictions_corrupted_data():
 
             inputs = tf.convert_to_tensor(inputs.data.numpy())
             data.append(inputs)
-            logits, preds = ensemble.predict(inputs)
+            logs, preds = ensemble.predict(inputs)
             predictions.append(preds)
+            logits.append(logs)
 
-            if (j * dataloader.batch_size) == data_set_size:
-                sub_grp = corr_grp.create_group("intensity_" + str(intensity))
+            if ((j+1) * dataloader.batch_size) == data_set_size:
+                sub_grp = corr_grp["intensity_" + str(intensity)]#corr_grp.create_group("intensity_" + str(intensity))
 
                 data = tf.concat(data, axis=0).numpy()
-                sub_grp.create_dataset("data", data)
+                sub_grp["data"] = data #sub_grp.create_dataset("data", data=data)
 
                 predictions = tf.concat(predictions, axis=0).numpy()
-                sub_grp.create_dataset("predictions", predictions)
+                sub_grp["predictions"] = predictions #sub_grp.create_dataset("predictions", data=predictions)
+
+                logits = tf.concat(logits, axis=0).numpy()
+                sub_grp.create_dataset("logits", data=logits)
 
                 targets = tf.concat(targets, axis=0).numpy()
-                sub_grp.create_dataset("targets", targets)
+                sub_grp["targets"] = targets #sub_grp.create_dataset("targets", data=targets)
 
                 preds = np.argmax(np.mean(predictions, axis=1), axis=-1)
                 acc = np.mean(preds == targets)
@@ -125,6 +135,7 @@ def ensemble_predictions_corrupted_data():
 
                 data = []
                 predictions = []
+                logits = []
                 targets = []
                 intensity += 1
 

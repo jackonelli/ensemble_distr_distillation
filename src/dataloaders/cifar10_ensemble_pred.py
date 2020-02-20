@@ -14,7 +14,8 @@ class Cifar10Data:
     data is organized as ((img, ensemble preds, ensemble logits), labels)
     """
 
-    def __init__(self, ind=None, train=True, augmentation=False, data_dir="../dataloaders/data/ensemble_predictions/"):
+    def __init__(self, ind=None, train=True, augmentation=False, corrupted=False,
+                 data_dir="../../dataloaders/data/ensemble_predictions/"):
         self._log = logging.getLogger(self.__class__.__name__)
 
         if augmentation:
@@ -25,7 +26,7 @@ class Cifar10Data:
         else:
             self.transform = transforms.ToTensor()
 
-        filepath = data_dir + 'ensemble_predictions.h5'
+        filepath = data_dir + "ensemble_predictions.h5"
 
         with h5py.File(filepath, 'r') as f:
             if train:
@@ -39,21 +40,60 @@ class Cifar10Data:
             targets = data_grp["targets"][()]
 
         if ind is None:
-            self.data = (data, predictions, logits)
-            self.targets = targets
+            data = (data, predictions, logits)
+            targets = targets
 
         else:
-            self.data = (data[ind, :, :, :], predictions[ind, :, :], logits[ind, :, :])
-            self.targets = targets[ind]
+            data = (data[ind, :, :, :], predictions[ind, :, :], logits[ind, :, :])
+            targets = targets[ind]
 
-        ensemble_predictions = np.argmax(np.mean(self.data[1], axis=1), axis=-1)
-        acc = np.mean(ensemble_predictions == np.squeeze(self.targets))
+        if corrupted:
+            training_inds = np.load(data_dir + "corrupted_data_indices.npy")[:5000]
+
+            corrupted_data = []
+            corrupted_predictions = []
+            corrupted_logits = []  # TODO: Predict and save this
+            corrupted_targets = []
+            corruptions = ["contrast", "frost", "gaussian_blur", "impulse_noise"]
+
+            filepath = data_dir + "ensemble_predictions_corrupted_data.h5"
+            with h5py.File(filepath, 'r') as f:
+
+                for corruption in corruptions:
+                    grp = f[corruption]
+
+                    for i in (1, 2):
+                        sub_grp = grp["intensity_" + str(i)]
+
+                        corrupted_data.append(sub_grp["data"][()][training_inds, :, :, :])
+                        corrupted_predictions.append(sub_grp["predictions"][()][training_inds, :, :])
+                        corrupted_logits.append(sub_grp["logits"][()][training_inds, :, :])
+                        corrupted_targets.append(sub_grp["targets"][()][training_inds])
+
+            data[0] = np.concatenate((data[0] / 255, np.concatenate(corrupted_data, axis=0)), axis=0)
+            data[1] = np.concatenate((data[1], np.concatenate(corrupted_predictions, axis=0)), axis=0)
+            data[2] = np.concatenate((data[2], np.concatenate(corrupted_logits, axis=0)), axis=0)
+            targets = np.concatenate((targets, np.concatenate(corrupted_targets, axis=0)), axis=0)
+
+        self.set = CustomSet(data[0], data[1], data[2], targets, self.transform)
+
+        ensemble_predictions = np.argmax(np.mean(self.set.data[1], axis=1), axis=-1)
+        acc = np.mean(ensemble_predictions == np.squeeze(self.set.targets))
         print("Ensemble accuracy: {}".format(acc))
 
-        self.input_size = self.data[0].shape[0]
         self.classes = ("plane", "car", "bird", "cat", "deer", "dog", "frog",
                         "horse", "ship", "truck")
         self.num_classes = len(self.classes)
+
+
+class CustomSet():
+
+    def __init__(self, img, predictions, logits, targets, transform):
+        self.data = (img, predictions, logits)
+        self.targets = targets
+        self.transform = transform
+
+        self.input_size = self.data[0].shape[0]
 
     def __len__(self):
         return self.input_size
@@ -71,6 +111,7 @@ class Cifar10Data:
 
         # doing this so that it is consistent with all other datasets
         # to return a PIL Image
+
         img = Image.fromarray(img)
 
         if self.transform is not None:
@@ -83,11 +124,12 @@ class Cifar10Data:
         return (img, preds, logits), target
 
 
+
 def main():
     """Entry point for debug visualisation"""
     # get some random training images
-    data = Cifar10Data(data_dir="data/ensemble_predictions/")
-    loader = torch.utils.data.DataLoader(data,
+    data = Cifar10Data(data_dir="data/ensemble_predictions/", corrupted=True)
+    loader = torch.utils.data.DataLoader(data.set,
                                          batch_size=4,
                                          shuffle=True,
                                          num_workers=0)

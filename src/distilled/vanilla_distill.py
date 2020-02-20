@@ -5,6 +5,7 @@ import src.loss as custom_loss
 import src.distilled.distilled_network as distilled_network
 
 
+# TODO: remove??
 class VanillaDistill(distilled_network.DistilledNet):
     def __init__(self,
                  layer_sizes,
