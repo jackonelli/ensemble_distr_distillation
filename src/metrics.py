@@ -200,7 +200,7 @@ def accuracy(predicted_distribution, true_labels):
 def accuracy_logits(logits_distr_par,
                     targets,
                     label_targets=False,
-                    num_samples=50):
+                    num_samples=100):
     """ Accuracy given that the inputs are parameters of the normal distribution over logits.
 
     B = batch size
@@ -236,7 +236,7 @@ def accuracy_logits(logits_distr_par,
         target_labels = targets
 
     else:
-        torch.zeros(mean.size(0), targets.size(1), 1) # to.(torch.device("cuda")) if using gpu
+        last_dim = torch.zeros(mean.size(0), targets.size(1), 1)  # .to(torch.device("cuda")) if using gpu
         target_distribution = torch.mean((torch.nn.Softmax(dim=-1))(torch.cat(
             (targets, last_dim), dim=-1)),
                                          dim=1)
