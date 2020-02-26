@@ -76,15 +76,16 @@ def make_boxplot(data_list, file_dir, label="ACC", model_list=None, colors=None,
     plt.show()
 
 
-def repeat_acc_ece_exp():
+def ood_data_experiment():
+    """Repeat experiment from Ovidia et al. (2019), plotting boxplots on accuracy and ece on corrupted data"""
 
     data_dir = "../../dataloaders/data/"
 
     model_list = ["distilled", "vanilla_distill", "ensemble_new", "vanilla", "temp_scaling",
                   "dropout_nofirst", "ll_dropout", "svi", "ll_svi"]
-    corruption_list = ["brightness"]#, "contrast", "defocus_blur", "elastic_transform", "fog", "frost",
-                       #"gaussian_blur", "gaussian_noise", "glass_blur", "impulse_noise", "pixelate",
-                       #"saturate", "shot_noise", "spatter", "speckle_noise", "zoom_blur"]
+    corruption_list = ["brightness", "contrast", "defocus_blur", "elastic_transform", "fog", "frost",
+                       "gaussian_blur", "gaussian_noise", "glass_blur", "impulse_noise", "pixelate",
+                       "saturate", "shot_noise", "spatter", "speckle_noise", "zoom_blur"]
     intensity_list = [0, 1, 2, 3, 4, 5]
     rep_list = [1, 2, 3, 4, 5]
     ensemble_inds = np.load("data/ensemble_indices.npy")
@@ -114,7 +115,7 @@ def repeat_acc_ece_exp():
                                                                                       rep=rep,
                                                                                       ensemble_indices=inds)
 
-                    if (model == "distilled") or (model == "ensemble_new") or (model == "ood_distill"):
+                    if (model == "distilled") or (model == "ensemble_new"):
                         data.set.predictions = np.mean(data.set.predictions, axis=1)
 
                     acc[i, k-1, j] = metrics.accuracy(torch.tensor(data.set.predictions),
@@ -132,33 +133,13 @@ def repeat_acc_ece_exp():
                  colors=colors, max_y=0.8)
 
 
-def make_h5py_data_file():
-    corruption_list = ["brightness", "contrast", "defocus_blur", "elastic_transform", "fog", "frost", "gaussian_blur",
-                       "gaussian_noise", "glass_blur", "impulse_noise", "motion_blur", "pixelate", "saturate",
-                       "shot_noise", "snow", "spatter", "speckle_noise", "zoom_blur"]
-
-    data_dir = "../../dataloaders/data/CIFAR-10-C/"
-    hf = h5py.File(data_dir + "corrupted_data.h5", 'w')
-    grp = hf.create_group("labels")
-    labels = np.load(data_dir + "labels.npy")
-    grp.create_dataset("labels", data=labels)
-
-    for corruption in corruption_list:
-        print(corruption)
-        grp = hf.create_group(corruption)
-
-        data = np.load(data_dir + corruption + ".npy")
-        grp.create_dataset("data", data=data)
-    hf.close()
-
-
-def entropy_test():
+def entropy_evaluation():
     """Compare entropy of ensemble and distilled model"""
 
     data_dir = "../../dataloaders/data/"
 
-    model_list = ["ensemble_new", "distilled"] #, "ood_distill"]
-    model_list_text = ["Ensemble", "Distilled"] #, "Distilled + OOD"]
+    model_list = ["ensemble_new", "distilled"]
+    model_list_text = ["Ensemble", "Distilled"]
 
     rep = 1
 
@@ -171,7 +152,6 @@ def entropy_test():
     al_unc = np.zeros((len(model_list), data_inds.shape[0]))
 
     colors = ["#B2DF8A", "#A6CEE3"]
-    edge_colors = ["#33A02C", "#1F78B4"]
 
     fig, ax = plt.subplots(1, 2)
 
@@ -207,84 +187,7 @@ def entropy_test():
     plt.show()
 
 
-def distillation_comparison():
-    """Compare distilled models with ensemble, performance on OOD data"""
-    data_dir = "../../dataloaders/data/"
-
-    model_list = ["ensemble_new", "ensemble_new", "distilled", "ood_distill"]
-    model_list_text = ["Ensemble", "Full ensemble", "Distilled", "Distilled + OOD"]
-
-    corruption_list = ["brightness", "defocus_blur", "elastic_transform", "fog", "gaussian_noise", "glass_blur",
-                       "pixelate", "saturate", "shot_noise", "spatter", "speckle_noise", "zoom_blur"]
-
-    intensity_list = [0, 1, 2, 3, 4, 5]
-
-    rep_list = [1]
-
-    data_inds = np.load("data/corrupted_data_indices.npy")[5000:]
-    ensemble_inds = np.load("data/ensemble_indices.npy")
-    ensemble_size = 10
-    max_entropy = torch.log(torch.tensor(10, dtype=torch.float))
-
-    acc_mean = np.zeros((len(model_list), len(intensity_list)))
-    acc_var = np.zeros((len(model_list), len(intensity_list)))
-    entropy_mean = np.zeros((len(model_list), len(intensity_list)))
-    entropy_var = np.zeros((len(model_list), len(intensity_list)))
-
-    fig, ax = plt.subplots(1, 2)
-
-    for i, model in enumerate(model_list):
-        print(model)
-        for j, intensity in enumerate(intensity_list):
-            print(intensity)
-
-            acc = np.zeros((len(corruption_list), len(intensity_list)))
-            entropy = np.zeros((len(corruption_list), len(intensity_list)))
-            for k, corruption in enumerate(corruption_list):
-                print(corruption)
-                for l, rep in enumerate(rep_list):
-
-                    if model == "ensemble_new":
-                        ens_inds = ensemble_inds[(rep * ensemble_size):(rep + 1) * ensemble_size]
-
-                        if i == 1:
-                            reps = None
-                        else:
-                            reps = rep
-                    else:
-                        ens_inds = None
-                        reps = rep
-
-                    data = cifar10_benchmark_model_predictions.Cifar10DataPredictions(model=model,
-                                                                                      corruption=corruption,
-                                                                                      intensity=intensity,
-                                                                                      data_dir=data_dir,
-                                                                                      rep=reps,
-                                                                                      ensemble_indices=ens_inds)
-
-                    predictions = torch.tensor(np.mean(data.set.predictions[data_inds, :, :], axis=1))
-                    acc[k, l] = metrics.accuracy(predictions,
-                                                 torch.tensor(data.set.targets[data_inds], dtype=torch.long))
-                    entropy[k, l] = metrics.entropy(predictions).mean() / max_entropy
-
-            acc_mean[i, j] = np.mean(acc.reshape(-1))
-            acc_var[i, j] = np.var(acc.reshape(-1))
-            entropy_mean[i, j] = np.mean(entropy.reshape(-1))
-            entropy_var[i, j] = np.var(entropy.reshape(-1))
-
-        ax[0].errorbar(intensity_list, acc_mean[i, :], yerr=acc_var[i, :], label=model_list_text[i])
-        ax[1].errorbar(intensity_list, entropy_mean[i, :], yerr=entropy_var[i, :], label=model_list_text[i])
-
-    ax[0].set_xlabel("Intensity")
-    ax[0].set_ylabel("Accuracy")
-    ax[0].legend(loc='upper right')
-    ax[1].set_xlabel("Intensity")
-    ax[1].set_ylabel("Total entropy")
-    ax[1].legend(loc='upper right')
-    plt.show()
-
-
-def params_test():
+def params_evaluation():
     """Compare params from distilled model with ensemble output mean and var"""
 
     data_dir = "../../dataloaders/data/"
@@ -341,16 +244,37 @@ def params_test():
     plt.show()
 
 
+def make_h5py_data_file():
+    """Save all corrupted data sets into one h5 file"""
+
+    corruption_list = ["brightness", "contrast", "defocus_blur", "elastic_transform", "fog", "frost", "gaussian_blur",
+                       "gaussian_noise", "glass_blur", "impulse_noise", "motion_blur", "pixelate", "saturate",
+                       "shot_noise", "snow", "spatter", "speckle_noise", "zoom_blur"]
+
+    data_dir = "../../dataloaders/data/CIFAR-10-C/"
+    hf = h5py.File(data_dir + "corrupted_data.h5", 'w')
+    grp = hf.create_group("labels")
+    labels = np.load(data_dir + "labels.npy")
+    grp.create_dataset("labels", data=labels)
+
+    for corruption in corruption_list:
+        print(corruption)
+        grp = hf.create_group(corruption)
+
+        data = np.load(data_dir + corruption + ".npy")
+        grp.create_dataset("data", data=data)
+    hf.close()
+
+
 def main():
     args = utils.parse_args()
     log_file = Path("{}.log".format(datetime.now().strftime('%Y%m%d_%H%M%S')))
     utils.setup_logger(log_path=Path.cwd() / args.log_dir / log_file,
                        log_level=args.log_level)
 
-    #repeat_acc_ece_exp()
-    #distillation_comparison()
-    entropy_test()
-    params_test()
+    ood_data_experiment()
+    #entropy_evaluation()
+    #params_evaluation()
 
 
 if __name__ == "__main__":

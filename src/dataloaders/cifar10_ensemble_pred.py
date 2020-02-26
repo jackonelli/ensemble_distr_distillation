@@ -65,15 +65,15 @@ class Cifar10Data:
                     for i in (1, 2):
                         sub_grp = grp["intensity_" + str(i)]
 
-                        corrupted_data.append(sub_grp["data"][()][training_inds, :, :, :])
+                        corrupted_data.append(sub_grp["data"][()][training_inds, :, :, :] * 255)
                         corrupted_predictions.append(sub_grp["predictions"][()][training_inds, :, :])
                         corrupted_logits.append(sub_grp["logits"][()][training_inds, :, :])
                         corrupted_targets.append(sub_grp["targets"][()][training_inds])
 
-            data[0] = np.concatenate((data[0] / 255, np.concatenate(corrupted_data, axis=0)), axis=0)
+            data[0] = np.concatenate((data[0], np.concatenate(corrupted_data, axis=0)), axis=0)
             data[1] = np.concatenate((data[1], np.concatenate(corrupted_predictions, axis=0)), axis=0)
             data[2] = np.concatenate((data[2], np.concatenate(corrupted_logits, axis=0)), axis=0)
-            targets = np.concatenate((targets, np.concatenate(corrupted_targets, axis=0)), axis=0)
+            targets = np.concatenate((np.concatenate(corrupted_targets, axis=0)), axis=0)
 
         self.set = CustomSet(data[0], data[1], data[2], targets, self.transform)
 

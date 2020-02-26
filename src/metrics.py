@@ -15,7 +15,7 @@ class Metric:
         self.function = function
         self.running_value = 0.0
         self.counter = 0
-        self.memory = []  # So that we can go back an look at the data
+        self.memory = []
 
     def __str__(self, decimal_places=3):
         return "{}: {:.3f}".format(self.name, self.mean())

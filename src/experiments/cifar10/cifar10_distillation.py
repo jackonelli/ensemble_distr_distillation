@@ -2,8 +2,6 @@ import numpy as np
 import logging
 import torch
 import h5py
-import matplotlib.pyplot as plt
-import scipy.stats as scipy_stats
 from src import utils
 from src import metrics
 from pathlib import Path
@@ -12,21 +10,24 @@ from src.dataloaders import cifar10_corrupted
 from src.dataloaders import cifar10_ensemble_pred
 from src.ensemble import tensorflow_ensemble
 from src.distilled import cifar_resnet_logits
-from src import resnet_utils
+from src.experiments.cifar10 import resnet_utils
 
 LOGGER = logging.getLogger(__name__)
 
 
-def train_distilled_network():
+def train_distilled_network(vanilla=False):
+    """Distill ensemble either with distribution distillation or mixture distillation"""
+
     args = utils.parse_args()
 
     log_file = Path("{}.log".format(datetime.now().strftime('%Y%m%d_%H%M%S')))
     utils.setup_logger(log_path=Path.cwd() / args.log_dir / log_file,
                        log_level=args.log_level)
 
-    N = 50000
-    train_ind = np.random.choice(np.arange(0, N), size=40000, replace=False)
-    valid_ind = np.stack([i for i in np.arange(N) if i not in train_ind])
+    data_ind = np.load("data/training_data_indices.npy")
+    num_train_points = 40000
+    train_ind = data_ind[:num_train_points]
+    valid_ind = data_ind[num_train_points:]
 
     train_set = cifar10_ensemble_pred.Cifar10Data(ind=train_ind, augmentation=True)
     valid_set = cifar10_ensemble_pred.Cifar10Data(ind=valid_ind)
@@ -57,12 +58,15 @@ def train_distilled_network():
                                                             resnet_utils.Bottleneck,
                                                             [2, 2, 2, 2],
                                                             learning_rate=args.lr,
-                                                            scale_teacher_logits=True)
+                                                            scale_teacher_logits=True,
+                                                            vanilla_distillation=vanilla)
 
     loss_metric = metrics.Metric(name="Mean loss", function=distilled_model.calculate_loss)
     distilled_model.add_metric(loss_metric)
-    #acc_metric = metrics.Metric(name="Mean rel acc", function=metrics.accuracy_logits)
-    #distilled_model.add_metric(acc_metric)
+
+    if not vanilla:
+        acc_metric = metrics.Metric(name="Relative accuracy", function=metrics.accuracy_logits)
+        distilled_model.add_metric(acc_metric)
 
     distilled_model.train(train_loader, num_epochs=args.num_epochs, validation_loader=valid_loader)
 
@@ -78,11 +82,13 @@ def train_distilled_network():
         model_acc += metrics.accuracy(predicted_distribution.to(distilled_model.device), labels.int())
         counter += 1
 
-    torch.save(distilled_model.state_dict(), "../models/distilled_model_cifar10")
+    torch.save(distilled_model.state_dict(), "models/distilled_model_cifar10")
 
 
 def predictions(model_dir="../models/distilled_model_cifar10",
                 file_dir="../../dataloaders/data/distilled_model_predictions.h5", vanilla=False):
+    """Make and save predictions on train and test data with distilled model at model_dir"""
+
     args = utils.parse_args()
 
     train_set = cifar10_ensemble_pred.Cifar10Data()
@@ -149,7 +155,6 @@ def predictions(model_dir="../models/distilled_model_cifar10",
             logits = np.concatenate(logits, axis=0)
             preds = np.argmax(np.mean(pred_samples, axis=1), axis=-1)
 
-
         # Check accuracy
         acc = np.mean(preds == targets)
         LOGGER.info("Accuracy on {} data set is: {}".format(label, acc))
@@ -176,6 +181,8 @@ def predictions(model_dir="../models/distilled_model_cifar10",
 
 def predictions_corrupted_data(model_dir="../models/distilled_model_cifar10",
                                file_dir="../../dataloaders/data/distilled_model_predictions.h5", vanilla=False):
+    """Make predictions on corrupted data with distilled model at model_dir"""
+
     args = utils.parse_args()
 
     # Load model
@@ -197,7 +204,6 @@ def predictions_corrupted_data(model_dir="../models/distilled_model_cifar10",
                        "gaussian_noise", "glass_blur", "impulse_noise", "motion_blur", "pixelate", "saturate",
                        "shot_noise", "snow", "spatter", "speckle_noise", "zoom_blur"]
 
-
     hf = h5py.File(file_dir, 'w')
 
     for i, corruption in enumerate(corruption_list):
@@ -215,7 +221,6 @@ def predictions_corrupted_data(model_dir="../models/distilled_model_cifar10",
                                                      batch_size=100,
                                                      shuffle=False,
                                                      num_workers=2)
-
             # data = []
             predictions = []
             targets = []
@@ -280,152 +285,17 @@ def predictions_corrupted_data(model_dir="../models/distilled_model_cifar10",
     hf.close()
 
 
-def evaluate_parameters(data_set, data_label="", file_dir="../../dataloaders/data/distilled_model_predictions.h5",
-                        teacher_ind=None):
-    """Comparison of mean and var histograms of ensemble and distilled model"""
-
-    # Loading predictions from file
-    with h5py.File(file_dir, 'r') as f:
-        data_item = f[data_set]
-        distilled_model_mean = data_item["mean"][()]
-        distilled_model_var = data_item["var"][()]
-        ensemble_logits = data_item["teacher-logits"][()]
-
-    if teacher_ind is not None:
-        ensemble_logits = ensemble_logits[:, teacher_ind, :]
-
-    max_value = 1000
-    num_inf = np.sum(np.isinf(distilled_model_var))
-    LOGGER.info("Setting {} infinite variance(s) to {}.".format(num_inf, max_value))
-    distilled_model_var[np.isinf(distilled_model_var)] = max_value
-
-    scaled_ensemble_logits = ensemble_logits - ensemble_logits[:, :, -1][:, :, np.newaxis]
-    ensemble_mean = np.mean(scaled_ensemble_logits, axis=1)
-    ensemble_var = np.var(scaled_ensemble_logits, axis=1)
-
-    metric_list = [[ensemble_mean, distilled_model_mean], [ensemble_var, distilled_model_var]]
-    metric_labels = ["mean", "variance"]
-
-    num_bins = 100
-
-    for metric, metric_label in zip(metric_list, metric_labels):
-        ensemble_metric = metric[0]
-        distilled_model_metric = metric[1]
-
-        fig, axis = plt.subplots(5, 2)
-
-        for i, ax in enumerate(axis.reshape(-1)[:-1]):
-            ax.hist(ensemble_metric[:, i], bins=num_bins, alpha=0.5, density=True, label="Ensemble")
-            ax.hist(distilled_model_metric[:, i], bins=num_bins, alpha=0.3, density=True, label="Distilled model")
-            ax.set_xlabel("Logit " + metric_label + ", dim " + str(i+1))
-            ax.legend()
-
-        fig.suptitle(data_label + ", logit " + metric_label)
-        plt.show()
-
-
-def evaluate_uncertainty(data_set, data_label="", file_dir="../../dataloaders/data/distilled_model_predictions.h5",
-                         teacher_ind=None):
-    """Comparison of entropy histograms of ensemble and distilled model"""
-
-    # Loading predictions from file
-    with h5py.File(file_dir, 'r') as f:
-        data_item = f[data_set]
-        distilled_model_predictions = data_item["predictions"][()]
-        ensemble_predictions = data_item["teacher-predictions"][()]
-
-    if teacher_ind is not None:
-        ensemble_predictions = ensemble_predictions[:, teacher_ind, :]
-
-    distilled_model_tot_unc, distilled_model_ep_unc, distilled_model_al_unc = \
-        metrics.uncertainty_separation_entropy(distilled_model_predictions, correct_nan=True)
-
-    ensemble_tot_unc, ensemble_ep_unc, ensemble_al_unc = metrics.uncertainty_separation_entropy(ensemble_predictions,
-                                                                                                correct_nan=True)
-
-    metric_list = [[ensemble_tot_unc, distilled_model_tot_unc], [ensemble_ep_unc, distilled_model_ep_unc],
-                   [ensemble_al_unc, distilled_model_al_unc]]
-    metric_labels = ["total uncertainty", "epistemic uncertainty", "aleatoric uncertainty"]
-
-    num_bins = 100
-
-    fig, axis = plt.subplots(1, 3)
-
-    for metric, metric_label, ax in zip(metric_list, metric_labels, axis.reshape(-1)):
-        ensemble_metric = metric[0]
-        distilled_model_metric = metric[1]
-
-        ax.hist(ensemble_metric, bins=num_bins, alpha=0.5, density=True, label="Ensemble")
-        ax.hist(distilled_model_metric, bins=num_bins, alpha=0.3, density=True, label="Distilled model")
-        ax.set_xlabel(metric_label)
-        ax.legend()
-
-    fig.suptitle(data_label + ", " + "uncertainty")
-    plt.show()
-
-
-def check_distribution(data_set="train", file_dir="../../dataloaders/data/distilled_model_predictions.h5",
-                       data_ind=None, teacher_ind=None):
-
-    with h5py.File(file_dir, 'r') as f:
-        data_item = f[data_set]
-        mean = data_item["mean"][()]
-        var = data_item["var"][()]
-        samples = data_item["teacher-logits"][()]
-
-    if data_ind is None:
-        data_ind = np.random.choice(np.arange(0, samples.shape[0]), size=1)
-
-    if teacher_ind is not None:
-        samples = samples[:, teacher_ind, :]
-
-    fig, axis = plt.subplots(5, 2)
-
-    for i, ax in enumerate(axis.reshape(-1)[:-1]):
-
-        x = np.linspace(mean[data_ind, i] - 3 * np.sqrt(var[data_ind, i]),
-                        mean[data_ind, i] + 3 * np.sqrt(var[data_ind, i]), 100)
-        ax.plot(x, scipy_stats.norm.pdf(x, mean[data_ind, i], np.sqrt(var[data_ind, i])))
-        ax.plot(samples[data_ind, :, i], scipy_stats.norm.pdf(samples[data_ind, :, i],
-                                                              mean[data_ind, i], np.sqrt(var[data_ind, i])), 'o')
-        ax.set_xlabel("Dim " + str(i))
-
-    fig.suptitle("Ensemble predictions and estimated distribution, {} data point".format(data_set))
-    plt.show()
-
-
-def evaluate_model(file_dir="../../dataloaders/data/distilled_model_predictions.h5", teacher_ind=None):
-
-    data_list = ["train", "test"]
-    data_labels = ["Train set", "Test set"]
-
-    for data_set, data_label in zip(data_list, data_labels):
-        evaluate_parameters(data_set, data_label=data_label, file_dir=file_dir, teacher_ind=teacher_ind)
-        evaluate_uncertainty(data_set, data_label=data_label, file_dir=file_dir, teacher_ind=teacher_ind)
-
-
-def create_index_permutation_file(max_val, file_dir):
-    indices = np.random.choice(max_val, size=max_val, replace=False)
-    np.save(file_dir, indices)
-
-
 def main():
     args = utils.parse_args()
     log_file = Path("{}.log".format(datetime.now().strftime('%Y%m%d_%H%M%S')))
     utils.setup_logger(log_path=Path.cwd() / args.log_dir / log_file,
                        log_level=args.log_level)
     LOGGER.info("Args: {}".format(args))
-    #evaluate_model(file_dir="../../dataloaders/data/distilled_model_predictions_ens10.h5",
-    #               teacher_ind=[44, 8, 7, 2, 43, 47, 3, 15, 21, 24])
-    #check_distribution(file_dir="../../dataloaders/data/distilled_model_predictions_ens10.h5")
-    predictions(model_dir="../models/distilled_model_cifar10_vanilla_3",
-                file_dir="../../dataloaders/data/distilled_model_vanilla_3_predictions.h5", vanilla=True)
-    #predictions_corrupted_data(model_dir="../models/distilled_model_cifar10_1",
-    #                           file_dir="../../dataloaders/data/distilled_model_corrupted_predictions_ens10.h5")
 
-    #create_index_permutation_file(50, "data/ensemble_indices")
-    #create_index_permutation_file(10000, "data/corrupted_data_indices")
-    #create_index_permutation_file(50000, "data/training_data_indices")
+    predictions(model_dir="../models/distilled_model_cifar10",
+                file_dir="../../dataloaders/data/distilled_model_predictions.h5")
+    #predictions_corrupted_data(model_dir="../models/distilled_model_cifar10_1",
+    #                           file_dir="../../dataloaders/data/distilled_model_predictions_corrupted_data.h5")
 
 
 if __name__ == "__main__":
