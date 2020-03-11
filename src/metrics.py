@@ -15,7 +15,7 @@ class Metric:
         self.function = function
         self.running_value = 0.0
         self.counter = 0
-        self.memory = []  # So that we can go back an look at the data
+        self.memory = []
 
     def __str__(self, decimal_places=3):
         return "{}: {:.3f}".format(self.name, self.mean())
@@ -40,7 +40,7 @@ class Metric:
         self.counter = 0
 
 
-def entropy(predicted_distribution, true_labels, correct_nan=False):
+def entropy(predicted_distribution, true_labels=None, correct_nan=False):
     """Entropy
 
     B = batch size, C = num classes
@@ -63,7 +63,6 @@ def entropy(predicted_distribution, true_labels, correct_nan=False):
     if correct_nan:
         entr = predicted_distribution * torch.log(predicted_distribution)
         entr[torch.isnan(entr)] = 0
-        # FRÅGAN ÄR OM DET SKULLE VARA LOGISKT ATT UTESLUTA DESSA ISTÄLLET
         entr = -torch.sum(entr, dim=-1)
     else:
         entr = -torch.sum(
@@ -122,8 +121,9 @@ def uncertainty_separation_variance(predicted_distribution, true_labels):
 
 
 def uncertainty_separation_entropy(predicted_distribution,
-                                   true_labels,
-                                   logits=False):
+                                   true_labels=None,
+                                   logits=False,
+                                   correct_nan=False):
     """Total, epistemic and aleatoric uncertainty based on entropy of categorical distribution
 
     B = batch size, C = num classes, N = num predictions
@@ -144,8 +144,11 @@ def uncertainty_separation_entropy(predicted_distribution,
         Aleatoric uncertainty: torch.tensor(B,)
     """
 
+    if isinstance(predicted_distribution, np.ndarray):
+        predicted_distribution = torch.tensor(predicted_distribution)
+
     max_entropy = torch.log(
-        torch.tensor(predicted_distribution.size(-1)).float())
+        torch.tensor(predicted_distribution.size(-1), dtype=torch.float))
 
     if logits:
         log_sum_exp_logits = torch.logsumexp(predicted_distribution,
@@ -163,6 +166,13 @@ def uncertainty_separation_entropy(predicted_distribution,
 
     total_uncertainty = entropy(mean_predicted_distribution,
                                 None) / max_entropy
+    if correct_nan:
+        num_nan = torch.sum(torch.isnan(total_uncertainty)) + torch.sum(
+            torch.isnan(aleatoric_uncertainty))
+        LOGGER.info("Setting {} nan value(s) to 0.".format(num_nan))
+        total_uncertainty[torch.isnan(total_uncertainty)] = 0
+        aleatoric_uncertainty[torch.isnan(aleatoric_uncertainty)] = 0
+
     epistemic_uncertainty = total_uncertainty - aleatoric_uncertainty
 
     return total_uncertainty, epistemic_uncertainty, aleatoric_uncertainty
@@ -191,7 +201,7 @@ def accuracy(predicted_distribution, true_labels):
 def accuracy_logits(logits_distr_par,
                     targets,
                     label_targets=False,
-                    num_samples=50):
+                    num_samples=100):
     """ Accuracy given that the inputs are parameters of the normal distribution over logits.
 
     B = batch size
@@ -228,8 +238,8 @@ def accuracy_logits(logits_distr_par,
         target_labels = targets
 
     else:
-        torch.zeros(mean.size(0), targets.size(1),
-                    1)  # to.(torch.device("cuda")) if using gpu
+        last_dim = torch.zeros(mean.size(0), targets.size(1),
+                               1)  # .to(torch.device("cuda")) if using gpu
         target_distribution = torch.mean((torch.nn.Softmax(dim=-1))(torch.cat(
             (targets, last_dim), dim=-1)),
                                          dim=1)
@@ -328,3 +338,58 @@ def squared_error(predictions, targets):
 
     return ((targets - predictions[:, :targets.size(-1)])**
             2).sum().item() / number_of_elements
+
+
+def ece(predicted_distribution, labels):
+    """"" Expected Calibration Error
+    B = batch size
+    D = output dimension
+
+    Args:
+        labels: np.ndarray(B,)
+        predictions: np.ndarray(B, D)
+
+    Returns:
+        Expected Calibration Error: float
+    """
+
+    num_samples = labels.shape[0]
+
+    probs_true_labels = np.zeros((predicted_distribution.shape[0], ))
+
+    confidence = np.max(predicted_distribution, axis=-1)
+    predicted_labels = np.argmax(predicted_distribution, axis=-1)
+
+    # Sort the data
+    ind = np.argsort(confidence)
+
+    confidence = confidence[ind]
+    predicted_labels = predicted_labels[ind]
+    labels = labels[ind]
+
+    # Will go for quartiles
+    split_values = np.array(
+        np.quantile(confidence, q=[0.25, 0.50, 0.75, 1.0], axis=0).tolist())
+
+    num_buckets = split_values.shape[0]
+    acc = np.zeros((num_buckets, 1))
+    conf = np.zeros((num_buckets, 1))
+    bucket_count = np.zeros((num_buckets, 1))
+
+    j = 0
+    for i in range(num_buckets):
+        while confidence[j] <= split_values[i]:
+            acc[i] += predicted_labels[j] == labels[j]
+            conf[i] += confidence[j]
+            bucket_count[i] += 1
+            j += 1
+
+            if j >= confidence.shape[0]:
+                break
+
+    acc = acc / bucket_count
+    conf = conf / bucket_count
+
+    ece = np.sum((bucket_count / num_samples) * np.abs(acc - conf))
+
+    return ece

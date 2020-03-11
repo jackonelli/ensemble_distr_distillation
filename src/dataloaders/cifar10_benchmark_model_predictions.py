@@ -9,71 +9,124 @@ class Cifar10DataPredictions:
     """Saved predictions for (corrupted) CIFAR10 data, wrapper
     """
 
-    def __init__(self, model, corruption, intensity, rep=None, data_dir="data/"):
+    def __init__(self, model, corruption, intensity, rep=None, data_dir="data/", ensemble_indices=None,
+                 extract_logits_info=False):
 
         self._log = logging.getLogger(self.__class__.__name__)
 
-        model_list = ["dropout", "dropout_nofirst", "ensemble", "ll_dropout", "ll_svi", "svi", "temp_scaling",
-                      "vanilla"]
+        model_list = ["distilled", "dropout", "dropout_nofirst", "ensemble", "ensemble_new", "ll_dropout", "ll_svi",
+                      "svi", "temp_scaling", "vanilla", "ood_distill", "vanilla_distill"]
         corruption_list = ["brightness", "contrast", "defocus_blur", "elastic_transform", "fog", "frost",
                            "gaussian_blur", "gaussian_noise", "glass_blur", "impulse_noise", "pixelate",
-                           "saturate", "shot_noise", "spatter", "speckle_noise", "zoom_blur"]
+                           "saturate", "shot_noise", "spatter", "speckle_noise", "zoom_blur", "test"]
         intensity_list = [0, 1, 2, 3, 4, 5]
 
         if (model not in model_list) or (intensity not in intensity_list) or (corruption not in corruption_list):
             print("Data not found: model, corruption or intensity does not exist")
 
-        if rep is not None and rep > 4:
-            print("Variable rep has to be between 0 and 4")
-
-        elif model == "ensemble":
-
-            filepath = "ensemble_predictions/ensemble_predictions.h5"
-
-            with h5py.File(filepath, 'r') as f:
-
-                if intensity == 0:
-                    sub_grp = f["test"]
-                else:
-                    grp = f[corruption]
-                    sub_grp = grp["intensity_" + str(intensity)]
-
-                self.predictions = sub_grp["predictions"][()]
-                self.targets = sub_grp["targets"][()]
-
-                if rep is not None:
-                    ensemble_size = 10
-                    self.predictions = self.predictions[:, rep*ensemble_size:(rep+1)*ensemble_size, :]
-                    self.targets = self.targets[:, rep*ensemble_size:(rep+1)*ensemble_size, :]
+        elif rep is not None and rep > 5:
+            print("Variable rep has to be between 1 and 5")
 
         else:
 
-            filepath = data_dir + "cifar_model_predictions.hdf5"
-
-            with h5py.File(filepath, 'r') as f:
-                grp = f[model]
+            if model == "ensemble_new":
 
                 if intensity == 0:
-                    sub_grp = grp["test"]
+                    filepath = data_dir + "ensemble_predictions/ensemble_predictions.h5"
                 else:
-                    sub_grp = grp["corrupt-static-" + corruption + "-" + str(intensity)]
+                    filepath = data_dir + "ensemble_predictions/ensemble_predictions_corrupted_data.h5"
 
-                #for key in data_set_item.keys()
-                predictions = sub_grp["probs"][()]
-                targets = sub_grp["labels"][()]
+                with h5py.File(filepath, 'r') as f:
 
-                if rep is None:
-                    self.predictions = predictions.reshape(predictions.shape[0]*predictions.shape[1], predictions.shape[2])
-                    self.targets = targets.reshape(targets.shape[0]*targets.shape[1])
+                        if intensity == 0:
+                            sub_grp = f["test"]
+                        else:
+                            grp = f[corruption]
+                            sub_grp = grp["intensity_" + str(intensity)]
+
+                        predictions = sub_grp["predictions"][()]
+                        targets = sub_grp["targets"][()]
+
+                        if extract_logits_info:
+                            self.logits = sub_grp["logits"][()]
+
+                # TODO: remove this option?
+                if rep is not None:
+
+                    if ensemble_indices is None:
+                        ensemble_size = 10
+                        predictions = predictions[:, (rep-1)*ensemble_size:rep*ensemble_size, :]
+
+                    else:
+                        predictions = predictions[:, ensemble_indices, :]
+
                 else:
-                    self.predictions = predictions[rep, :, :]
-                    self.targets = targets[rep, :]
+                    targets = np.repeat([targets], 5, axis=0).reshape(-1)
+
+            elif model == "distilled" or model == "ood_distill" or model == "vanilla_distill":
+
+                spec = ""
+                if model == "ood_distill":
+                    spec = "corr_"  # TODO: Change to ood?
+                elif model == "vanilla_distill":
+                    spec = "vanilla_"
+
+                filepath = data_dir + "distilled_model_" + spec + str(rep) + "_predictions_corrupted_data.h5"
+
+                with h5py.File(filepath, 'r') as f:
+
+                    if intensity == 0:
+                        grp = f["test"]
+                    else:
+                        grp = f[corruption]
+
+                    sub_grp = grp["intensity_" + str(intensity)]
+
+                    predictions = sub_grp["predictions"][()]
+                    targets = sub_grp["targets"][()]
+
+                    if extract_logits_info:
+                        self.mean = sub_grp["mean"][()]
+                        self.var = sub_grp["var"][()]
+
+            else:
+
+                filepath = data_dir + "cifar_model_predictions.hdf5"
+
+                with h5py.File(filepath, 'r') as f:
+                    grp = f[model]
+
+                    if intensity == 0:
+                        sub_grp = grp["test"]
+                    else:
+                        sub_grp = grp["corrupt-static-" + corruption + "-" + str(intensity)]
+
+                    predictions = sub_grp["probs"][()]
+                    targets = np.squeeze(sub_grp["labels"][()])
+
+                    if rep is None:
+                        predictions = predictions.reshape(-1, predictions.shape[-1])
+                        targets = targets.reshape(-1)
+
+                    else:
+                        predictions = predictions[rep-1, :, :]
+                        targets = targets[rep-1, :]
+
+            self.set = CustomSet(predictions, targets)
 
             self.classes = ("plane", "car", "bird", "cat", "deer", "dog", "frog",
                             "horse", "ship", "truck")
             self.num_classes = len(self.classes)
 
-            self.length = self.predictions.shape[0]
+            self.set = CustomSet(predictions, targets)
+
+
+class CustomSet:
+
+    def __init__(self, predictions, targets):
+        self.predictions = predictions
+        self.targets = targets
+        self.length = self.predictions.shape[0]
 
     def __len__(self):
         return self.length
@@ -96,7 +149,7 @@ def main():
     """Entry point for debug visualisation"""
     # get some random training images
     data = Cifar10DataPredictions("dropout", "brightness", 1)
-    loader = torch.utils.data.DataLoader(data,
+    loader = torch.utils.data.DataLoader(data.set,
                                          batch_size=4,
                                          shuffle=False,
                                          num_workers=0)

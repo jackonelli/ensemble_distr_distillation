@@ -12,22 +12,49 @@ class Cifar10DataCorrupted:
     """CIFAR data with corruptions, wrapper
     """
 
-    def __init__(self, corruption, data_dir="data/CIFAR-10-C/", torch=True):
+    def __init__(self, corruption, intensity, data_dir="data/", torch=True, ind=None):
         self._log = logging.getLogger(self.__class__.__name__)
 
-        corruption_list = ["brightness", "contrast", "defocus_blur", "elastic_transform", "fog", "frost",
+        corruption_list = ["test", "brightness", "contrast", "defocus_blur", "elastic_transform", "fog", "frost",
                            "gaussian_blur", "gaussian_noise", "glass_blur", "impulse_noise", "jpeg_compression",
                            "motion_blur", "pixelate", "saturate", "shot_noise", "snow", "spatter", "speckle_noise",
                            "zoom_blur"]
 
-        if corruption not in corruption_list:
-            self._log.info("Data not found: corruption does not exist")
+        if corruption not in corruption_list or intensity > 5:
+            self._log.info("Data not found: corruption or intensity does not exist")
 
         else:
 
-            data = np.load(data_dir + corruption + ".npy")
-            labels = np.load(data_dir + "labels.npy")
+            if corruption == "test":
+                self.set = torchvision.datasets.CIFAR10(root=data_dir,
+                                                        train=False,
+                                                        download=True)
 
+                data = np.array(self.set.data)
+                labels = self.set.targets
+
+            else:
+
+                filepath = data_dir + "corrupted_data.h5"
+                with h5py.File(filepath, 'r') as f:
+                    grp = f[corruption]
+                    data = grp["data"][()]
+                    grp = f["labels"]
+                    labels = grp["labels"][()]
+
+                set_size = 10000
+                data = data[((intensity - 1) * set_size):(intensity * set_size), :, :, :]
+                labels = labels[((intensity - 1) * set_size):(intensity * set_size)]
+
+            if ind is not None:
+                data = data[ind, :, :, :]
+                labels = [ind]
+
+            self.set = CustomSet(data, labels, torch=torch)
+
+            self.classes = ("plane", "car", "bird", "cat", "deer", "dog", "frog",
+                            "horse", "ship", "truck")
+            self.num_classes = len(self.classes)
             self.set = CustomSet(data, labels, torch=torch)
 
             self.classes = ("plane", "car", "bird", "cat", "deer", "dog", "frog",
@@ -50,7 +77,6 @@ class CustomSet:
         """
         Args:
             index (int): Index
-
         Returns:
             tuple: (image, target) where target is index of the target class.
         """
@@ -85,7 +111,6 @@ def main():
 
     # print labels
     print(" ".join("%5s" % data.classes[labels[j]] for j in range(4)))
-
 
 
 if __name__ == "__main__":

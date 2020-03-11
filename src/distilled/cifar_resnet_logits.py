@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.optim as torch_optim
 import src.loss as custom_loss
 import src.distilled.distilled_network as distilled_network
-from pathlib import Path
 import torch.nn.functional as F
 
 
@@ -15,7 +14,8 @@ class CifarResnetLogits(distilled_network.DistilledNet):
                  device=torch.device('cpu'),
                  use_hard_labels=False,
                  learning_rate=0.001,
-                 scale_teacher_logits=False):
+                 scale_teacher_logits=False,
+                 vanilla_distillation=False):
 
         super().__init__(teacher=teacher,
                          loss_function=custom_loss.gaussian_neg_log_likelihood,
@@ -23,7 +23,8 @@ class CifarResnetLogits(distilled_network.DistilledNet):
 
         self.use_hard_labels = use_hard_labels
         self.learning_rate = learning_rate
-        self.scale_teacher_logits = scale_teacher_logits
+        self.scale_teacher_logits = scale_teacher_logits # In this class, this is already determined by the linear layer, really
+        self.vanilla_distillation = vanilla_distillation
 
         self.in_planes = 64
 
@@ -33,11 +34,13 @@ class CifarResnetLogits(distilled_network.DistilledNet):
         self.layer2 = self._make_layer(block, 128, num_blocks[1], stride=2)
         self.layer3 = self._make_layer(block, 256, num_blocks[2], stride=2)
         self.layer4 = self._make_layer(block, 512, num_blocks[3], stride=2)
-        self.linear = nn.Linear(512 * block.expansion, 27)
 
-        self.optimizer = torch_optim.Adam(self.parameters(), lr=self.learning_rate)
-        self.to(self.device)
+        if self.vanilla_distillation:
+            self.output_size = 10
+        else:
+            self.output_size = 27
 
+        self.linear = nn.Linear(512 * block.expansion, self.output_size)
 
          # TODO: Temporary test of mse in beginning of training, SHOULD BE REMOVED BEFORE PUSHING (SORRY OTHERWISE)
         self.mse = False
@@ -45,7 +48,7 @@ class CifarResnetLogits(distilled_network.DistilledNet):
 
         # Ad-hoc fix zero variance.
 
-        self.variance_lower_bound = 0.001
+        self.variance_lower_bound = 0.0
         if self.variance_lower_bound > 0.0:
             self._log.warning("Non-zero variance lower bound set ({})".format(
                 self.variance_lower_bound))
@@ -67,7 +70,7 @@ class CifarResnetLogits(distilled_network.DistilledNet):
         self.loss = custom_loss.gaussian_neg_log_likelihood
         self.mse = False
 
-    def forward(self, x):
+    def forward(self, x, softmax_transform=True, t=1, return_raw=False, comp_fix=False):
         """Estimate parameters of distribution
         """
 
@@ -83,41 +86,77 @@ class CifarResnetLogits(distilled_network.DistilledNet):
         out = out.view(out.size(0), -1)
         out = self.linear(out)
 
-        split = int(out.shape[-1] / 3)
-        mean = out[:, :split]
-        var_z = out[:, split:(2*split)]
-        const = nn.ReLU(out[:, (2*split):])
+        if self.vanilla_distillation:
+            if softmax_transform:
+                out = torch.exp(out / t) / torch.sum(torch.exp(out / t), dim=-1, keepdim=True)
+            return out
 
-        var = torch.log(1 + torch.exp(var_z)) + const + self.variance_lower_bound
-        #var = torch.exp(var_z)
+        else:
+            split = int(out.shape[-1] / 3)
+            mean = out[:, :split]
+            var_z = out[:, split:(2 * split)]
+            const = nn.ReLU()(out[:, (2 * split):])
 
-        return mean, var
+            if comp_fix:
+                var = torch.zeros(var_z.size()).to(self.device)
+                var[var_z > 10] = var_z[var_z > 10] + const[var_z > 10] + self.variance_lower_bound
+                var[var_z <= 10] = torch.log(1 + torch.exp(var_z[var_z <= 10])) + const[
+                    var_z <= 10] + self.variance_lower_bound
+            else:
+                var = torch.log(1 + torch.exp(var_z)) + const + self.variance_lower_bound
 
-    def _generate_teacher_predictions(self, inputs):
+            if return_raw:
+                return mean, var, out
+            else:
+                return mean, var
+
+    def _generate_teacher_predictions(self, inputs, t=1):
         """Generate teacher predictions"""
 
-        logits = self.teacher.get_logits(inputs)
+        if self.vanilla_distillation:
+            logits = self.teacher.get_logits(inputs)
+            predictions = torch.exp(logits / t) / torch.sum(torch.exp(logits / t), dim=-1, keepdim=True)
+            mean_predictions = torch.mean(predictions, dim=1)
 
-        if self.scale_teacher_logits:
-            scaled_logits = logits - torch.stack([logits[:, :, -1]], axis=-1)
-            logits = scaled_logits[:, :, :-1]
+            return mean_predictions
 
-        return logits
+        else:
 
-    def predict(self, input_, num_samples=None, return_logits=False):
+            logits = self.teacher.get_logits(inputs)
+
+            if self.scale_teacher_logits:
+                scaled_logits = logits - torch.stack([logits[:, :, -1]], axis=-1)
+                logits = scaled_logits[:, :, :-1]
+
+            return logits
+
+    def predict(self, input_, num_samples=None, return_raw_data=False, return_logits=False, comp_fix=False):
         """Predict parameters
         Wrapper function for the forward function.
         """
 
-        samples = self.predict_logits(input_)
-
-        if return_logits:
-            return samples, nn.Softmax(dim=-1)(samples)
+        if self.vanilla_distillation:
+            return self.forward(input_)
 
         else:
-            return nn.Softmax(dim=-1)(samples)
 
-    def predict_logits(self, input_, num_samples=None):
+            samples = self.predict_logits(input_, num_samples, return_raw_data, comp_fix)
+
+            output = []
+            if return_raw_data:
+                samples, mean, var, raw_output = samples
+                output.append(mean)
+                output.append(var)
+                output.append(raw_output)
+
+            if return_logits:
+                output.append(samples)
+
+            output.append(nn.Softmax(dim=-1)(samples))
+
+            return output
+
+    def predict_logits(self, input_, num_samples=None, return_raw_data=False, comp_fix=False):
         """Predict parameters
         Wrapper function for the forward function.
         """
@@ -125,28 +164,41 @@ class CifarResnetLogits(distilled_network.DistilledNet):
         if isinstance(input_, list) or isinstance(input_, tuple):
             input_ = input_[0]
 
-        if num_samples is None:
-            num_samples = 50
+        # TODO: Consider making vanilla distillation a separate class
+        if self.vanilla_distillation:
+            return self.forward(input_, softmax_transform=False)
 
-        mean, var = self.forward(input_)
+        else:
+            if num_samples is None:
+                num_samples = 100
 
-        samples = torch.zeros(
-            [input_.size(0), num_samples,
-             int(self.output_size / 2)])
-        for i in range(input_.size(0)):
+            if return_raw_data:
+                mean, var, raw_output = self.forward(input_, return_raw=True, comp_fix=comp_fix)
+            else:
+                mean, var = self.forward(input_, comp_fix=comp_fix)
 
-            rv = torch.distributions.multivariate_normal.MultivariateNormal(
-                loc=mean[i, :], covariance_matrix=torch.diag(var[i, :]))
-            samples[i, :, :] = rv.rsample([num_samples])
+            samples = torch.zeros(
+                [input_.size(0), num_samples,
+                 int(self.output_size / 3)])
 
-        if self.scale_teacher_logits:
-            samples = torch.cat((samples, torch.zeros(samples.size(0), num_samples, 1)))
+            for i in range(input_.size(0)):
+                rv = torch.distributions.multivariate_normal.MultivariateNormal(
+                    loc=mean[i, :], covariance_matrix=torch.diag(var[i, :]))
+                samples[i, :, :] = rv.rsample([num_samples])
 
-        return samples
+            if self.scale_teacher_logits:
+                samples = torch.cat((samples, torch.zeros(samples.size(0), num_samples, 1)), dim=-1)
+
+            output = [samples]
+            if return_raw_data:
+                output.append(mean)
+                output.append(var)
+                output.append(raw_output)
+
+            return output
 
     def _learning_rate_condition(self, epoch):
-        step_epochs = [80, 120, 160, 180]
-        if epoch in step_epochs:
+        if epoch%20 == 0:
             return True
         else:
             return False
@@ -160,18 +212,6 @@ class CifarResnetLogits(distilled_network.DistilledNet):
             outputs = outputs[0]
 
         return self.loss(outputs, teacher_predictions)
-
-    # To use as a metric
-    def mean_expected_value(self, outputs, teacher_predictions):
-        exp_value = outputs[0]
-
-        return torch.mean(exp_value, dim=0)
-
-    # To use as a metric
-    def mean_variance(self, outputs, teacher_predictions):
-        variance = outputs[1]
-
-        return torch.mean(variance, dim=0)
 
     def eval_mode(self, train=False):
         # Setting layers to eval mode
