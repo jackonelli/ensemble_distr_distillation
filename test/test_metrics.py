@@ -22,22 +22,22 @@ class TestMetrics(unittest.TestCase):
     def test_accuracy(self):
         true_label = torch.tensor(0).int()
         predictions = torch.tensor([0.9, 0.1])
-        acc = metrics.accuracy(predictions, true_label)
+        acc = metrics.accuracy(predictions, true_label.long())
         self.assertAlmostEqual(acc, 1)
 
-    #def test_accuracy_logits(self):
-    #    mean = torch.tensor([[1, 10]]).float()
-    #    var = torch.tensor([[1, 1]]).float()
-    #    distr_par = (mean, var)
-    #    target_logits = torch.tensor([[[2, 5]]]).float()
-    #    acc = metrics.accuracy_logits(distr_par, target_logits)
-    #    self.assertAlmostEqual(acc, 1)
+    def test_accuracy_logits(self):
+        mean = torch.tensor([[1, 10]]).float()
+        var = torch.tensor([[1, 1]]).float()
+        distr_par = (mean, var)
+        target_logits = torch.tensor([[[2, 5]]]).float()
+        acc = metrics.accuracy_logits(distr_par, target_logits)
+        self.assertAlmostEqual(acc, 1)
 
     def test_accuracy_batch(self):
         true_label = torch.tensor([1, 0, 2, 0]).int()
         predictions = torch.tensor([[0.05, 0.09, 0.05], [0.1, 0.8, 0.1],
                                     [0.1, 0.2, 0.7], [0.25, 0.5, 0.25]])
-        acc = metrics.accuracy(predictions, true_label)
+        acc = metrics.accuracy(predictions, true_label.long())
         self.assertAlmostEqual(acc, 0.5)
 
     def test_squared_error(self):
@@ -50,14 +50,15 @@ class TestMetrics(unittest.TestCase):
         B, N, D = 1, 3, 1
         targets = torch.tensor([0.9, 1, 1.1]).reshape((B, N, D))
         regression_estimate = torch.tensor([1]).reshape((B, D))
-        mse = metrics.mean_squared_error(regression_estimate, targets)
-        self.assertAlmostEqual(mse.item(), 0.02 / 3)
+        mse = metrics.mean_squared_error(regression_estimate.float(), targets)
+        self.assertAlmostEqual(mse.item(), (0.02 / 3))
 
     def test_root_mean_squared_error(self):
         B, N, D = 2, 1, 1
         targets = torch.tensor([6, 6]).reshape((B, N, D))
         regression_estimate = torch.tensor([3.0402, 2.6091]).reshape((B, D))
-        rmse = metrics.root_mean_squared_error(regression_estimate, targets)
+        rmse = metrics.root_mean_squared_error(regression_estimate,
+                                               targets.float())
         self.assertAlmostEqual(rmse.item(),
                                3.1826576041101244,
                                places=NUM_DECIMALS)

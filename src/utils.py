@@ -218,7 +218,7 @@ def positive_moberg(epsilon=0.0):
 
 def generate_order(arr, descending=True):
     """Generate order based on array"""
-    sorted_indices = torch.argsort(arr, 0, descending=True)
+    sorted_indices = torch.argsort(arr, 0, descending=descending)
     return sorted_indices.reshape((len(arr), ))
 
 
@@ -242,7 +242,6 @@ def plot_error_curve(ax,
     sorted_inds = generate_order(uncert_meas)
     sorted_error = error[sorted_inds]
     smooth_error = moving_average(sorted_error, window_size)
-    mirrored_smooth_error = smooth_error[0] - smooth_error
     ax.plot(np.arange(len(smooth_error)), smooth_error, label=label)
 
 
@@ -254,7 +253,7 @@ def plot_sparsification_error(ax, y_true, y_pred, uncert_meas, label,
     ax.plot(rel_part_size, sparse_err, label=label)
     ax.plot(rel_part_size, sparse_err_oracle, label="Oracle")
     ax.set_xlabel("Fraction of removed points")
-    #ax.set_ylabel("\textit{SE}")
+    # ax.set_ylabel("\textit{SE}")
     ax.legend()
 
 
@@ -304,6 +303,7 @@ def ause(y_true, y_pred, uncert_meas, num_partitions):
 
 
 def area_under_curve(x, y):
+    """Calculate area under curve"""
     return torch.trapz(x=x, y=y)
 
 
@@ -339,7 +339,7 @@ def plot_uncert(ax,
                     errorevery=5,
                     color="r",
                     label="$E_w[\\sigma_w^2(x)]$")
-        #ax.plot(x, ale, \"g-\", label=\"$E_w[\\sigma_w^2(x)]$\")
+        # ax.plot(x, ale, \"g-\", label=\"$E_w[\\sigma_w^2(x)]$\")
     if epi is not None:
         epi = epi[::every_nth]
         ax.fill_between(x,
@@ -348,64 +348,10 @@ def plot_uncert(ax,
                         facecolor="blue",
                         alpha=0.5,
                         label="var$_w(\\mu_w(x))$")
-        #ax.plot(x, np.sqrt(100*epi))
+        # ax.plot(x, np.sqrt(100*epi))
     ax.legend(prop={'size': 20})
     ax.set_xlabel("$x$")
     ax.set_ylabel("$y$")
-
-
-def shifted_color_map(cmap,
-                      start=0,
-                      midpoint=0.5,
-                      stop=1.0,
-                      name='shiftedcmap'):
-    '''
-    function taken from
-    https://stackoverflow.com/questions/7404116/...
-        ...defining-the-midpoint-of-a-colormap-in-matplotlib
-    Function to offset the "center" of a colormap. Useful for
-    data with a negative min and positive max and you want the
-    middle of the colormap's dynamic range to be at zero
-
-    Input
-    -----
-      cmap : The matplotlib colormap to be altered
-      start : Offset from lowest point in the colormap's range.
-          Defaults to 0.0 (no lower ofset). Should be between
-          0.0 and `midpoint`.
-      midpoint : The new center of the colormap. Defaults to
-          0.5 (no shift). Should be between 0.0 and 1.0. In
-          general, this should be  1 - vmax/(vmax + abs(vmin))
-          For example if your data range from -15.0 to +5.0 and
-          you want the center of the colormap at 0.0, `midpoint`
-          should be set to  1 - 5/(5 + 15)) or 0.75
-      stop : Offset from highets point in the colormap's range.
-          Defaults to 1.0 (no upper ofset). Should be between
-          `midpoint` and 1.0.
-    '''
-    cdict = {'red': [], 'green': [], 'blue': [], 'alpha': []}
-
-    # regular index to compute the colors
-    reg_index = np.linspace(start, stop, 257)
-
-    # shifted index to match the data
-    shift_index = np.hstack([
-        np.linspace(0.0, midpoint, 128, endpoint=False),
-        np.linspace(midpoint, 1.0, 129, endpoint=True)
-    ])
-
-    for ri, si in zip(reg_index, shift_index):
-        r, g, b, a = cmap(ri)
-
-        cdict['red'].append((si, r, r))
-        cdict['green'].append((si, g, g))
-        cdict['blue'].append((si, b, b))
-        cdict['alpha'].append((si, a, a))
-
-    newcmap = matplotlib.colors.LinearSegmentedColormap(name, cdict)
-    plt.register_cmap(cmap=newcmap)
-
-    return newcmap
 
 
 def gaussian_mixture_moments(mus, sigma_sqs):
@@ -424,40 +370,6 @@ def gaussian_mixture_moments(mus, sigma_sqs):
         sigma_sq = torch.mean(sigma_sqs + mus**2, dim=1) - mu**2
 
     return mu, sigma_sq
-
-
-def torch_cov(arr, rowvar=False):
-    """Estimate a covariance matrix given data.
-
-    Covariance indicates the level to which two variables vary together.
-    If we examine N-dimensional samples, `X = [x_1, x_2, ... x_N]^T`,
-    then the covariance matrix element `C_{ij}` is the covariance of
-    `x_i` and `x_j`. The element `C_{ii}` is the variance of `x_i`.
-
-    Args:
-        arr: A 1-D or 2-D array containing multiple variables and observations.
-            Each row of `arr` represents a variable, and each column a single
-            observation of all those variables.
-        rowvar: If `rowvar` is True, then each row represents a
-            variable, with observations in the columns. Otherwise, the
-            relationship is transposed: each column represents a variable,
-            while the rows contain observations.
-
-    Returns:
-        The covariance matrix of the variables.
-    """
-
-    if arr.dim() > 2:
-        raise ValueError('arr has more than 2 dimensions')
-    if arr.dim() < 2:
-        arr = arr.view(1, -1)
-    if not rowvar and arr.size(0) != 1:
-        arr = arr.t()
-    # arr = arr.type(torch.double)  # uncomment this line if desired
-    fact = 1.0 / (arr.size(1) - 1)
-    arr -= torch.mean(arr, dim=1, keepdim=True)
-    arr_transposed = arr.t()  # if complex: mt = m.t().conj()
-    return fact * arr.matmul(arr_transposed).squeeze()
 
 
 def unpack_results(result):

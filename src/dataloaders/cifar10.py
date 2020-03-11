@@ -6,7 +6,6 @@ import torchvision.transforms as transforms
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
-from src import utils
 
 
 class Cifar10Data:
@@ -23,18 +22,17 @@ class Cifar10Data:
                                              num_workers=2)
     """
 
-    def __init__(self, ind=None, train=True, augmentation=False, transpose=False, root="./data"):
+    def __init__(self, ind=None, train=True, augmentation=False, torch=True, root="./data"):
         self._log = logging.getLogger(self.__class__.__name__)
 
-        self.transpose = transpose
+        self.torch = torch
         if augmentation:
             self.transform = transforms.Compose([
                 transforms.RandomCrop(32, padding=4),
-                transforms.RandomHorizontalFlip(),
-                transforms.ToTensor()])
+                transforms.RandomHorizontalFlip()])
 
         else:
-            self.transform = transforms.ToTensor()
+            self.transform = None
 
         self.set = torchvision.datasets.CIFAR10(root=root,
                                                 train=train,
@@ -65,15 +63,15 @@ class Cifar10Data:
         # doing this so that it is consistent with all other datasets
         # to return a PIL Image
 
-        if self.transpose:
-            img = np.transpose(img, (1, 2, 0))
+        if self.torch:
+            img = transforms.ToTensor()(Image.fromarray(img))
         else:
-            img = Image.fromarray(img)
+            img = img / 255
 
         if self.transform is not None:
             img = self.transform(img)
 
-        target = torch.tensor(target)
+        target = torch.tensor(target)  # TODO: Remove?
 
         return img, target
 

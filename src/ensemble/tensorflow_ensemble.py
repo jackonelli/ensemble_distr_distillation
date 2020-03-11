@@ -1,11 +1,10 @@
 import logging
 import tensorflow as tf
 from scipy.special import softmax as scipy_softmax
-import src.experiments.cifar10.uq_benchmark_2019.models_lib as models_lib
-
-"""This is a wrapper class that extracts saved data from a specific type of dataset"""
+from src.experiments.cifar10.uq_benchmark_2019 import models_lib
 
 
+"""This is a wrapper class that extracts saved data from a specific type of data set"""
 class TensorflowEnsemble:
     def __init__(self, output_size, indices=None):
         """The ensemble member needs to track the size
@@ -55,8 +54,6 @@ class TensorflowEnsemble:
     def predict(self, inputs):
         """Ensemble prediction
         Returns the predictions of all individual ensemble members.
-        The return is actually a tuple with (pred_mean, all_predictions)
-        for backwards compatibility but this should be removed.
         B = batch size, K = num output params, N = ensemble size
 
 
@@ -75,14 +72,17 @@ class TensorflowEnsemble:
 
         return logits, predictions
 
+    def eval_mode(self):
+
+        for member in self.members:
+            for layer in member.layers:
+                layer.trainable = False
+
     def load_ensemble(self, models_dir, num_members=None):
 
         for i in range(num_members):
             member = models_lib.load_model(models_dir + str(i))
-            # TODO: kolla detta för tf-modellerna, DETTA ÄR JU VIKTIGT ÄNDÅ!!! MEN det är förmodligen så, eftersom att vi får samma acc
-            # member.eval(), should be called if we have dropout or batch-norm
-            # in our layers, to make sure that self.train = False,
-            # just that it doesn't work for now
             self.add_member(member)
+
 
 
