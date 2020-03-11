@@ -124,6 +124,7 @@ def uncertainty_separation_variance(predicted_distribution, true_labels):
         Aleatoric uncertainty: torch.tensor(B,)
     """
 
+    true_labels = None
     total_uncertainty = np.var(predicted_distribution[:, :, 0], axis=-1)
     aleatoric_uncertainty = np.mean(predicted_distribution[:, :, 1], axis=-1)
     epistemic_uncertainty = total_uncertainty - aleatoric_uncertainty

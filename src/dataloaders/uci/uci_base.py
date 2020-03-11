@@ -7,6 +7,8 @@ import torch.utils.data as torch_data
 from sklearn.model_selection import KFold
 import urllib.request
 
+# TODO: Check all url:s
+
 
 class UCIData():
     """UCI base class"""

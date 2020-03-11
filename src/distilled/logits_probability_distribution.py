@@ -10,7 +10,7 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
     def __init__(self,
                  layer_sizes,
                  teacher,
-                 variance_transform=utils.variance_linear_asymptote(),
+                 variance_transform=utils.positive_linear_asymptote(),
                  device=torch.device('cpu'),
                  use_hard_labels=False,
                  learning_rate=0.001,
@@ -111,7 +111,7 @@ class LogitsProbabilityDistribution(distilled_network.DistilledNet):
         Wrapper function for the loss function.
         """
 
-        return self.loss(outputs, teacher_predictions)
+        return self.loss(outputs, teacher_predictions.to(self.device))
 
     # TÄNKER MIG ATT VI KAN HA EN CALC_REG
 

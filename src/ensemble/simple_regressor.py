@@ -14,7 +14,7 @@ class Model(ensemble.EnsembleMember):
                  layer_sizes,
                  loss_function,
                  device=torch.device("cpu"),
-                 variance_transform=utils.variance_linear_asymptote):
+                 variance_transform=utils.positive_linear_asymptote()):
 
         super().__init__(output_size=layer_sizes[-1] // 2,
                          loss_function=loss_function,

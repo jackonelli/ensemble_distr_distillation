@@ -317,7 +317,7 @@ def inverse_wishart_neg_log_likelihood(parameters, target):
     return torch.mean(normalizer + ll)  # Mean over batch
 
 
-def gaussian_inv_wishart_neg_log_likelihood(parameters, targets):
+def norm_inv_wish_nll(parameters, targets):
     """NLL loss for the Gaussian inverse-Wishart distribution:
 
     https://en.wikipedia.org/wiki/Normal-inverse-Wishart_distribution
@@ -345,6 +345,10 @@ def gaussian_inv_wishart_neg_log_likelihood(parameters, targets):
 
     mu = targets[0]
     var_diag = targets[1]
+
+    print("mu_0:", mu_0.shape)
+    print("mu:", mu.shape)
+    print("var_diag:", var_diag.shape)
 
     nll_gaussian = gaussian_neg_log_likelihood((mu_0, var_diag / lambda_), mu)
     nll_inverse_wishart = inverse_wishart_neg_log_likelihood((psi, nu),

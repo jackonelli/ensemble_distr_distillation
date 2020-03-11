@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 
 
 class GaussianSinus(torch.utils.data.Dataset):
+    """1D sinusoidal data with noise, increasing with x"""
     def __init__(self,
                  store_file,
                  train=True,
@@ -49,6 +50,14 @@ class GaussianSinus(torch.utils.data.Dataset):
         return (np.array(inputs, dtype=np.float32),
                 np.array([targets], dtype=np.float32))
 
+    @staticmethod
+    def x_to_y_mapping(x):
+        """Noisy mapping defining the dataset"""
+        mu = np.sin(x)
+        sigma = 0.15 * 1 / (1 + np.exp(-x))
+        y = np.random.multivariate_normal(mean=mu, cov=(np.diag(sigma)))
+        return y, mu, sigma
+
     def sample_new_data(self):
         self.file.parent.mkdir(parents=True, exist_ok=True)
         lower, upper = self.range
@@ -58,10 +67,7 @@ class GaussianSinus(torch.utils.data.Dataset):
         else:
             x = np.random.uniform(low=lower, high=upper, size=self.n_samples)
 
-        mu = np.sin(x)
-        sigma = 0.15 * 1 / (1 + np.exp(-x))
-        y = np.random.multivariate_normal(mean=mu, cov=(np.diag(sigma)))
-
+        y, _, _ = self.x_to_y_mapping(x)
         combined_data = np.column_stack((x, y))
         np.random.shuffle(combined_data)
         np.savetxt(self.file, combined_data, delimiter=",")
@@ -71,12 +77,16 @@ class GaussianSinus(torch.utils.data.Dataset):
             csv_reader = csv.reader(csv_file, delimiter=",", quotechar="|")
             assert self.n_samples - 1 == sum(1 for row in csv_reader)
 
-    def get_full_data(self):
+    def get_full_data(self, sorted_=False):
+        """Get full dataset as numpy array"""
         tmp_raw_data = list()
         with self.file.open(newline="") as csv_file:
             csv_reader = csv.reader(csv_file, delimiter=",", quotechar="|")
             tmp_raw_data = [data for data in csv_reader]
-        return np.array(tmp_raw_data, dtype=float)
+        full_data = np.array(tmp_raw_data, dtype=float)
+        if sorted_:
+            full_data = full_data[full_data[:, 0].argsort()]
+        return full_data
 
 
 def plot_reg_data(data, ax):
