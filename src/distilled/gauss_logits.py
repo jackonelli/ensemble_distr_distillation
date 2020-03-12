@@ -6,11 +6,11 @@ import src.distilled.distilled_network as distilled_network
 from src import utils
 
 
-class LogitsProbabilityDistribution(distilled_network.DistilledNet):
+class Model(distilled_network.DistilledNet):
     def __init__(self,
                  layer_sizes,
                  teacher,
-                 variance_transform=utils.variance_linear_asymptote(),
+                 variance_transform=utils.positive_linear_asymptote(),
                  device=torch.device('cpu'),
                  use_hard_labels=False,
                  learning_rate=0.001,

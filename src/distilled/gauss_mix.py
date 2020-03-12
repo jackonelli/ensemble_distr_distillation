@@ -15,7 +15,7 @@ class Model(distilled_network.DistilledNet):
                  loss_function,
                  teacher,
                  device=torch.device("cpu"),
-                 variance_transform=utils.variance_linear_asymptote()):
+                 variance_transform=utils.positive_linear_asymptote()):
 
         super().__init__(teacher=teacher,
                          loss_function=loss_function,
