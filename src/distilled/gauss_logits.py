@@ -56,7 +56,7 @@ class Model(distilled_network.DistilledNet):
     def _generate_teacher_predictions(self, inputs):
         """Generate teacher predictions"""
 
-        logits = self.teacher.get_logits(inputs)
+        logits = self.teacher.get_logits(inputs).to(self.device)
 
         if self.scale_teacher_logits:
             scaled_logits = logits - torch.stack([logits[:, :, -1]], axis=-1)

@@ -61,20 +61,6 @@ class DistilledNet(nn.Module, ABC):
             if self._learning_rate_condition(epoch_number):
                 scheduler.step()
 
-            if os.path.isfile("model_data/par_adam.npy"):
-                par_arr = np.load("model_data/par_adam.npy", allow_pickle=True)
-                par_arr = np.concatenate((par_arr, self.par.detach().numpy()))
-                grad_arr = np.load("model_data/grad_adam.npy",
-                                   allow_pickle=True)
-                grad_arr = np.concatenate(
-                    (grad_arr, self.par.grad.detach().numpy()))
-            else:
-                par_arr = self.par.detach().numpy()
-                grad_arr = self.par.grad.detach().numpy()
-
-            np.save("model_data/par_adam.npy", par_arr)
-            np.save("model_data/grad_adam.npy", grad_arr)
-
         self._reset_metrics()  # For storing purposes
 
     def _train_epoch(self,
@@ -104,8 +90,7 @@ class DistilledNet(nn.Module, ABC):
             else:
                 inputs, labels = inputs.to(self.device), labels.to(self.device)
 
-            teacher_predictions = self._generate_teacher_predictions(
-                inputs).detach()
+            teacher_predictions = self._generate_teacher_predictions(inputs)
 
             outputs = self.forward(inputs)
 
@@ -116,6 +101,7 @@ class DistilledNet(nn.Module, ABC):
             running_loss += loss.item()
 
             if math.isnan(running_loss):
+                self._log.error("Loss is NaN")
                 break
 
             if validation_loader is None:
@@ -152,7 +138,7 @@ class DistilledNet(nn.Module, ABC):
 
             outputs = self.forward(inputs)
             teacher_predictions = self._generate_teacher_predictions(inputs)
-            teacher_predictions = teacher_predictions.to(self.device)
+            teacher_predictions = teacher_predictions
             self._update_metrics(outputs, teacher_predictions)
 
     def _generate_teacher_predictions(self, inputs):
