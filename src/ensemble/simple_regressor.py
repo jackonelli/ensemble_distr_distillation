@@ -4,6 +4,7 @@ import torch.nn as nn
 from src.ensemble import ensemble
 import src.loss as custom_loss
 import src.utils as utils
+import src.utils_dir.pytorch as torch_utils
 
 
 class Model(ensemble.EnsembleMember):
@@ -31,6 +32,19 @@ class Model(ensemble.EnsembleMember):
 
         self.optimizer = None
         self.to(self.device)
+
+    def info(self):
+        """Get model settings"""
+        return {
+            "name":
+            "simple_regressor",
+            "layer_sizes":
+            torch_utils.human_readable_arch(self.layers),
+            "loss_function":
+            self.loss.__name__,
+            "variance_transform":
+            torch_utils.human_readable_lambda(self.variance_transform)
+        }
 
     def forward(self, x):
 
