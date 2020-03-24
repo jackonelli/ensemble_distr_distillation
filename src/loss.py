@@ -90,18 +90,44 @@ def gaussian_neg_log_likelihood_diag(parameters, target):
 
     return nll / B
 
-def norm_inv_wish_loss(parameters, targets):
-    """Normal-inverse Wishart NLL
-    B = batch size, D = dimension of target (num classes), N = ensemble size
+
+def norm_inv_wish_nll(parameters, target):
+    """Negative log likelihood loss for the Normal-Inverse Wishart distribution
+    B = batch size, D = target dimension, N = ensemble size
+
+    The distribution parameters are tensors:
+        - mu_0: torch.tensor((B, D))
+        - lambda_: torch.tensor(B)
+        - psi: torch.tensor((B, D))
+        - nu: torch.tensor(B)
+    parameters of the normal distribution (mu_0, scale)
+    and of the inverse-Wishart distribution (psi, nu)
 
     Args:
-        parameters (torch.tensor((B, D)), torch.tensor((B, D))):
-            mean values and variances of y|x for every x in
-            batch.
+        parameters (mu_0, lambda_, psi, nu): See above
 
-        target (torch.tensor((B, N, D))): sample from the normal
-            distribution, if not an ensemble prediction N=1.
+        target (torch.tensor((B, N, D)), torch.tensor((B, N, D))):
+            mean and variance (diagonal of covariance
+            matrix) as output by N ensemble members.
     """
+
+    B, N, D = target[0].size()
+
+    mu_0 = parameters[0]
+    lambda_ = parameters[1]
+    psi = parameters[2]
+    nu = parameters[3]
+    mu = target[0]
+    var = target[1]
+
+    nll_gaussian = 0.0
+    for sample in np.arange(N):
+        cov_mat = var[:, sample, :]
+        nll_gaussian += gaussian_neg_log_likelihood((mu_0, cov_mat / lambda_),
+                                                    mu)
+    nll_inverse_wishart = inverse_wishart_neg_log_likelihood((psi, nu), var)
+
+    return nll_gaussian / N + nll_inverse_wishart
 
 
 def inv_wish_nll(parameters, target):
@@ -116,10 +142,6 @@ def inv_wish_nll(parameters, target):
             (diagonal of covariance matrix)
             as output by N ensemble members.
             """
-
-    # This should only happen when we only have one target (i.e. N=1)
-    if target.dim() == 2:
-        target = torch.unsqueeze(target, dim=1)
 
     psi = parameters[0]
     nu = parameters[1]
@@ -153,7 +175,9 @@ def inv_wish_nll(parameters, target):
                           dim=0) / target.size(1)
 
     return torch.mean(normalizer + ll)  # Mean over batch
-def kl_div_gauss_and_mixture_of_gauss(parameters, targets):
+
+
+def kl_div_gauss_and_mixture_of_gauss(parameters, target):
     """KL divergence between a single gaussian and a mixture of M gaussians
 
     for derivation details, see paper.
@@ -177,8 +201,8 @@ def kl_div_gauss_and_mixture_of_gauss(parameters, targets):
     mu_gauss = parameters[0]
     sigma_sq_gauss = parameters[1]
 
-    mus_mixture = targets[0]
-    sigma_sqs_mixture = targets[1]
+    mus_mixture = target[0]
+    sigma_sqs_mixture = target[1]
 
     mu_bar = mus_mixture.mean(dim=1, keepdim=True)
     term_1 = torch.mean(
