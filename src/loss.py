@@ -92,67 +92,46 @@ def gaussian_neg_log_likelihood_diag(parameters, target):
     return nll / B
 
 
-def kl_div_gauss_and_mixture_of_gauss(parameters, targets):
-    """KL divergence between a single gaussian and a mixture of M gaussians
+def norm_inv_wish_nll(parameters, target):
+    """Negative log likelihood loss for the Normal-Inverse Wishart distribution
+    B = batch size, D = target dimension, N = ensemble size
 
-    for derivation details, see paper.
-
-    Note: The loss is only correct up to a constant w.r.t. the parameters.
-
-    TODO: Support multivarate
-
-    TODO: Support weighted mixture
-
-    B = batch size, N = ensemble size
-
-    Args:
-        parameters (torch.tensor((B, 1)), torch.tensor((B, 1))):
-            mean values and variances of y|x for every x in
-            batch.
-        target ((torch.tensor((B, N)), (torch.tensor((B, N)))):
-            means and variances of the mixture components
-    """
-
-    mu_gauss = parameters[0]
-    sigma_sq_gauss = parameters[1]
-
-    mus_mixture = targets[0]
-    sigma_sqs_mixture = targets[1]
-
-    mu_bar = mus_mixture.mean(dim=1, keepdim=True)
-    term_1 = torch.mean(
-        sigma_sqs_mixture +
-        (mus_mixture - mu_bar)**2, dim=1, keepdim=True) / sigma_sq_gauss
-    term_2 = (mu_bar - mu_gauss)**2
-    term_3 = torch.log(sigma_sq_gauss) / 2
-
-    loss = torch.mean(term_1 + term_2 + term_3, dim=0)
-    return loss
-
-
-def mse(mean, target):
-    """Mean squared loss (torch built-in wrapper)
-    B = batch size, D = dimension of target, N = number of samples
+    The distribution parameters are tensors:
+        - mu_0: torch.tensor((B, D))
+        - lambda_: torch.tensor(B)
+        - psi: torch.tensor((B, D))
+        - nu: torch.tensor(B)
+    parameters of the normal distribution (mu_0, scale)
+    and of the inverse-Wishart distribution (psi, nu)
 
     Args:
-        mean (torch.tensor((B, D))):
-            mean values of y|x for every x in
-            batch (and for every ensemble member).
-        target (torch.tensor((B, N, D))): Ground truth sample
-            (if not an ensemble prediction N=1.)
+        parameters (mu_0, lambda_, psi, nu): See above
+
+        target (torch.tensor((B, N, D)), torch.tensor((B, N, D))):
+            mean and variance (diagonal of covariance
+            matrix) as output by N ensemble members.
     """
 
-    _, N, _ = target.size()
-    loss_function = torch.nn.MSELoss(reduction="mean")
-    total_loss = 0
-    for sample_ind in np.arange(N):
-        sample = target[:, sample_ind, :]
-        total_loss += loss_function(sample, mean)
+    B, N, D = target[0].size()
 
-    return total_loss / N
+    mu_0 = parameters[0]
+    lambda_ = parameters[1]
+    psi = parameters[2]
+    nu = parameters[3]
+    mu = target[0]
+    var = target[1]
+
+    nll_gaussian = 0.0
+    for sample in np.arange(N):
+        cov_mat = var[:, sample, :]
+        nll_gaussian += gaussian_neg_log_likelihood((mu_0, cov_mat / lambda_),
+                                                    mu)
+    nll_inverse_wishart = inverse_wishart_neg_log_likelihood((psi, nu), var)
+
+    return nll_gaussian / N + nll_inverse_wishart
 
 
-def inverse_wishart_neg_log_likelihood(parameters, target):
+def inv_wish_nll(parameters, target):
     """Negative log likelihood loss for the inverse-Wishart distribution
     B = batch size, D = target dimension, N = ensemble size
 
@@ -164,10 +143,6 @@ def inverse_wishart_neg_log_likelihood(parameters, target):
             (diagonal of covariance matrix)
             as output by N ensemble members.
             """
-
-    # This should only happen when we only have one target (i.e. N=1)
-    if target.dim() == 2:
-        target = torch.unsqueeze(target, dim=1)
 
     psi = parameters[0]
     nu = parameters[1]
@@ -203,11 +178,71 @@ def inverse_wishart_neg_log_likelihood(parameters, target):
     return torch.mean(normalizer + ll)  # Mean over batch
 
 
+def kl_div_gauss_and_mixture_of_gauss(parameters, target):
+    """KL divergence between a single gaussian and a mixture of M gaussians
+
+    for derivation details, see paper.
+
+    Note: The loss is only correct up to a constant w.r.t. the parameters.
+
+    TODO: Support multivarate
+
+    TODO: Support weighted mixture
+
+    B = batch size, N = ensemble size
+
+    Args:
+        parameters (torch.tensor((B, 1)), torch.tensor((B, 1))):
+            mean values and variances of y|x for every x in
+            batch.
+        target ((torch.tensor((B, N)), (torch.tensor((B, N)))):
+            means and variances of the mixture components
+    """
+
+    mu_gauss = parameters[0]
+    sigma_sq_gauss = parameters[1]
+
+    mus_mixture = target[0]
+    sigma_sqs_mixture = target[1]
+
+    mu_bar = mus_mixture.mean(dim=1, keepdim=True)
+    term_1 = torch.mean(
+        sigma_sqs_mixture +
+        (mus_mixture - mu_bar)**2, dim=1, keepdim=True) / sigma_sq_gauss
+    term_2 = (mu_bar - mu_gauss)**2
+    term_3 = torch.log(sigma_sq_gauss) / 2
+
+    loss = torch.mean(term_1 + term_2 + term_3, dim=0)
+    return loss
+
+
+def mse(mean, target):
+    """Mean squared loss (torch built-in wrapper)
+    B = batch size, D = dimension of target, N = number of samples
+
+    Args:
+        mean (torch.tensor((B, D))):
+            mean values of y|x for every x in
+            batch (and for every ensemble member).
+        target (torch.tensor((B, N, D))): Ground truth sample
+            (if not an ensemble prediction N=1.)
+    """
+
+    _, N, _ = target.size()
+    loss_function = torch.nn.MSELoss(reduction="mean")
+    total_loss = 0
+    for sample_ind in np.arange(N):
+        sample = target[:, sample_ind, :]
+        total_loss += loss_function(sample, mean)
+
+    return total_loss / N
+
+
 def dirichlet_nll(parameters, target):
-    loss = 0
 
     distr = torch_dirichlet.Dirichlet(concentration=parameters)
     neg_log_prob = - distr.log_prob(torch.transpose(target, 0, 1))
     loss = torch.mean(neg_log_prob)
 
     return loss
+
