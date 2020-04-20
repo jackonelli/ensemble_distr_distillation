@@ -1,14 +1,16 @@
-import numpy as np
 import logging
-import src.ensemble.tensorflow_ensemble as tensorflow_ensemble
-import tensorflow as tf
-import torch
-import src.dataloaders.cifar10_corrupted as cifar10_corrupted
-import src.dataloaders.cifar10 as cifar10
-import h5py
 from pathlib import Path
 from datetime import datetime
 from src import utils
+import numpy as np
+import tensorflow as tf
+import torch
+import h5py
+import matplotlib.pyplot as plt
+import scipy.stats as scipy_stats
+
+from src.ensemble import tensorflow_ensemble
+from src.dataloaders import cifar10, cifar10_corrupted, cifar10_ensemble_pred
 
 
 LOGGER = logging.getLogger(__name__)
@@ -135,13 +137,48 @@ def ensemble_predictions_corrupted_data():
     hf.close()
 
 
+def logits_gaussian_check():
+
+    data_set = cifar10_ensemble_pred.Cifar10Data(train=False)
+
+    data_loader = torch.utils.data.DataLoader(data_set.set,
+                                              batch_size=1,
+                                              shuffle=True,
+                                              num_workers=0)
+
+    num_dim = 10
+    corr_coeff = np.zeros(num_dim)
+    num_samples = 1000
+    fig, axis = plt.subplots(2, 5)
+    j = 0
+    l = 0
+    for batch in data_loader:
+        data, _ = batch
+        logits = data[2]
+
+        for i, ax in enumerate(axis.reshape(-1)):
+            #ax.hist(logits[:, i])
+            res = scipy_stats.probplot(np.squeeze(logits[:, i]), plot=ax)
+            corr_coeff[i] += res[1][2]
+         
+            ax.set_title("Dim {}".format(i+1))
+
+        plt.show()
+        j += 1
+        if j == num_samples:
+            break
+
+    corr_coeff = corr_coeff / num_samples #len(data_set.set)
+    print(corr_coeff)
+
+
 def main():
     args = utils.parse_args()
     log_file = Path("{}.log".format(datetime.now().strftime('%Y%m%d_%H%M%S')))
     utils.setup_logger(log_path=Path.cwd() / args.log_dir / log_file,
                        log_level=args.log_level)
     LOGGER.info("Args: {}".format(args))
-    ensemble_predictions()
+    logits_gaussian_check()
 
 
 if __name__ == "__main__":

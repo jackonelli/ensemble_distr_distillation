@@ -15,7 +15,7 @@ class Cifar10DataPredictions:
         self._log = logging.getLogger(self.__class__.__name__)
 
         model_list = ["distilled", "dropout", "dropout_nofirst", "ensemble", "ensemble_new", "ll_dropout", "ll_svi",
-                      "svi", "temp_scaling", "vanilla", "ood_distill", "vanilla_distill"]
+                      "svi", "temp_scaling", "vanilla", "ood_distill", "vanilla_distill", "dirichlet_distill"]
         corruption_list = ["brightness", "contrast", "defocus_blur", "elastic_transform", "fog", "frost",
                            "gaussian_blur", "gaussian_noise", "glass_blur", "impulse_noise", "pixelate",
                            "saturate", "shot_noise", "spatter", "speckle_noise", "zoom_blur", "test"]
@@ -63,13 +63,15 @@ class Cifar10DataPredictions:
                 else:
                     targets = np.repeat([targets], 5, axis=0).reshape(-1)
 
-            elif model == "distilled" or model == "ood_distill" or model == "vanilla_distill":
+            elif model in ["distilled", "ood_distill", "vanilla_distill", "dirichlet_distill"]:
 
                 spec = ""
                 if model == "ood_distill":
                     spec = "corr_"  # TODO: Change to ood?
                 elif model == "vanilla_distill":
                     spec = "vanilla_"
+                elif model == "dirichlet_distill":
+                    spec = "dirichlet_"
 
                 filepath = data_dir + "distilled_model_" + spec + str(rep) + "_predictions_corrupted_data.h5"
 

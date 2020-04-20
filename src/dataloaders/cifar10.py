@@ -60,9 +60,6 @@ class Cifar10Data:
         """
         img, target = self.set.data[index], self.set.targets[index]
 
-        # doing this so that it is consistent with all other datasets
-        # to return a PIL Image
-
         if self.torch:
             img = transforms.ToTensor()(Image.fromarray(img))
         else:
@@ -71,7 +68,7 @@ class Cifar10Data:
         if self.transform is not None:
             img = self.transform(img)
 
-        target = torch.tensor(target)  # TODO: Remove?
+        target = torch.tensor(target)
 
         return img, target
 
@@ -81,9 +78,8 @@ def main():
     # get some random training images
     data = Cifar10Data()
 
-    bs = 4
     loader = torch.utils.data.DataLoader(data,
-                                         batch_size=bs,
+                                         batch_size=4,
                                          shuffle=True,
                                          num_workers=0)
     dataiter = iter(loader)
@@ -94,7 +90,7 @@ def main():
     plt.show()
 
     # print labels
-    print(" ".join("%5s" % data.classes[labels[j]] for j in range(bs)))
+    print(" ".join("%5s" % data.classes[labels[j]] for j in range(4)))
 
 
 if __name__ == "__main__":

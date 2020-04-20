@@ -1,15 +1,17 @@
-import numpy as np
 import logging
-import torch
-import src.dataloaders.cifar10_benchmark_model_predictions as cifar10_benchmark_model_predictions
-import matplotlib.lines as matplot_lines
-from matplotlib import pyplot as plt
 from pathlib import Path
 from datetime import datetime
+import h5py
+import numpy as np
+import torch
+import matplotlib.lines as matplot_lines
+from matplotlib import pyplot as plt
+import tikzplotlib
+
 from src import utils
 from src import metrics
-import h5py
-import tikzplotlib
+from src.dataloaders import cifar10_benchmark_model_predictions
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -39,7 +41,7 @@ def make_boxplot(data_list, file_dir, label="ACC", model_list=None, colors=None,
 
     for i, (data, ax) in enumerate(zip(data_list, axis.reshape(-1)[0:num_intensities])):
 
-        bplot = ax.boxplot(data, whis=10000, patch_artist=True)  # Setting whis to high value forces plot to show min/max
+        bplot = ax.boxplot(data, whis=10000, patch_artist=True)  # Setting "whis" to high value forces plot to show min/max
 
         if i == 0 or i == 3:
             ax.set_ylabel(label)
@@ -81,13 +83,13 @@ def ood_data_experiment():
 
     data_dir = "../../dataloaders/data/"
 
-    model_list = ["distilled", "vanilla_distill", "ensemble_new", "vanilla", "temp_scaling",
+    model_list = ["distilled", "dirichlet_distill", "vanilla_distill", "ensemble_new", "vanilla", "temp_scaling",
                   "dropout_nofirst", "ll_dropout", "svi", "ll_svi"]
     corruption_list = ["brightness", "contrast", "defocus_blur", "elastic_transform", "fog", "frost",
                        "gaussian_blur", "gaussian_noise", "glass_blur", "impulse_noise", "pixelate",
                        "saturate", "shot_noise", "spatter", "speckle_noise", "zoom_blur"]
     intensity_list = [0, 1, 2, 3, 4, 5]
-    rep_list = [1, 2, 3, 4, 5]
+    rep_list = [1]#, 2, 3, 4, 5]
     ensemble_inds = np.load("data/ensemble_indices.npy")
     ensemble_size = 10
 
@@ -115,7 +117,7 @@ def ood_data_experiment():
                                                                                       rep=rep,
                                                                                       ensemble_indices=inds)
 
-                    if (model == "distilled") or (model == "ensemble_new"):
+                    if model in ["distilled", "ensemble_new", "dirichlet_distill"]:
                         data.set.predictions = np.mean(data.set.predictions, axis=1)
 
                     acc[i, k-1, j] = metrics.accuracy(torch.tensor(data.set.predictions),
@@ -125,11 +127,11 @@ def ood_data_experiment():
         acc_list.append(acc.reshape(-1, acc.shape[-1]))
         ece_list.append(ece.reshape(-1, ece.shape[-1]))
 
-    model_list_text = ["Distilled", "Vanilla Distilled", "Ensemble", "Vanilla", "Temp Scaling", "Dropout",
-                       "LL Dropout", "SVI", "LL SVI"]
-    colors = ["#A6CEE3", "#1F78B4", "#B2DF8A", "#33A02C", "#FB9A99", "#E31A1C", "#FDBF6F", "#FF7F00", "#CAB2D6"]#, "#6A3D9A"]
-    make_boxplot(acc_list, "fig/acc_benchmark_experiments_test.tikz", model_list=model_list_text, colors=colors)
-    make_boxplot(ece_list, "fig/ece_benchmark_experiments_test.tikz", label="ECE", model_list=model_list_text,
+    model_list_text = ["Gaussian Distilled", "Dirichlet Distilled", "Vanilla Distilled", "Ensemble", "Vanilla",
+                       "Temp Scaling", "Dropout", "LL Dropout", "SVI", "LL SVI"]
+    colors = ["#A6CEE3", "#1F78B4", "#B2DF8A", "#33A02C", "#FB9A99", "#E31A1C", "#FDBF6F", "#FF7F00", "#CAB2D6", "#6A3D9A"]
+    make_boxplot(acc_list, "data/fig/acc_benchmark_experiments_test.tikz", model_list=model_list_text, colors=colors)
+    make_boxplot(ece_list, "data/fig/ece_benchmark_experiments_test.tikz", label="ECE", model_list=model_list_text,
                  colors=colors, max_y=0.8)
 
 
@@ -138,12 +140,12 @@ def entropy_evaluation():
 
     data_dir = "../../dataloaders/data/"
 
-    model_list = ["ensemble_new", "distilled"]
-    model_list_text = ["Ensemble", "Distilled"]
+    model_list = ["ensemble_new", "dirichlet_distill"]
+    model_list_text = ["Ensemble", "Distilled Model"]
 
     rep = 1
 
-    data_inds = np.load("data/corrupted_data_indices.npy")[5000:]
+    data_inds = np.load("data/corrupted_data_indices.npy")#[5000:]
     ensemble_inds = np.load("data/ensemble_indices.npy")
     ensemble_size = 10
 
@@ -162,8 +164,8 @@ def entropy_evaluation():
             ens_inds = None
 
         data = cifar10_benchmark_model_predictions.Cifar10DataPredictions(model=model,
-                                                                          corruption="contrast",
-                                                                          intensity=5,
+                                                                          corruption="brightness",
+                                                                          intensity=0,
                                                                           data_dir=data_dir,
                                                                           rep=rep,
                                                                           ensemble_indices=ens_inds)
@@ -182,7 +184,7 @@ def entropy_evaluation():
     ax[1].set_xlabel("Epistemic uncertainty")
     ax[1].legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
 
-    tikzplotlib.save("fig/entropy_decomposition_ood.tikz")
+    tikzplotlib.save("data/fig/entropy_decomposition_dirichlet.tikz")
 
     plt.show()
 
@@ -193,11 +195,11 @@ def params_evaluation():
     data_dir = "../../dataloaders/data/"
 
     model_list = ["ensemble_new", "distilled"]#, "ood_distill"]
-    model_list_text = ["Ensemble", "Distilled model"]#, "Distilled + OOD"]
+    model_list_text = ["Ensemble", "Distilled Model"]#, "Distilled + OOD"]
 
     rep = 1
 
-    #data_inds = np.load("data/corrupted_data_indices.npy")[5000:]
+    data_inds = np.load("data/corrupted_data_indices.npy")#[5000:]
     num_data_points = 10000
     ensemble_inds = np.load("data/ensemble_indices.npy")
     ensemble_size = 10
@@ -212,20 +214,20 @@ def params_evaluation():
 
     for i, model in enumerate(model_list):
         data = cifar10_benchmark_model_predictions.Cifar10DataPredictions(model=model,
-                                                                          corruption="contrast",
-                                                                          intensity=5,
+                                                                          corruption="brightness",
+                                                                          intensity=0,
                                                                           data_dir=data_dir,
                                                                           rep=rep,
                                                                           ensemble_indices=rel_ensemble_inds,
                                                                           extract_logits_info=True)
 
         if model == "ensemble_new":
-            scaled_logits = data.logits - data.logits[:, :, -1][:, :, np.newaxis]
+            scaled_logits = data.logits[data_inds, :, :] - data.logits[data_inds, :, -1][:, :, np.newaxis]
             mean[i, :] = np.mean(np.mean(scaled_logits, axis=1), axis=-1)
             var[i, :] = np.mean(np.var(scaled_logits, axis=1), axis=-1)
         else:
-            mean[i, :] = np.mean(data.mean, axis=-1)
-            var[i, :] = np.mean(data.var, axis=-1)
+            mean[i, :] = np.mean(data.mean[data_inds, :], axis=-1)
+            var[i, :] = np.mean(data.var[data_inds, :], axis=-1)
 
         bm = np.linspace(-40, 20, 50)
         bv = np.linspace(0, 45, 50)
@@ -239,7 +241,7 @@ def params_evaluation():
     ax[1].set_xlabel("Variance")
     ax[1].legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
 
-    tikzplotlib.save("fig/logit_params_ood.tikz")
+    tikzplotlib.save("data/fig/logit_params.tikz")
 
     plt.show()
 

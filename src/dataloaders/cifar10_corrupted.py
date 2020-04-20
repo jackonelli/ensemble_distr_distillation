@@ -6,6 +6,7 @@ import torchvision.transforms as transforms
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
+import h5py
 
 
 class Cifar10DataCorrupted:
@@ -26,7 +27,7 @@ class Cifar10DataCorrupted:
         else:
 
             if corruption == "test":
-                self.set = torchvision.datasets.CIFAR10(root=data_dir,
+                self.set = torchvision.datasets.CIFAR10(root="/data",
                                                         train=False,
                                                         download=True)
 
@@ -35,7 +36,7 @@ class Cifar10DataCorrupted:
 
             else:
 
-                filepath = data_dir + "corrupted_data.h5"
+                filepath = data_dir + "dataloaders/data/CIFAR-10-C/corrupted_data.h5"
                 with h5py.File(filepath, 'r') as f:
                     grp = f[corruption]
                     data = grp["data"][()]

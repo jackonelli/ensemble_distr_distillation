@@ -2,6 +2,7 @@
 import torch
 import numpy as np
 import torch.distributions.multivariate_normal as torch_mvn
+import torch.distributions.dirichlet as torch_dirichlet
 
 import logging
 
@@ -200,3 +201,13 @@ def inverse_wishart_neg_log_likelihood(parameters, target):
                           dim=0) / target.size(1)
 
     return torch.mean(normalizer + ll)  # Mean over batch
+
+
+def dirichlet_nll(parameters, target):
+    loss = 0
+
+    distr = torch_dirichlet.Dirichlet(concentration=parameters)
+    neg_log_prob = - distr.log_prob(torch.transpose(target, 0, 1))
+    loss = torch.mean(neg_log_prob)
+
+    return loss

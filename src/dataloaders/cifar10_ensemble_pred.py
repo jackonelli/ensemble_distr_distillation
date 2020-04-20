@@ -1,12 +1,12 @@
 """Data loader for CIFAR data with ensemble predictions"""
 import logging
+import h5py
 import torch
 import torchvision
 import torchvision.transforms as transforms
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
-import h5py
 
 
 class Cifar10Data:
@@ -52,7 +52,7 @@ class Cifar10Data:
 
             corrupted_data = []
             corrupted_predictions = []
-            corrupted_logits = []  # TODO: Predict and save this
+            corrupted_logits = []
             corrupted_targets = []
             corruptions = ["contrast", "frost", "gaussian_blur", "impulse_noise"]
 

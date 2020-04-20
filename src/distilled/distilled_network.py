@@ -22,22 +22,17 @@ class DistilledNet(nn.Module, ABC):
 
         if self.loss is None or not issubclass(type(self.loss),
                                                nn.modules.loss._Loss):
-            # raise ValueError(
-            #    "Must assign proper loss function to child.loss.")
+
             self._log.warning(
                 "Must assign proper loss function to child.loss.")
         self.optimizer = None
         self._log.info("Moving model to device: {}".format(device))
         self.device = device
 
-    def train(self, train_loader, num_epochs, validation_loader=None):
+    def train(self, train_loader, num_epochs, validation_loader=None, temp_anneling=False):
         """ Common train method for all distilled networks
         Should NOT be overridden!
         """
-
-        # Note that we step every iteration (as opposed to every epoch) NOT TRUE ANYMORE
-        #scheduler = self.get_scheduler(step_size=5 * len(train_loader),
-        #                              cyclical=False)
 
         clr = utils.adapted_lr(c=0.7)
         scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, [clr])
@@ -60,6 +55,9 @@ class DistilledNet(nn.Module, ABC):
             self._print_epoch(epoch_number, loss)
             if self._learning_rate_condition(epoch_number):
                 scheduler.step()
+
+            if temp_anneling and epoch_number >= int(num_epochs / 2):
+                self.temperature_annealing()
 
         self._reset_metrics()  # For storing purposes
 
@@ -108,11 +106,7 @@ class DistilledNet(nn.Module, ABC):
                 #self._reset_metrics()
                 self._update_metrics(
                     outputs, teacher_predictions
-                )  # BUT THIS DOES NOT WORK FOR EG ACCURACY
-                # USE EITHER METRICS.ACCURACY_SOFT_LABELS OR METRICS.ACCURACY_LOGITS
-
-            #if self._learning_rate_condition():
-            #    scheduler.step()
+                )
 
         if validation_loader is not None:
             # TODO: should we do model.eval() here or would it just waste our time?
@@ -170,6 +164,8 @@ class DistilledNet(nn.Module, ABC):
             metric_string += " {}".format(metric)
         self._log.info(metric_string)
 
+
+    # TODO: REMOVE?
     def get_scheduler(self, step_size=100, factor=100000, cyclical=False):
 
         if cyclical:

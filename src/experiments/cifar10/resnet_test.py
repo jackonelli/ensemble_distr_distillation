@@ -1,13 +1,13 @@
-import numpy as np
 import logging
+from pathlib import Path
+from datetime import datetime
+import numpy as np
 import torch
+
 from src import utils
 from src import metrics
 from src.dataloaders import cifar10
 from src.ensemble import cifar_resnet
-
-from pathlib import Path
-from datetime import datetime
 
 
 LOGGER = logging.getLogger(__name__)

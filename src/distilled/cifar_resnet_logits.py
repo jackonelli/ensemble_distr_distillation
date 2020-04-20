@@ -14,8 +14,8 @@ class CifarResnetLogits(distilled_network.DistilledNet):
                  device=torch.device('cpu'),
                  use_hard_labels=False,
                  learning_rate=0.001,
-                 scale_teacher_logits=False,
-                 vanilla_distillation=False):
+                 vanilla_distillation=False,
+                 temp=2.5):
 
         super().__init__(teacher=teacher,
                          loss_function=custom_loss.gaussian_neg_log_likelihood,
@@ -23,7 +23,6 @@ class CifarResnetLogits(distilled_network.DistilledNet):
 
         self.use_hard_labels = use_hard_labels
         self.learning_rate = learning_rate
-        self.scale_teacher_logits = scale_teacher_logits # In this class, this is already determined by the linear layer, really
         self.vanilla_distillation = vanilla_distillation
 
         self.in_planes = 64
@@ -37,6 +36,7 @@ class CifarResnetLogits(distilled_network.DistilledNet):
 
         if self.vanilla_distillation:
             self.output_size = 10
+            self.temp = temp
         else:
             self.output_size = 27
 
@@ -70,7 +70,7 @@ class CifarResnetLogits(distilled_network.DistilledNet):
         self.loss = custom_loss.gaussian_neg_log_likelihood
         self.mse = False
 
-    def forward(self, x, softmax_transform=True, t=1, return_raw=False, comp_fix=False):
+    def forward(self, x, softmax_transform=True, return_raw=False, comp_fix=False):
         """Estimate parameters of distribution
         """
 
@@ -88,7 +88,7 @@ class CifarResnetLogits(distilled_network.DistilledNet):
 
         if self.vanilla_distillation:
             if softmax_transform:
-                out = torch.exp(out / t) / torch.sum(torch.exp(out / t), dim=-1, keepdim=True)
+                out = torch.exp(out / self.temp) / torch.sum(torch.exp(out / self.temp), dim=-1, keepdim=True)
             return out
 
         else:
@@ -110,12 +110,12 @@ class CifarResnetLogits(distilled_network.DistilledNet):
             else:
                 return mean, var
 
-    def _generate_teacher_predictions(self, inputs, t=1):
+    def _generate_teacher_predictions(self, inputs):
         """Generate teacher predictions"""
 
         if self.vanilla_distillation:
             logits = self.teacher.get_logits(inputs)
-            predictions = torch.exp(logits / t) / torch.sum(torch.exp(logits / t), dim=-1, keepdim=True)
+            predictions = torch.exp(logits / self.temp) / torch.sum(torch.exp(logits / self.temp), dim=-1, keepdim=True)
             mean_predictions = torch.mean(predictions, dim=1)
 
             return mean_predictions
@@ -123,12 +123,9 @@ class CifarResnetLogits(distilled_network.DistilledNet):
         else:
 
             logits = self.teacher.get_logits(inputs)
+            scaled_logits = logits - torch.stack([logits[:, :, -1]], axis=-1)
 
-            if self.scale_teacher_logits:
-                scaled_logits = logits - torch.stack([logits[:, :, -1]], axis=-1)
-                logits = scaled_logits[:, :, :-1]
-
-            return logits
+            return scaled_logits[:, :, :-1]
 
     def predict(self, input_, num_samples=None, return_raw_data=False, return_logits=False, comp_fix=False):
         """Predict parameters
@@ -164,7 +161,6 @@ class CifarResnetLogits(distilled_network.DistilledNet):
         if isinstance(input_, list) or isinstance(input_, tuple):
             input_ = input_[0]
 
-        # TODO: Consider making vanilla distillation a separate class
         if self.vanilla_distillation:
             return self.forward(input_, softmax_transform=False)
 
@@ -213,11 +209,10 @@ class CifarResnetLogits(distilled_network.DistilledNet):
 
         return self.loss(outputs, teacher_predictions)
 
-    def eval_mode(self, train=False):
+    def eval_mode(self, train=False, temp=None):
         # Setting layers to eval mode
 
         if train:
-            # Not sure this is the way to go
             self.conv1.train()
             self.bn1.train()
             self.layer1.train()
@@ -225,6 +220,13 @@ class CifarResnetLogits(distilled_network.DistilledNet):
             self.layer3.train()
             self.layer4.train()
             self.linear.train()
+
+            if self.vanilla_distillation:
+                if temp is not None:
+                    self.temp = temp
+                else:
+                    self.temp = 2.5
+
         else:
             self.conv1.eval()
             self.bn1.eval()
@@ -234,7 +236,8 @@ class CifarResnetLogits(distilled_network.DistilledNet):
             self.layer4.eval()
             self.linear.eval()
 
-
+            if self.vanilla_distillation:
+                self.temp = 1
 
 
 
