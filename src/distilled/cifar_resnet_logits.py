@@ -17,8 +17,13 @@ class CifarResnetLogits(distilled_network.DistilledNet):
                  vanilla_distillation=False,
                  temp=2.5):
 
+        if vanilla_distillation:
+            loss_fun = custom_loss.cross_entropy_soft_targets
+        else:
+            loss_fun = custom_loss.gaussian_neg_log_likelihood
+
         super().__init__(teacher=teacher,
-                         loss_function=custom_loss.gaussian_neg_log_likelihood,
+                         loss_function=loss_fun,
                          device=device)
 
         self.use_hard_labels = use_hard_labels
@@ -41,11 +46,6 @@ class CifarResnetLogits(distilled_network.DistilledNet):
             self.output_size = 27
 
         self.linear = nn.Linear(512 * block.expansion, self.output_size)
-
-         # TODO: Temporary test of mse in beginning of training, SHOULD BE REMOVED BEFORE PUSHING (SORRY OTHERWISE)
-        self.mse = False
-        #self.loss = custom_loss.mse
-
         # Ad-hoc fix zero variance.
 
         self.variance_lower_bound = 0.0
@@ -65,10 +65,6 @@ class CifarResnetLogits(distilled_network.DistilledNet):
             layers.append(block(self.in_planes, planes, stride))
             self.in_planes = planes * block.expansion
         return nn.Sequential(*layers)
-
-    def restore_loss(self):
-        self.loss = custom_loss.gaussian_neg_log_likelihood
-        self.mse = False
 
     def forward(self, x, softmax_transform=True, return_raw=False, comp_fix=False):
         """Estimate parameters of distribution
@@ -149,7 +145,10 @@ class CifarResnetLogits(distilled_network.DistilledNet):
             if return_logits:
                 output.append(samples)
 
-            output.append(nn.Softmax(dim=-1)(samples))
+            if isinstance(samples, list):
+                output.append(nn.Softmax(dim=-1)(samples[0]))
+            else:
+                output.append(nn.Softmax(dim=-1)(samples))
 
             return output
 
@@ -182,8 +181,7 @@ class CifarResnetLogits(distilled_network.DistilledNet):
                     loc=mean[i, :], covariance_matrix=torch.diag(var[i, :]))
                 samples[i, :, :] = rv.rsample([num_samples])
 
-            if self.scale_teacher_logits:
-                samples = torch.cat((samples, torch.zeros(samples.size(0), num_samples, 1)), dim=-1)
+            samples = torch.cat((samples, torch.zeros(samples.size(0), num_samples, 1)), dim=-1)
 
             output = [samples]
             if return_raw_data:
@@ -203,9 +201,6 @@ class CifarResnetLogits(distilled_network.DistilledNet):
         """Calculate loss function
         Wrapper function for the loss function.
         """
-
-        if self.mse:
-            outputs = outputs[0]
 
         return self.loss(outputs, teacher_predictions)
 

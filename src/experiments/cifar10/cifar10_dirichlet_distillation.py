@@ -16,7 +16,7 @@ from src.experiments.cifar10 import resnet_utils
 LOGGER = logging.getLogger(__name__)
 
 
-def train_distilled_network_dirichlet():
+def train_distilled_network_dirichlet(model_dir="models/distilled_model_cifar10_dirichlet", rep=1):
     """Distill ensemble either with distribution distillation or mixture distillation"""
 
     args = utils.parse_args()
@@ -30,28 +30,30 @@ def train_distilled_network_dirichlet():
     train_ind = data_ind[:num_train_points]
     valid_ind = data_ind[num_train_points:]
 
-    train_set = cifar10_ensemble_pred.Cifar10Data(ind=train_ind, augmentation=True)
-    valid_set = cifar10_ensemble_pred.Cifar10Data(ind=valid_ind)
+    train_data = cifar10_ensemble_pred.Cifar10Data(ind=train_ind, augmentation=True)
+    valid_data = cifar10_ensemble_pred.Cifar10Data(ind=valid_ind)
 
-    train_loader = torch.utils.data.DataLoader(train_set,
+    train_loader = torch.utils.data.DataLoader(train_data.set,
                                                batch_size=100,
                                                shuffle=True,
-                                               num_workers=2)
+                                               num_workers=0)
 
-    valid_loader = torch.utils.data.DataLoader(valid_set,
+    valid_loader = torch.utils.data.DataLoader(valid_data.set,
                                                batch_size=100,
                                                shuffle=True,
-                                               num_workers=2)
+                                               num_workers=0)
 
-    test_set = cifar10_ensemble_pred.Cifar10Data(train=False)
+    test_data = cifar10_ensemble_pred.Cifar10Data(train=False)
 
-    test_loader = torch.utils.data.DataLoader(test_set,
+    test_loader = torch.utils.data.DataLoader(test_data.set,
                                               batch_size=64,
                                               shuffle=True,
-                                              num_workers=2)
+                                              num_workers=0)
 
+    ensemble_size = 10
+    ind = np.load("data/ensemble_indices.npy")[((rep - 1) * ensemble_size):(rep * ensemble_size)]
     ensemble = tensorflow_ensemble.TensorflowEnsemble(
-        output_size=10)
+        output_size=10, indices=ind)
     # models_dir = 'models/cifar-0508-ensemble_50/r'
     # ensemble.load_ensemble(models_dir, num_members=50)
 
@@ -63,7 +65,7 @@ def train_distilled_network_dirichlet():
     loss_metric = metrics.Metric(name="Mean loss", function=distilled_model.calculate_loss)
     distilled_model.add_metric(loss_metric)
 
-    distilled_model.train(train_loader, num_epochs=args.num_epochs, validation_loader=valid_loader, temp_anneling=True)
+    distilled_model.train(train_loader, num_epochs=args.num_epochs, validation_loader=valid_loader,temp_anneling=True)
 
     distilled_model.eval_mode()
     counter = 0
@@ -71,16 +73,15 @@ def train_distilled_network_dirichlet():
 
     for batch in test_loader:
         inputs, labels = batch
-        inputs = inputs.to(distilled_model.device)
+        inputs, labels = inputs[0].to(distilled_model.device), labels.to(distilled_model.device)
 
-        predicted_distribution = distilled_model.predict(inputs)
-        model_acc += metrics.accuracy(predicted_distribution.to(distilled_model.device), labels.int())
+        predicted_distribution = distilled_model.predict(inputs).mean(axis=1)
+        model_acc += metrics.accuracy(predicted_distribution.to(distilled_model.device), labels.long())
         counter += 1
 
     LOGGER.info("Test accuracy is {}".format(model_acc / counter))
 
-    torch.save(distilled_model.state_dict(), "models/distilled_model_cifar10")
-
+    torch.save(distilled_model.state_dict(), model_dir)
 
 
 def predictions_dirichlet(model_dir="../models/distilled_model_cifar10",
@@ -89,8 +90,8 @@ def predictions_dirichlet(model_dir="../models/distilled_model_cifar10",
 
     args = utils.parse_args()
 
-    train_set = cifar10_ensemble_pred.Cifar10Data()
-    test_set = cifar10_ensemble_pred.Cifar10Data(train=False)
+    train_data = cifar10_ensemble_pred.Cifar10Data()
+    test_data = cifar10_ensemble_pred.Cifar10Data(train=False)
 
     ensemble = tensorflow_ensemble.TensorflowEnsemble(output_size=10)
 
@@ -102,15 +103,15 @@ def predictions_dirichlet(model_dir="../models/distilled_model_cifar10",
     distilled_model.load_state_dict(torch.load(model_dir, map_location=torch.device('cpu')))
     distilled_model.eval_mode()
 
-    data_list = [test_set, train_set]
+    data_list = [test_data, train_data]
     labels = ["test", "train"]
 
     hf = h5py.File(file_dir, 'w')
 
     for data_set, label in zip(data_list, labels):
 
-        data, pred_samples, alpha, teacher_logits, teacher_predictions, targets = \
-            [], [], [], [], [], [], [], []
+        data, pred_samples, alpha, teacher_predictions, targets = \
+            [], [], [], [], []
 
         data_loader = torch.utils.data.DataLoader(data_set.set,
                                                   batch_size=32,
@@ -122,18 +123,17 @@ def predictions_dirichlet(model_dir="../models/distilled_model_cifar10",
             img = inputs[0].to(distilled_model.device)
             data.append(img.data.numpy())
             targets.append(labels.data.numpy())
-            teacher_logits.append(inputs[2].data.numpy())
             teacher_predictions.append(inputs[1].data.numpy())
 
-            a, probs = distilled_model.predict(img, return_params=True, return_logits=True)
+            a, probs = distilled_model.predict(img, return_params=True)
             alpha.append(a.data.numpy())
             pred_samples.append(probs.data.numpy())
 
         data = np.concatenate(data, axis=0)
         pred_samples = np.concatenate(pred_samples, axis=0)
-        teacher_logits = np.concatenate(teacher_logits, axis=0)
         teacher_predictions = np.concatenate(teacher_predictions, axis=0)
         targets = np.concatenate(targets, axis=0)
+        alpha = np.concatenate(alpha, axis=0)
 
         preds = np.argmax(np.mean(pred_samples, axis=1), axis=-1)
 
@@ -149,7 +149,6 @@ def predictions_dirichlet(model_dir="../models/distilled_model_cifar10",
         grp = hf.create_group(label)
         grp.create_dataset("data", data=data)
         grp.create_dataset("predictions", data=pred_samples)
-        grp.create_dataset("teacher-logits", data=teacher_logits)
         grp.create_dataset("teacher-predictions", data=teacher_predictions)
         grp.create_dataset("targets", data=targets)
         grp.create_dataset("alpha", data=alpha)
@@ -158,11 +157,11 @@ def predictions_dirichlet(model_dir="../models/distilled_model_cifar10",
 
 
 def predictions_corrupted_data_dirichlet(model_dir="models/distilled_model_cifar10_dirichlet",
-                               file_dir="../../dataloaders/data/distilled_model_predictions_dirichlet.h5"):
+                               file_dir="../../dataloaders/data/distilled_model_predictions_corrupted_data_dirichlet.h5"):
     args = utils.parse_args()
 
     # Load model
-    ensemble = tensorflow_ensemble.TensorflowEnsemble(output_size=10)  # This is irrelevant
+    ensemble = tensorflow_ensemble.TensorflowEnsemble(output_size=10)
 
     distilled_model = cifar_resnet_dirichlet.CifarResnetDirichlet(ensemble,
                                                                   resnet_utils.Bottleneck,
@@ -174,9 +173,8 @@ def predictions_corrupted_data_dirichlet(model_dir="models/distilled_model_cifar
     distilled_model.eval_mode()
 
     corruption_list = ["test", "brightness", "contrast", "defocus_blur", "elastic_transform", "fog", "frost",
-                       "gaussian_blur",
-                       "gaussian_noise", "glass_blur", "impulse_noise", "motion_blur", "pixelate", "saturate",
-                       "shot_noise", "snow", "spatter", "speckle_noise", "zoom_blur"]
+                       "gaussian_blur", "gaussian_noise", "glass_blur", "impulse_noise", "motion_blur", "pixelate",
+                       "saturate", "shot_noise", "snow", "spatter", "speckle_noise", "zoom_blur"]
 
     hf = h5py.File(file_dir, 'w')
 
@@ -198,9 +196,7 @@ def predictions_corrupted_data_dirichlet(model_dir="models/distilled_model_cifar
                                                      num_workers=0)
 
             # data = []
-            predictions = []
-            targets = []
-            alpha = []
+            predictions, targets, alpha = [], [], []
 
             for j, batch in enumerate(dataloader):
                 inputs, labels = batch
@@ -209,7 +205,7 @@ def predictions_corrupted_data_dirichlet(model_dir="models/distilled_model_cifar
 
                 inputs, labels = inputs.to(distilled_model.device), labels.to(distilled_model.device)
 
-                a, preds = distilled_model.predict(inputs, return_raw_data=True)
+                a, preds = distilled_model.predict(inputs, return_params=True)
                 alpha.append(a.to(torch.device("cpu")).data.numpy())
                 predictions.append(preds.to(torch.device("cpu")).data.numpy())
 
@@ -242,8 +238,9 @@ def main():
                        log_level=args.log_level)
     LOGGER.info("Args: {}".format(args))
 
-    predictions_corrupted_data_dirichlet(model_dir="models/distilled_model_cifar10_dirichlet_1",
-                               file_dir="../../dataloaders/data/distilled_model_dirichlet_1_predictions_corrupted_data.h5")
+    train_distilled_network_dirichlet()
+    #predictions_dirichlet()
+    predictions_corrupted_data_dirichlet()
 
 
 if __name__ == "__main__":

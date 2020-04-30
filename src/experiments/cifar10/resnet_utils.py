@@ -1,4 +1,4 @@
-# Resnet blocks for cifar10
+# Resnet-blocks for cifar10
 
 '''ResNet in PyTorch.
 For Pre-activation ResNet, see 'preact_resnet.py'.

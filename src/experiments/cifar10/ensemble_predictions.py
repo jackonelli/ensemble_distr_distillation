@@ -31,7 +31,7 @@ def ensemble_predictions():
     labels = ["test", "train"]
 
     data_dir = "../../dataloaders/data/ensemble_predictions/"
-    hf = h5py.File(data_dir + 'ensemble_predictions_test.h5', 'w')
+    hf = h5py.File(data_dir + 'ensemble_predictions.h5', 'w')
 
     for data_set, label in zip(data_list, labels):
         data, logits, predictions, targets = [], [], [], []
@@ -137,49 +137,13 @@ def ensemble_predictions_corrupted_data():
     hf.close()
 
 
-def logits_gaussian_check():
-
-    data_set = cifar10_ensemble_pred.Cifar10Data(train=False)
-
-    data_loader = torch.utils.data.DataLoader(data_set.set,
-                                              batch_size=1,
-                                              shuffle=True,
-                                              num_workers=0)
-
-    num_dim = 10
-    corr_coeff = np.zeros(num_dim)
-    num_samples = 1000
-    fig, axis = plt.subplots(2, 5)
-    j = 0
-    l = 0
-    for batch in data_loader:
-        data, _ = batch
-        logits = data[2]
-
-        for i, ax in enumerate(axis.reshape(-1)):
-            #ax.hist(logits[:, i])
-            res = scipy_stats.probplot(np.squeeze(logits[:, i]), plot=ax)
-            corr_coeff[i] += res[1][2]
-         
-            ax.set_title("Dim {}".format(i+1))
-
-        plt.show()
-        j += 1
-        if j == num_samples:
-            break
-
-    corr_coeff = corr_coeff / num_samples #len(data_set.set)
-    print(corr_coeff)
-
-
 def main():
     args = utils.parse_args()
     log_file = Path("{}.log".format(datetime.now().strftime('%Y%m%d_%H%M%S')))
     utils.setup_logger(log_path=Path.cwd() / args.log_dir / log_file,
                        log_level=args.log_level)
     LOGGER.info("Args: {}".format(args))
-    logits_gaussian_check()
-
+    ensemble_predictions()
 
 if __name__ == "__main__":
     main()

@@ -61,12 +61,14 @@ class Cifar10Data:
         img, target = self.set.data[index], self.set.targets[index]
 
         if self.torch:
-            img = transforms.ToTensor()(Image.fromarray(img))
+            img = Image.fromarray(img)
         else:
             img = img / 255
 
         if self.transform is not None:
-            img = self.transform(img)
+            img = transforms.ToTensor()(self.transform(img))
+        elif self.torch:
+            img = (transforms.ToTensor()(img))
 
         target = torch.tensor(target)
 

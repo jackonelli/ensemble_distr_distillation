@@ -77,7 +77,7 @@ class CifarResnetDirichlet(distilled_network.DistilledNet):
 
         return predictions
 
-    def predict(self, input_, num_samples=None, return_raw_data=False):
+    def predict(self, input_, num_samples=None, return_params=False):
         """Predict parameters
         Wrapper function for the forward function.
         """
@@ -98,7 +98,7 @@ class CifarResnetDirichlet(distilled_network.DistilledNet):
             rv = torch.distributions.dirichlet.Dirichlet(concentration=alphas[i, :])
             samples[i, :, :] = rv.rsample([num_samples])
 
-        if return_raw_data:
+        if return_params:
             return alphas, samples
 
         else:
@@ -110,7 +110,7 @@ class CifarResnetDirichlet(distilled_network.DistilledNet):
         else:
             return False
 
-    def temperature_anneling(self, temp_factor=0.95):
+    def temperature_annealing(self, temp_factor=0.95):
 
         if self.temp > 1:
             self.temp = temp_factor * self.temp
@@ -119,7 +119,6 @@ class CifarResnetDirichlet(distilled_network.DistilledNet):
         """Calculate loss function
         Wrapper function for the loss function.
         """
-
         return self.loss(outputs, teacher_predictions)
 
     def eval_mode(self, train=False, temp=None):

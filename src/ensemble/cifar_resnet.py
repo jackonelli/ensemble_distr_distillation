@@ -54,7 +54,7 @@ class ResNet(ensemble.EnsembleMember):  # Change of inheritance
         return logits
 
     def calculate_loss(self, outputs, labels):
-        return self.loss(outputs, labels)
+        return self.loss(outputs, labels.long())
 
     def predict(self, x, t=1):
         x = self.forward(x)

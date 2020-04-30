@@ -15,20 +15,6 @@ from src.dataloaders import cifar10_benchmark_model_predictions
 
 LOGGER = logging.getLogger(__name__)
 
-def calc_acc(data_loader):
-    # Return accuracy over data loader
-
-    acc = 0
-    idx = 0
-    for batch in data_loader:
-        predictions, labels = batch
-        predicted_labels = np.argmax(predictions, axis=-1)
-        acc += np.mean(predicted_labels.data.numpy() == labels.data.numpy())
-        idx += 1
-
-    return acc / idx
-
-
 def make_boxplot(data_list, file_dir, label="ACC", model_list=None, colors=None, max_y=1.0):
     """Make boxplot over data in data_list
     M = number of models, N = number of data_sets, I = number of intensities, R = number of repetitions
@@ -89,7 +75,7 @@ def ood_data_experiment():
                        "gaussian_blur", "gaussian_noise", "glass_blur", "impulse_noise", "pixelate",
                        "saturate", "shot_noise", "spatter", "speckle_noise", "zoom_blur"]
     intensity_list = [0, 1, 2, 3, 4, 5]
-    rep_list = [1]#, 2, 3, 4, 5]
+    rep_list = [1, 2, 3, 4, 5]
     ensemble_inds = np.load("data/ensemble_indices.npy")
     ensemble_size = 10
 

@@ -128,7 +128,7 @@ class CustomSet():
 def main():
     """Entry point for debug visualisation"""
     # get some random training images
-    data = Cifar10Data(data_dir="data/ensemble_predictions/", corrupted=True)
+    data = Cifar10Data(data_dir="data/ensemble_predictions/")
     loader = torch.utils.data.DataLoader(data.set,
                                          batch_size=4,
                                          shuffle=True,
