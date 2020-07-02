@@ -11,15 +11,17 @@ from src.dataloaders import cifar10, cifar10_corrupted
 from src.experiments.cifar10 import resnet_utils
 from src.ensemble import ensemble
 from src.ensemble import cifar_resnet
-from src import metrics
 
 LOGGER = logging.getLogger(__name__)
 
 
-def ensemble_predictions(ensemble, torch_data=True):  # If torch_data is not true, ensemble is assumed to be Tensorflow
+def ensemble_predictions(ensemble_filepath="models/resnet_ensemble", torch_data=True):  # If torch_data is not true, ensemble is assumed to be Tensorflow
     """ Make and save predictions from ensemble """
     train_set = cifar10.Cifar10Data(torch_data=torch_data)
     test_set = cifar10.Cifar10Data(train=False, torch_data=torch_data)
+
+    output_size = 10
+    resnet_ensemble = load_ensemble(ensemble_filepath, output_size=output_size)
 
     data_list = [test_set, train_set]
     labels = ["test", "train"]
@@ -43,7 +45,7 @@ def ensemble_predictions(ensemble, torch_data=True):  # If torch_data is not tru
                 targets.append(tf.convert_to_tensor(labels.data.numpy()))
 
             data.append(inputs)
-            logs, preds = ensemble.predict(inputs)
+            logs, preds = resnet_ensemble.predict(inputs)
             logits.append(logs)
             predictions.append(preds)
 
@@ -71,14 +73,16 @@ def ensemble_predictions(ensemble, torch_data=True):  # If torch_data is not tru
         grp.create_dataset("targets", data=targets)
 
 
-def ensemble_predictions_corrupted_data(ensemble, torch_data=True):
+def ensemble_predictions_corrupted_data(ensemble_filepath="models/resnet_ensemble", torch_data=True):
     """ Make and save predictions from ensemble on corrupted data sets"""
 
-    # Load model
     corruption_list = ["brightness", "contrast", "defocus_blur", "elastic_transform", "fog", "frost", "gaussian_blur",
                        "gaussian_noise", "glass_blur", "impulse_noise", "motion_blur", "pixelate", "saturate",
                        "shot_noise", "snow", "spatter", "speckle_noise", "zoom_blur"]
     intensity_list = [1, 2, 3, 4, 5]
+
+    output_size=10
+    resnet_ensemble = load_ensemble(ensemble_filepath, output_size=output_size)
 
     data_dir = "../../dataloaders/data/ensemble_predictions/"
     hf = h5py.File(data_dir + 'ensemble_predictions_corrupted_data.h5', 'w')
@@ -106,7 +110,7 @@ def ensemble_predictions_corrupted_data(ensemble, torch_data=True):
                     inputs = tf.convert_to_tensor(inputs.data.numpy())
 
                 data.append(inputs)
-                logs, preds = ensemble.predict(inputs)
+                logs, preds = resnet_ensemble.predict(inputs)
                 predictions.append(preds)
                 logits.append(logs)
 
@@ -143,9 +147,9 @@ def ensemble_predictions_corrupted_data(ensemble, torch_data=True):
 def train_ensemble(args, ensemble_filepath="models/resnet_ensemble"):
 
     output_size = 10
-    prob_ensemble = ensemble.Ensemble(output_size=output_size)
+    resnet_ensemble = ensemble.Ensemble(output_size=output_size)
 
-    data_ind = np.load("data/training_data_indices.npy")
+    data_ind = np.load("training_files/training_data_indices.npy")
     num_train_points = 40000
     train_ind = data_ind[:num_train_points]
     valid_ind = data_ind[num_train_points:]
@@ -171,26 +175,23 @@ def train_ensemble(args, ensemble_filepath="models/resnet_ensemble"):
     #                                           num_workers=0)
 
     device = utils.torch_settings(args.seed, args.gpu)
-    for _ in range(1): # args.num_ensemble_members
+    for _ in range(args.num_ensemble_members):
         resnet_model = cifar_resnet.ResNet(resnet_utils.Bottleneck, [2, 2, 2, 2], device=device, learning_rate=args.lr)
 
-        resnet_model.train(train_loader, validation_loader=valid_loader, num_epochs=1, # args.num_epochs
+        resnet_model.train(train_loader, validation_loader=valid_loader, num_epochs=args.num_epochs,
                            reshape_targets=False)
 
-        prob_ensemble.add_member(resnet_model)
+        resnet_ensemble.add_member(resnet_model)
 
-    loss_metric = metrics.Metric(name="Loss", function=torch.nn.CrossEntropyLoss)
-    prob_ensemble.add_metrics([loss_metric])
-    prob_ensemble.train(train_loader, args.num_epochs, validation_loader=valid_loader)
-
-    prob_ensemble.save_ensemble(ensemble_filepath)
-
-    return ensemble
+    resnet_ensemble.save_ensemble(ensemble_filepath)
 
 
-def load_ensemble():
-    """Placeholder for loading ensemble from elsewhere"""
-    pass
+def load_ensemble(ensemble_filepath="models/resnet_ensemble", output_size=10):
+    """Change this function to load ensemble from elsewhere"""
+    prob_ensemble = ensemble.Ensemble(output_size=output_size)
+    prob_ensemble.load_ensemble(ensemble_filepath)
+
+    return prob_ensemble
 
 
 def main():
@@ -200,8 +201,8 @@ def main():
                        log_level=args.log_level)
     LOGGER.info("Args: {}".format(args))
 
-    ensemble = train_ensemble(args)
-    #ensemble_predictions_corrupted_data(ensemble)
+    train_ensemble(args)
+    ensemble_predictions_corrupted_data()
     #ensemble_predictions(ensemble)
 
 
