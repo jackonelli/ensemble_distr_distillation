@@ -22,10 +22,10 @@ class Cifar10Data:
                                              num_workers=2)
     """
 
-    def __init__(self, ind=None, train=True, augmentation=False, torch=True, root="./data"):
+    def __init__(self, ind=None, train=True, augmentation=False, torch_data=True, root="./data"):
         self._log = logging.getLogger(self.__class__.__name__)
 
-        self.torch = torch
+        self.torch_data = torch_data
         if augmentation:
             self.transform = transforms.Compose([
                 transforms.RandomCrop(32, padding=4),
@@ -60,18 +60,17 @@ class Cifar10Data:
         """
         img, target = self.set.data[index], self.set.targets[index]
 
-        # doing this so that it is consistent with all other datasets
-        # to return a PIL Image
-
-        if self.torch:
-            img = transforms.ToTensor()(Image.fromarray(img))
+        if self.torch_data:
+            img = Image.fromarray(img)
         else:
             img = img / 255
 
         if self.transform is not None:
-            img = self.transform(img)
+            img = transforms.ToTensor()(self.transform(img))
+        elif self.torch_data:
+            img = (transforms.ToTensor()(img))
 
-        target = torch.tensor(target)  # TODO: Remove?
+        target = torch.tensor(target)
 
         return img, target
 
@@ -81,9 +80,8 @@ def main():
     # get some random training images
     data = Cifar10Data()
 
-    bs = 4
     loader = torch.utils.data.DataLoader(data,
-                                         batch_size=bs,
+                                         batch_size=4,
                                          shuffle=True,
                                          num_workers=0)
     dataiter = iter(loader)
@@ -94,7 +92,7 @@ def main():
     plt.show()
 
     # print labels
-    print(" ".join("%5s" % data.classes[labels[j]] for j in range(bs)))
+    print(" ".join("%5s" % data.classes[labels[j]] for j in range(4)))
 
 
 if __name__ == "__main__":

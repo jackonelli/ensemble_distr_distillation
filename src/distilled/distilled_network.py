@@ -6,8 +6,6 @@ import torch.nn as nn
 import torch.optim as torch_optim
 import math
 import src.utils as utils
-import os
-import numpy as np
 
 
 class DistilledNet(nn.Module, ABC):
@@ -22,8 +20,7 @@ class DistilledNet(nn.Module, ABC):
 
         if self.loss is None or not issubclass(type(self.loss),
                                                nn.modules.loss._Loss):
-            # raise ValueError(
-            #    "Must assign proper loss function to child.loss.")
+
             self._log.warning(
                 "Must assign proper loss function to child.loss.")
         self.optimizer = None
@@ -35,14 +32,10 @@ class DistilledNet(nn.Module, ABC):
         Should NOT be overridden!
         """
 
-        # Note that we step every iteration (as opposed to every epoch) NOT TRUE ANYMORE
-        #scheduler = self.get_scheduler(step_size=5 * len(train_loader),
-        #                              cyclical=False)
-
         clr = utils.adapted_lr(c=0.7)
         scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, [clr])
 
-        self.use_hard_labels = False  # VILL VI HA DENNA?
+        self.use_hard_labels = False
 
         self._log.info("Training distilled network.")
 
@@ -61,12 +54,14 @@ class DistilledNet(nn.Module, ABC):
             if self._learning_rate_condition(epoch_number):
                 scheduler.step()
 
+            if self._temp_annealing_schedule(epoch_number):
+                self._temperature_anneling()
+
         self._reset_metrics()  # For storing purposes
 
     def _train_epoch(self,
                      train_loader,
-                     validation_loader=None,
-                     scheduler=None):
+                     validation_loader=None):
         """Common train epoch method for all distilled networks
         Should NOT be overridden!
         TODO: Make sure train_loader returns None for labels,
@@ -108,11 +103,7 @@ class DistilledNet(nn.Module, ABC):
                 #self._reset_metrics()
                 self._update_metrics(
                     outputs, teacher_predictions
-                )  # BUT THIS DOES NOT WORK FOR EG ACCURACY
-                # USE EITHER METRICS.ACCURACY_SOFT_LABELS OR METRICS.ACCURACY_LOGITS
-
-            #if self._learning_rate_condition():
-            #    scheduler.step()
+                )
 
         if validation_loader is not None:
             # TODO: should we do model.eval() here or would it just waste our time?
@@ -170,6 +161,8 @@ class DistilledNet(nn.Module, ABC):
             metric_string += " {}".format(metric)
         self._log.info(metric_string)
 
+
+    # TODO: REMOVE?
     def get_scheduler(self, step_size=100, factor=100000, cyclical=False):
 
         if cyclical:
@@ -207,7 +200,10 @@ class DistilledNet(nn.Module, ABC):
         """Evaluate condition for increasing learning rate
         Defaults to never increasing. I.e. returns False
         """
+        return False
 
+    def _temp_annealing_schedule(self, epoch=None):
+        """Evaluate condition for softmax temperature annealing"""
         return False
 
     @abstractmethod

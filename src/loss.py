@@ -2,6 +2,7 @@
 import torch
 import numpy as np
 import torch.distributions.multivariate_normal as torch_mvn
+import torch.distributions.dirichlet as torch_dirichlet
 
 import logging
 
@@ -243,3 +244,13 @@ def mse(mean, target):
         total_loss += loss_function(sample, mean)
 
     return total_loss / N
+
+
+def dirichlet_nll(parameters, target):
+
+    distr = torch_dirichlet.Dirichlet(concentration=parameters)
+    neg_log_prob = - distr.log_prob(torch.transpose(target, 0, 1))
+    loss = torch.mean(neg_log_prob)
+
+    return loss
+

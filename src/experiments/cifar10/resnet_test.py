@@ -1,16 +1,17 @@
-import numpy as np
 import logging
+from pathlib import Path
+from datetime import datetime
+import numpy as np
 import torch
+
 from src import utils
 from src import metrics
 from src.dataloaders import cifar10
 from src.ensemble import cifar_resnet
-
-from pathlib import Path
-from datetime import datetime
-
+from src.experiments.cifar10 import resnet_utils
 
 LOGGER = logging.getLogger(__name__)
+
 
 def test_downloaded_resnet_network():
     args = utils.parse_args()
@@ -30,26 +31,21 @@ def test_downloaded_resnet_network():
     train_loader = torch.utils.data.DataLoader(train_set,
                                                batch_size=100,
                                                shuffle=True,
-                                               num_workers=2)
+                                               num_workers=0)
 
     valid_loader = torch.utils.data.DataLoader(valid_set,
                                                batch_size=100,
                                                shuffle=True,
-                                               num_workers=2)
+                                               num_workers=0)
 
     test_set = cifar10.Cifar10Data(train=False)
 
     test_loader = torch.utils.data.DataLoader(test_set,
                                               batch_size=64,
                                               shuffle=True,
-                                              num_workers=2)
+                                              num_workers=0)
 
-    resnet_model = cifar_resnet.ResNet(cifar_resnet.Bottleneck, [2, 2, 2, 2], learning_rate=args.lr)
-
-    acc_metric = metrics.Metric(name="Mean acc", function=metrics.accuracy)
-    loss_metric = metrics.Metric(name="Mean loss", function=resnet_model.calculate_loss)
-    resnet_model._add_metric(acc_metric)
-    resnet_model._add_metric(loss_metric)
+    resnet_model = cifar_resnet.ResNet(resnet_utils.Bottleneck, [2, 2, 2, 2], learning_rate=args.lr)
 
     resnet_model.train(train_loader, validation_loader=valid_loader, num_epochs=args.num_epochs, reshape_targets=False)
     # Check accuracy on test data
@@ -63,7 +59,7 @@ def test_downloaded_resnet_network():
         inputs = inputs.to(resnet_model.device)
 
         predicted_distribution = resnet_model.predict(inputs)
-        model_acc += metrics.accuracy(predicted_distribution.to(torch.device("cpu")), labels.int())
+        model_acc += metrics.accuracy(predicted_distribution.to(torch.device("cpu")), labels.long())
         counter += 1
 
     model_acc = model_acc / counter
