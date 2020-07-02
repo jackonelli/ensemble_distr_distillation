@@ -1,4 +1,3 @@
-"""Data loader for CIFAR data with ensemble predictions"""
 import logging
 import torch
 import h5py
@@ -6,7 +5,8 @@ import numpy as np
 
 
 class Cifar10DataPredictions:
-    """Saved predictions for (corrupted) CIFAR10 data, wrapper
+    """Saved predictions for (corrupted) CIFAR10 data, wrapper. Files created through distillation
+    experiments from src.experiments.cifar10 or obtained from Ovadia et. al. (2019)
     """
 
     def __init__(self, model, corruption, intensity, rep=None, data_dir="data/", ensemble_indices=None,
@@ -15,7 +15,7 @@ class Cifar10DataPredictions:
         self._log = logging.getLogger(self.__class__.__name__)
 
         model_list = ["distilled", "dropout", "dropout_nofirst", "ensemble", "ensemble_new", "ll_dropout", "ll_svi",
-                      "svi", "temp_scaling", "vanilla", "ood_distill", "vanilla_distill"]
+                      "svi", "temp_scaling", "vanilla", "mixture_distill", "dirichlet_distill"]
         corruption_list = ["brightness", "contrast", "defocus_blur", "elastic_transform", "fog", "frost",
                            "gaussian_blur", "gaussian_noise", "glass_blur", "impulse_noise", "pixelate",
                            "saturate", "shot_noise", "spatter", "speckle_noise", "zoom_blur", "test"]
@@ -25,11 +25,12 @@ class Cifar10DataPredictions:
             print("Data not found: model, corruption or intensity does not exist")
 
         elif rep is not None and rep > 5:
-            print("Variable rep has to be between 1 and 5")
+            print("Rep has to be between 1 and 5")
 
         else:
 
             if model == "ensemble_new":
+                # Ensemble file created from own source
 
                 if intensity == 0:
                     filepath = data_dir + "ensemble_predictions/ensemble_predictions.h5"
@@ -50,7 +51,6 @@ class Cifar10DataPredictions:
                         if extract_logits_info:
                             self.logits = sub_grp["logits"][()]
 
-                # TODO: remove this option?
                 if rep is not None:
 
                     if ensemble_indices is None:
@@ -63,13 +63,13 @@ class Cifar10DataPredictions:
                 else:
                     targets = np.repeat([targets], 5, axis=0).reshape(-1)
 
-            elif model == "distilled" or model == "ood_distill" or model == "vanilla_distill":
+            elif model in ["distilled", "mixture_distill", "dirichlet_distill"]:
 
                 spec = ""
-                if model == "ood_distill":
-                    spec = "corr_"  # TODO: Change to ood?
-                elif model == "vanilla_distill":
-                    spec = "vanilla_"
+                if model == "mixture_distill":
+                    spec = "mixture_"
+                elif model == "dirichlet_distill":
+                    spec = "dirichlet_"
 
                 filepath = data_dir + "distilled_model_" + spec + str(rep) + "_predictions_corrupted_data.h5"
 
@@ -147,7 +147,6 @@ class CustomSet:
 
 def main():
     """Entry point for debug visualisation"""
-    # get some random training images
     data = Cifar10DataPredictions("dropout", "brightness", 1)
     loader = torch.utils.data.DataLoader(data.set,
                                          batch_size=4,

@@ -8,9 +8,6 @@ import src.metrics as metrics
 import src.utils as utils
 
 
-# TODO: I added the option in the ensemble-members to be able to
-# calculate metrics on new data,
-# maybe we should have a similar ensemble-level option
 class Ensemble():
     """Ensemble base class
     The ensemble member needs to track the size
@@ -94,7 +91,7 @@ class Ensemble():
     def transform_logits(self, logits, transformation=None):
         """Ensemble predictions from logits
         Returns the predictions of all individual ensemble members,
-	    by applying the logits 'transformation' to the logits.
+        by applying the logits 'transformation' to the logits.
         B = batch size, K = num output params, N = ensemble size
 
         Args:
@@ -219,16 +216,16 @@ class EnsembleMember(nn.Module, ABC):
                                                     step_size=1,
                                                     gamma=0.1)
 
-        #clr = utils.adapted_lr(c=0.7)
-        #scheduler = torch.optim.lr_scheduler.LambdaLR(
+        # clr = utils.adapted_lr(c=0.7)
+        # scheduler = torch.optim.lr_scheduler.LambdaLR(
         #    self.optimizer, [clr])
 
         for epoch_number in range(1, num_epochs + 1):
-            loss = self._train_epoch(train_loader, validation_loader)
+            loss = self._train_epoch(train_loader, validation_loader, reshape_targets=reshape_targets)
             self._print_epoch(epoch_number, loss, "Train")
             store_loss["Train"].append(loss)
             if validation_loader is not None:
-                loss = self._validate_epoch(validation_loader)
+                loss = self._validate_epoch(validation_loader, reshape_targets=reshape_targets)
                 self._print_epoch(epoch_number, loss, "Validation")
                 store_loss["Validation"].append(loss)
             if self._learning_rate_condition(epoch_number):
@@ -258,7 +255,7 @@ class EnsembleMember(nn.Module, ABC):
             logits = self.forward(inputs)
             outputs = self.transform_logits(logits)
 
-            if reshape_targets:  # TODO: Does this really concern  all cases?
+            if reshape_targets:
                 # num_samples is different from batch size,
                 # the loss expects a target with shape
                 # (B, N, D), so that it can handle a full ensemble pred.
@@ -280,7 +277,7 @@ class EnsembleMember(nn.Module, ABC):
 
         return running_loss / (batch_count + 1)
 
-    def _validate_epoch(self, validation_loader):
+    def _validate_epoch(self, validation_loader, reshape_targets=True):
         """Common validate epoch method for all ensemble member classes
         Should NOT be overridden!
         """
@@ -300,8 +297,10 @@ class EnsembleMember(nn.Module, ABC):
 
                 num_samples = 1
                 batch_size = targets.size(0)
-                targets = targets.reshape(
-                    (batch_size, num_samples, self.target_size))
+
+                if reshape_targets:
+                    targets = targets.reshape(
+                        (batch_size, num_samples, self.target_size))
 
                 tmp_loss = self.calculate_loss(outputs, targets)
                 running_loss += tmp_loss

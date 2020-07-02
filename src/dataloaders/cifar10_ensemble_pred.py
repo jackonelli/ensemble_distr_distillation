@@ -1,17 +1,17 @@
-"""Data loader for CIFAR data with ensemble predictions"""
 import logging
+import h5py
 import torch
 import torchvision
 import torchvision.transforms as transforms
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
-import h5py
 
 
 class Cifar10Data:
     """CIFAR data wrapper with ensemble predictions,
-    data is organized as ((img, ensemble preds, ensemble logits), labels)
+    data is organised as ((img, ensemble preds, ensemble logits), labels) (To create an h5 file with ensemble
+    predictions you can use ensemble_predictions() ensemble_predictions.py from src.experiments.cifar10)
     """
 
     def __init__(self, ind=None, train=True, augmentation=False, corrupted=False,
@@ -52,7 +52,7 @@ class Cifar10Data:
 
             corrupted_data = []
             corrupted_predictions = []
-            corrupted_logits = []  # TODO: Predict and save this
+            corrupted_logits = []
             corrupted_targets = []
             corruptions = ["contrast", "frost", "gaussian_blur", "impulse_noise"]
 
@@ -128,7 +128,7 @@ class CustomSet():
 def main():
     """Entry point for debug visualisation"""
     # get some random training images
-    data = Cifar10Data(data_dir="data/ensemble_predictions/", corrupted=True)
+    data = Cifar10Data(data_dir="data/ensemble_predictions/")
     loader = torch.utils.data.DataLoader(data.set,
                                          batch_size=4,
                                          shuffle=True,

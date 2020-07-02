@@ -71,6 +71,10 @@ def parse_args():
     parser.add_argument("--gpu",
                         action="store_true",
                         help="Use gpu, if available")
+    parser.add_argument("--rep",
+                        type=int,
+                        default=1,
+                        help="Replication number (cifar10 experiments)")
 
     return parser.parse_args()
 
@@ -178,9 +182,6 @@ def is_nan_or_inf(tensor):
 
 
 def adapted_lr(c=0.7):
-    # the torch_optim.lr_scheduler.CycleLR does not work with Adam so I copied this one from here:
-    # https://towardsdatascience.com/adaptive-and-cyclical-learning-rates-using-pytorch-2bf904d18dee
-
     # Lambda function to calculate the LR
     lr_lambda = lambda it: (it + 1)**(-c)
 

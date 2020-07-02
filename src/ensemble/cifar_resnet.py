@@ -1,9 +1,3 @@
-'''ResNet in PyTorch.
-For Pre-activation ResNet, see 'preact_resnet.py'.
-Reference:
-[1] Kaiming He, Xiangyu Zhang, Shaoqing Ren, Jian Sun
-    Deep Residual Learning for Image Recognition. arXiv:1512.03385
-'''
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -11,10 +5,21 @@ import torch.optim as torch_optim
 from src.ensemble import ensemble
 from src.experiments.cifar10 import resnet_utils
 
-"""ResNet ensemble member"""
-class ResNet(ensemble.EnsembleMember):  # Change of inheritance
-    def __init__(self, block, num_blocks, learning_rate=0.001, num_classes=10):
-        super().__init__(output_size=10, loss_function=nn.CrossEntropyLoss(), device=torch.device("cpu"))
+
+class ResNet(ensemble.EnsembleMember):
+    """ResNet
+    Resnet network adapted to Cifar10, adapted from https://github.com/kuangliu/pytorch-cifar
+
+    Args:
+        block (resnet_utils.BasicBlock/resnet_utils.Bottleneck)
+        num_blocks (vector(int))
+        device (torch.Device)
+        learning_rate (float)
+        num_classes (int)
+    """
+
+    def __init__(self, block, num_blocks, device=torch.device('cpu'), learning_rate=0.001, num_classes=10):
+        super().__init__(output_size=num_classes, loss_function=nn.CrossEntropyLoss(), device=device)
         self.learning_rate = learning_rate
 
         self.in_planes = 64
@@ -54,7 +59,7 @@ class ResNet(ensemble.EnsembleMember):  # Change of inheritance
         return logits
 
     def calculate_loss(self, outputs, labels):
-        return self.loss(outputs, labels)
+        return self.loss(outputs, labels.long())
 
     def predict(self, x, t=1):
         x = self.forward(x)
