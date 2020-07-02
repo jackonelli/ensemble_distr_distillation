@@ -209,62 +209,6 @@ def accuracy(predicted_distribution, true_labels):
     return (true_labels == predicted_labels).sum().item() / number_of_elements
 
 
-def accuracy_logits(logits_distr_par,
-                    targets,
-                    label_targets=False,
-                    num_samples=100):
-    """ Accuracy given that the inputs are parameters of the normal distribution over logits.
-
-    B = batch size
-    K = number of classes
-    N = number of ensemble member
-
-    Args:
-        targets: torch.tensor(B, N, K-1) if logits targets, (B, K) otherwise
-        logits_distr_par: torch.tensor((B, K-1), (B, K-1))
-        label_targets: specifies if the targets is in logits or in labels form
-
-    Returns:
-        Accuracy: float
-    """
-
-    mean = logits_distr_par[0]
-    var = logits_distr_par[1]
-
-    samples = torch.zeros([mean.size(0), num_samples, mean.size(-1)])
-    for i in range(mean.size(0)):
-        rv = torch.distributions.multivariate_normal.MultivariateNormal(
-            loc=mean[i, :], covariance_matrix=torch.diag(var[i, :]))
-        samples[i, :, :] = rv.rsample([num_samples])
-
-    # samples = samples.to.(torch.device("cuda")) if using gpu
-    last_dim = torch.zeros(mean.size(0), num_samples,
-                           1)  # to.(torch.device("cuda")) if using gpu
-    predicted_distribution = torch.mean((torch.nn.Softmax(dim=-1))(torch.cat(
-        (samples, last_dim), dim=-1)),
-                                        dim=1)
-    predicted_labels, _ = utils.tensor_argmax(predicted_distribution)
-
-    if label_targets:
-        target_labels = targets
-
-    else:
-        last_dim = torch.zeros(mean.size(0), targets.size(1),
-                               1)  # .to(torch.device("cuda")) if using gpu
-        target_distribution = torch.mean((torch.nn.Softmax(dim=-1))(torch.cat(
-            (targets, last_dim), dim=-1)),
-                                         dim=1)
-
-        target_labels, _ = utils.tensor_argmax(target_distribution)
-
-    number_of_elements = np.prod(target_labels.size(0))
-
-    if number_of_elements == 0:
-        number_of_elements = 1
-    return (target_labels.int() == predicted_labels.int()
-            ).sum().item() / number_of_elements
-
-
 def error(predicted_distribution, true_labels):
     """ Error
     B = batch size

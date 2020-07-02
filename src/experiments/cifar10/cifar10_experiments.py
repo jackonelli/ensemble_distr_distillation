@@ -1,7 +1,6 @@
 import logging
 from pathlib import Path
 from datetime import datetime
-import h5py
 import numpy as np
 import torch
 import matplotlib.lines as matplot_lines
@@ -66,7 +65,7 @@ def make_boxplot(data_list, file_dir, label="ACC", model_list=None, colors=None,
 
 
 def ood_data_experiment():
-    """Repeat experiment from Ovidia et al. (2019), plotting boxplots on accuracy and ece on corrupted data"""
+    """Repeat experiment from Ovidia et al. (2019), plotting boxplots with accuracy and ece on corrupted data"""
 
     data_dir = "../../dataloaders/data/"
 
@@ -116,32 +115,11 @@ def ood_data_experiment():
 
     model_list_text = ["Gaussian Distilled", "Dirichlet Distilled", "Mixture Distilled", "Ensemble", "Vanilla",
                        "Temp Scaling", "Dropout", "LL Dropout", "SVI", "LL SVI"]
-    colors = ["#A6CEE3", "#1F78B4", "#B2DF8A", "#33A02C", "#FB9A99", "#E31A1C", "#FDBF6F", "#FF7F00", "#CAB2D6", "#6A3D9A"]
+    colors = ["#A6CEE3", "#1F78B4", "#B2DF8A", "#33A02C", "#FB9A99", "#E31A1C", "#FDBF6F", "#FF7F00", "#CAB2D6",
+              "#6A3D9A"]
     make_boxplot(acc_list, "data/fig/acc_benchmark_experiments_test.tikz", model_list=model_list_text, colors=colors)
     make_boxplot(ece_list, "data/fig/ece_benchmark_experiments_test.tikz", label="ECE", model_list=model_list_text,
                  colors=colors, max_y=0.8)
-
-
-def make_h5py_data_file():
-    """Save all corrupted data sets into one h5 file"""
-
-    corruption_list = ["brightness", "contrast", "defocus_blur", "elastic_transform", "fog", "frost", "gaussian_blur",
-                       "gaussian_noise", "glass_blur", "impulse_noise", "motion_blur", "pixelate", "saturate",
-                       "shot_noise", "snow", "spatter", "speckle_noise", "zoom_blur"]
-
-    data_dir = "../../dataloaders/data/CIFAR-10-C/"
-    hf = h5py.File(data_dir + "corrupted_data.h5", 'w')
-    grp = hf.create_group("labels")
-    labels = np.load(data_dir + "labels.npy")
-    grp.create_dataset("labels", data=labels)
-
-    for corruption in corruption_list:
-        print(corruption)
-        grp = hf.create_group(corruption)
-
-        data = np.load(data_dir + corruption + ".npy")
-        grp.create_dataset("data", data=data)
-    hf.close()
 
 
 def main():

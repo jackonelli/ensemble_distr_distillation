@@ -25,14 +25,6 @@ class TestMetrics(unittest.TestCase):
         acc = metrics.accuracy(predictions, true_label.long())
         self.assertAlmostEqual(acc, 1)
 
-    def test_accuracy_logits(self):
-        mean = torch.tensor([[1, 10]]).float()
-        var = torch.tensor([[1, 1]]).float()
-        distr_par = (mean, var)
-        target_logits = torch.tensor([[[2, 5]]]).float()
-        acc = metrics.accuracy_logits(distr_par, target_logits)
-        self.assertAlmostEqual(acc, 1)
-
     def test_accuracy_batch(self):
         true_label = torch.tensor([1, 0, 2, 0]).int()
         predictions = torch.tensor([[0.05, 0.09, 0.05], [0.1, 0.8, 0.1],

@@ -106,9 +106,7 @@ class DistilledNet(nn.Module, ABC):
                 )
 
         if validation_loader is not None:
-            # TODO: should we do model.eval() here or would it just waste our time?
             with torch.no_grad():
-                # We will compare here with the teacher predictions
                 self.calculate_metric_dataloader(validation_loader)
 
         return running_loss

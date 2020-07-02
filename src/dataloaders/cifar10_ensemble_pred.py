@@ -1,4 +1,3 @@
-"""Data loader for CIFAR data with ensemble predictions"""
 import logging
 import h5py
 import torch
@@ -11,7 +10,8 @@ from PIL import Image
 
 class Cifar10Data:
     """CIFAR data wrapper with ensemble predictions,
-    data is organized as ((img, ensemble preds, ensemble logits), labels)
+    data is organised as ((img, ensemble preds, ensemble logits), labels) (To create an h5 file with ensemble
+    predictions you can use ensemble_predictions() ensemble_predictions.py from src.experiments.cifar10)
     """
 
     def __init__(self, ind=None, train=True, augmentation=False, corrupted=False,
