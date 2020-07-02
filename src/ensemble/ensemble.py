@@ -8,9 +8,6 @@ import src.metrics as metrics
 import src.utils as utils
 
 
-# TODO: I added the option in the ensemble-members to be able to
-# calculate metrics on new data,
-# maybe we should have a similar ensemble-level option
 class Ensemble():
     """Ensemble base class
     The ensemble member needs to track the size
@@ -219,8 +216,8 @@ class EnsembleMember(nn.Module, ABC):
                                                     step_size=1,
                                                     gamma=0.1)
 
-        #clr = utils.adapted_lr(c=0.7)
-        #scheduler = torch.optim.lr_scheduler.LambdaLR(
+        # clr = utils.adapted_lr(c=0.7)
+        # scheduler = torch.optim.lr_scheduler.LambdaLR(
         #    self.optimizer, [clr])
 
         for epoch_number in range(1, num_epochs + 1):

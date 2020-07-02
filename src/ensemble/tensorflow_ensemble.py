@@ -4,14 +4,12 @@ from scipy.special import softmax as scipy_softmax
 from src.experiments.cifar10.uq_benchmark_2019 import models_lib
 
 
-"""This is a wrapper class that extracts saved data from a specific type of data set"""
 class TensorflowEnsemble:
+    """This is a wrapper class that extracts saved data from a dataset structured as
+    ((input, ensemble predictions, ensemble logits), labels),
+    an ensemble were the ensemble member predictions are loaded from file"""
+
     def __init__(self, output_size, indices=None):
-        """The ensemble member needs to track the size
-        of the output of the ensemble
-        This can be automatically inferred but it would look ugly
-        and this now works as a sanity check as well
-        """
         self.members = list()
         self._log = logging.getLogger(self.__class__.__name__)
         self.output_size = output_size
@@ -52,16 +50,7 @@ class TensorflowEnsemble:
         return logits
 
     def predict(self, inputs):
-        """Ensemble prediction
-        Returns the predictions of all individual ensemble members.
-        B = batch size, K = num output params, N = ensemble size
-
-
-        Args:
-            inputs (torch.tensor((B, data_dim))): data batch
-
-        Returns:
-            predictions (torch.tensor((B, N, K)))
+        """ Make predictions with Tensorflow ensemble members
         """
         logits = []
         for member_ind, member in enumerate(self.members):

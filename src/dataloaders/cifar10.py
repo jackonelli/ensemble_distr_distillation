@@ -22,10 +22,10 @@ class Cifar10Data:
                                              num_workers=2)
     """
 
-    def __init__(self, ind=None, train=True, augmentation=False, torch=True, root="./data"):
+    def __init__(self, ind=None, train=True, augmentation=False, torch_data=True, root="./data"):
         self._log = logging.getLogger(self.__class__.__name__)
 
-        self.torch = torch
+        self.torch_data = torch_data
         if augmentation:
             self.transform = transforms.Compose([
                 transforms.RandomCrop(32, padding=4),
@@ -60,14 +60,14 @@ class Cifar10Data:
         """
         img, target = self.set.data[index], self.set.targets[index]
 
-        if self.torch:
+        if self.torch_data:
             img = Image.fromarray(img)
         else:
             img = img / 255
 
         if self.transform is not None:
             img = transforms.ToTensor()(self.transform(img))
-        elif self.torch:
+        elif self.torch_data:
             img = (transforms.ToTensor()(img))
 
         target = torch.tensor(target)

@@ -15,7 +15,7 @@ class Cifar10DataPredictions:
         self._log = logging.getLogger(self.__class__.__name__)
 
         model_list = ["distilled", "dropout", "dropout_nofirst", "ensemble", "ensemble_new", "ll_dropout", "ll_svi",
-                      "svi", "temp_scaling", "vanilla", "ood_distill", "vanilla_distill", "dirichlet_distill"]
+                      "svi", "temp_scaling", "vanilla", "mixture_distill", "dirichlet_distill"]
         corruption_list = ["brightness", "contrast", "defocus_blur", "elastic_transform", "fog", "frost",
                            "gaussian_blur", "gaussian_noise", "glass_blur", "impulse_noise", "pixelate",
                            "saturate", "shot_noise", "spatter", "speckle_noise", "zoom_blur", "test"]
@@ -25,7 +25,7 @@ class Cifar10DataPredictions:
             print("Data not found: model, corruption or intensity does not exist")
 
         elif rep is not None and rep > 5:
-            print("Variable rep has to be between 1 and 5")
+            print("Rep has to be between 1 and 5")
 
         else:
 
@@ -50,7 +50,6 @@ class Cifar10DataPredictions:
                         if extract_logits_info:
                             self.logits = sub_grp["logits"][()]
 
-                # TODO: remove this option?
                 if rep is not None:
 
                     if ensemble_indices is None:
@@ -63,13 +62,11 @@ class Cifar10DataPredictions:
                 else:
                     targets = np.repeat([targets], 5, axis=0).reshape(-1)
 
-            elif model in ["distilled", "ood_distill", "vanilla_distill", "dirichlet_distill"]:
+            elif model in ["distilled", "mixture_distill", "dirichlet_distill"]:
 
                 spec = ""
-                if model == "ood_distill":
-                    spec = "corr_"  # TODO: Change to ood?
-                elif model == "vanilla_distill":
-                    spec = "vanilla_"
+                if model == "mixture_distill":
+                    spec = "mixture_"
                 elif model == "dirichlet_distill":
                     spec = "dirichlet_"
 
@@ -149,7 +146,6 @@ class CustomSet:
 
 def main():
     """Entry point for debug visualisation"""
-    # get some random training images
     data = Cifar10DataPredictions("dropout", "brightness", 1)
     loader = torch.utils.data.DataLoader(data.set,
                                          batch_size=4,

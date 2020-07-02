@@ -7,17 +7,28 @@ import torch.nn.functional as F
 
 
 class CifarResnetLogits(distilled_network.DistilledNet):
+    """CifarResnetDirichlet
+    Network that predicts parameters for Gaussian distribution over teacher output logits,
+    or (if mixture_distillation=True) predicts the mean of the teacher output
+    Args:
+        teacher (Ensemble)
+        block (resnet_utils.BasicBlock/resnet_utils.Bottleneck)
+        num_blocks (vector(int))
+        device (torch.Device)
+        learning_rate (float)
+        mixture_distillation (boolean)
+        temp (float)
+    """
     def __init__(self,
                  teacher,
                  block,
                  num_blocks,
                  device=torch.device('cpu'),
-                 use_hard_labels=False,
                  learning_rate=0.001,
-                 vanilla_distillation=False,
+                 mixture_distillation=False,
                  temp=2.5):
 
-        if vanilla_distillation:
+        if mixture_distillation:
             loss_fun = custom_loss.cross_entropy_soft_targets
         else:
             loss_fun = custom_loss.gaussian_neg_log_likelihood
@@ -26,9 +37,8 @@ class CifarResnetLogits(distilled_network.DistilledNet):
                          loss_function=loss_fun,
                          device=device)
 
-        self.use_hard_labels = use_hard_labels
         self.learning_rate = learning_rate
-        self.vanilla_distillation = vanilla_distillation
+        self.mixture_distillation = mixture_distillation
 
         self.in_planes = 64
 
@@ -39,15 +49,15 @@ class CifarResnetLogits(distilled_network.DistilledNet):
         self.layer3 = self._make_layer(block, 256, num_blocks[2], stride=2)
         self.layer4 = self._make_layer(block, 512, num_blocks[3], stride=2)
 
-        if self.vanilla_distillation:
+        if self.mixture_distillation:
             self.output_size = 10
             self.temp = temp
         else:
             self.output_size = 27
 
         self.linear = nn.Linear(512 * block.expansion, self.output_size)
-        # Ad-hoc fix zero variance.
 
+        # Ad-hoc fix zero variance.
         self.variance_lower_bound = 0.0
         if self.variance_lower_bound > 0.0:
             self._log.warning("Non-zero variance lower bound set ({})".format(
@@ -82,7 +92,7 @@ class CifarResnetLogits(distilled_network.DistilledNet):
         out = out.view(out.size(0), -1)
         out = self.linear(out)
 
-        if self.vanilla_distillation:
+        if self.mixture_distillation:
             if softmax_transform:
                 out = torch.exp(out / self.temp) / torch.sum(torch.exp(out / self.temp), dim=-1, keepdim=True)
             return out
@@ -109,7 +119,7 @@ class CifarResnetLogits(distilled_network.DistilledNet):
     def _generate_teacher_predictions(self, inputs):
         """Generate teacher predictions"""
 
-        if self.vanilla_distillation:
+        if self.mixture_distillation:
             logits = self.teacher.get_logits(inputs)
             predictions = torch.exp(logits / self.temp) / torch.sum(torch.exp(logits / self.temp), dim=-1, keepdim=True)
             mean_predictions = torch.mean(predictions, dim=1)
@@ -128,7 +138,7 @@ class CifarResnetLogits(distilled_network.DistilledNet):
         Wrapper function for the forward function.
         """
 
-        if self.vanilla_distillation:
+        if self.mixture_distillation:
             return self.forward(input_)
 
         else:
@@ -153,14 +163,11 @@ class CifarResnetLogits(distilled_network.DistilledNet):
             return output
 
     def predict_logits(self, input_, num_samples=None, return_raw_data=False, comp_fix=False):
-        """Predict parameters
-        Wrapper function for the forward function.
-        """
 
         if isinstance(input_, list) or isinstance(input_, tuple):
             input_ = input_[0]
 
-        if self.vanilla_distillation:
+        if self.mixture_distillation:
             return self.forward(input_, softmax_transform=False)
 
         else:
@@ -198,10 +205,6 @@ class CifarResnetLogits(distilled_network.DistilledNet):
             return False
 
     def calculate_loss(self, outputs, teacher_predictions, labels=None):
-        """Calculate loss function
-        Wrapper function for the loss function.
-        """
-
         return self.loss(outputs, teacher_predictions)
 
     def eval_mode(self, train=False, temp=None):
@@ -216,7 +219,7 @@ class CifarResnetLogits(distilled_network.DistilledNet):
             self.layer4.train()
             self.linear.train()
 
-            if self.vanilla_distillation:
+            if self.mixture_distillation:
                 if temp is not None:
                     self.temp = temp
                 else:
@@ -231,7 +234,7 @@ class CifarResnetLogits(distilled_network.DistilledNet):
             self.layer4.eval()
             self.linear.eval()
 
-            if self.vanilla_distillation:
+            if self.mixture_distillation:
                 self.temp = 1
 
 

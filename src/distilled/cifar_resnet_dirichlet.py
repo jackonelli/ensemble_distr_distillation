@@ -8,12 +8,21 @@ from src.distilled import distilled_network
 
 
 class CifarResnetDirichlet(distilled_network.DistilledNet):
+    """CifarResnetDirichlet
+    Network that predicts parameters for Dirichlet distribution over teacher output
+    Args:
+        teacher (Ensemble)
+        block (resnet_utils.BasicBlock/resnet_utils.Bottleneck)
+        num_blocks (vector(int))
+        device (torch.Device)
+        learning_rate (float)
+        temp (float)
+    """
     def __init__(self,
                  teacher,
                  block,
                  num_blocks,
                  device=torch.device('cpu'),
-                 use_hard_labels=False,
                  learning_rate=0.001,
                  temp=10):
 
@@ -21,7 +30,6 @@ class CifarResnetDirichlet(distilled_network.DistilledNet):
                          loss_function=custom_loss.dirichlet_nll,
                          device=device)
 
-        self.use_hard_labels = use_hard_labels
         self.learning_rate = learning_rate
         self.temp = temp
 
@@ -110,10 +118,19 @@ class CifarResnetDirichlet(distilled_network.DistilledNet):
         else:
             return False
 
-    def temperature_annealing(self, temp_factor=0.95):
+    def _temperature_annealing(self, temp_factor=0.95):
 
         if self.temp > 1:
             self.temp = temp_factor * self.temp
+
+        if self.temp < 1:
+            self.temp = 1
+
+    def _temp_annealing_schedule(self, epoch=None):
+        if epoch >= 50:
+            return True
+        else:
+            return False
 
     def calculate_loss(self, outputs, teacher_predictions, labels=None):
         """Calculate loss function

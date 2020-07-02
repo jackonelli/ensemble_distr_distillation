@@ -11,8 +11,10 @@ import torch.optim as torch_optim
 from src.ensemble import ensemble
 from src.experiments.cifar10 import resnet_utils
 
-"""ResNet ensemble member"""
-class ResNet(ensemble.EnsembleMember):  # Change of inheritance
+
+class ResNet(ensemble.EnsembleMember):
+    """ResNet ensemble member"""
+
     def __init__(self, block, num_blocks, learning_rate=0.001, num_classes=10):
         super().__init__(output_size=10, loss_function=nn.CrossEntropyLoss(), device=torch.device("cpu"))
         self.learning_rate = learning_rate

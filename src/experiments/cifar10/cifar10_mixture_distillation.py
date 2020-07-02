@@ -1,4 +1,4 @@
-"""Train and make predictions with distilled network parameterising a Dirichlet distribution over ensemble output"""
+"""Train and make predictions with mixture distilled network"""
 
 import logging
 from pathlib import Path
@@ -12,14 +12,14 @@ from src import metrics
 from src.dataloaders import cifar10_corrupted
 from src.dataloaders import cifar10_ensemble_pred
 from src.ensemble import tensorflow_ensemble
-from src.distilled import cifar_resnet_dirichlet
+from src.distilled import cifar_resnet_distilled
 from src.experiments.cifar10 import resnet_utils
 
 LOGGER = logging.getLogger(__name__)
 
 
-def train_distilled_network_dirichlet(model_dir="models/distilled_model_cifar10_dirichlet", rep=1):
-    """Distill ensemble with distribution distillation (Dirichlet) """
+def train_distilled_network_mixture(model_dir="models/distilled_model_cifar10_mixture", rep=1):
+    """Distill ensemble either with distribution distillation or mixture distillation"""
 
     args = utils.parse_args()
 
@@ -59,10 +59,11 @@ def train_distilled_network_dirichlet(model_dir="models/distilled_model_cifar10_
     # models_dir = 'models/cifar-0508-ensemble_50/r'
     # ensemble.load_ensemble(models_dir, num_members=50)
 
-    distilled_model = cifar_resnet_dirichlet.CifarResnetDirichlet(ensemble,
-                                                                  resnet_utils.Bottleneck,
-                                                                  [2, 2, 2, 2],
-                                                                  learning_rate=args.lr)
+    distilled_model = cifar_resnet_distilled.CifarResnetLogits(ensemble,
+                                                               resnet_utils.Bottleneck,
+                                                               [2, 2, 2, 2],
+                                                               learning_rate=args.lr,
+                                                               mixture_distillation=True)
 
     loss_metric = metrics.Metric(name="Mean loss", function=distilled_model.calculate_loss)
     distilled_model.add_metric(loss_metric)
@@ -77,7 +78,8 @@ def train_distilled_network_dirichlet(model_dir="models/distilled_model_cifar10_
         inputs, labels = batch
         inputs, labels = inputs[0].to(distilled_model.device), labels.to(distilled_model.device)
 
-        predicted_distribution = distilled_model.predict(inputs).mean(axis=1)
+        predicted_distribution = distilled_model.predict(inputs)
+
         model_acc += metrics.accuracy(predicted_distribution.to(distilled_model.device), labels.long())
         counter += 1
 
@@ -86,8 +88,8 @@ def train_distilled_network_dirichlet(model_dir="models/distilled_model_cifar10_
     torch.save(distilled_model.state_dict(), model_dir)
 
 
-def predictions_dirichlet(model_dir="../models/distilled_model_cifar10_dirichlet",
-                file_dir="../../dataloaders/data/distilled_model_predictions_dirichlet.h5"):
+def predictions_mixture(model_dir="models/distilled_model_cifar10_mixture",
+                        file_dir="../../dataloaders/data/distilled_model_predictions_mixture.h5"):
     """Make and save predictions on train and test data with distilled model at model_dir"""
 
     args = utils.parse_args()
@@ -97,10 +99,11 @@ def predictions_dirichlet(model_dir="../models/distilled_model_cifar10_dirichlet
 
     ensemble = tensorflow_ensemble.TensorflowEnsemble(output_size=10)
 
-    distilled_model = cifar_resnet_dirichlet.CifarResnetDirichlet(ensemble,
-                                                                  resnet_utils.Bottleneck,
-                                                                  [2, 2, 2, 2],
-                                                                  learning_rate=args.lr)
+    distilled_model = cifar_resnet_distilled.CifarResnetLogits(ensemble,
+                                                               resnet_utils.Bottleneck,
+                                                               [2, 2, 2, 2],
+                                                               learning_rate=args.lr,
+                                                               mixture_distillation=True)
 
     distilled_model.load_state_dict(torch.load(model_dir, map_location=torch.device('cpu')))
     distilled_model.eval_mode()
@@ -112,8 +115,7 @@ def predictions_dirichlet(model_dir="../models/distilled_model_cifar10_dirichlet
 
     for data_set, label in zip(data_list, labels):
 
-        data, pred_samples, alpha, teacher_predictions, targets = \
-            [], [], [], [], []
+        data, pred_samples,  teacher_logits, teacher_predictions, targets = [], [], [], [], []
 
         data_loader = torch.utils.data.DataLoader(data_set.set,
                                                   batch_size=32,
@@ -125,19 +127,19 @@ def predictions_dirichlet(model_dir="../models/distilled_model_cifar10_dirichlet
             img = inputs[0].to(distilled_model.device)
             data.append(img.data.numpy())
             targets.append(labels.data.numpy())
+            teacher_logits.append(inputs[2].data.numpy())
             teacher_predictions.append(inputs[1].data.numpy())
 
-            a, probs = distilled_model.predict(img, return_params=True)
-            alpha.append(a.data.numpy())
+            probs = distilled_model.predict(img)
             pred_samples.append(probs.data.numpy())
 
         data = np.concatenate(data, axis=0)
         pred_samples = np.concatenate(pred_samples, axis=0)
+        teacher_logits = np.concatenate(teacher_logits, axis=0)
         teacher_predictions = np.concatenate(teacher_predictions, axis=0)
         targets = np.concatenate(targets, axis=0)
-        alpha = np.concatenate(alpha, axis=0)
 
-        preds = np.argmax(np.mean(pred_samples, axis=1), axis=-1)
+        preds = np.argmax(pred_samples, axis=-1)
 
         # Check accuracy
         acc = np.mean(preds == targets)
@@ -151,28 +153,27 @@ def predictions_dirichlet(model_dir="../models/distilled_model_cifar10_dirichlet
         grp = hf.create_group(label)
         grp.create_dataset("data", data=data)
         grp.create_dataset("predictions", data=pred_samples)
+        grp.create_dataset("teacher-logits", data=teacher_logits)
         grp.create_dataset("teacher-predictions", data=teacher_predictions)
         grp.create_dataset("targets", data=targets)
-        grp.create_dataset("alpha", data=alpha)
-
-    return pred_samples
 
 
-def predictions_corrupted_data_dirichlet(model_dir="models/distilled_model_cifar10_dirichlet",
-                               file_dir="../../dataloaders/data/distilled_model_predictions_corrupted_data_dirichlet.h5"):
-    """Make and save predictions on corrupted data with distilled model at model_dir"""
+def predictions_corrupted_data_mixture(model_dir="models/distilled_model_cifar10_mixture",
+                                       file_dir="../../dataloaders/data/distilled_model_predictions_mixture.h5"):
+    """Make predictions on corrupted data with distilled model at model_dir"""
 
     args = utils.parse_args()
 
     # Load model
     ensemble = tensorflow_ensemble.TensorflowEnsemble(output_size=10)
 
-    distilled_model = cifar_resnet_dirichlet.CifarResnetDirichlet(ensemble,
-                                                                  resnet_utils.Bottleneck,
-                                                                  [2, 2, 2, 2],
-                                                                  learning_rate=args.lr)
+    distilled_model = cifar_resnet_distilled.CifarResnetLogits(ensemble,
+                                                               resnet_utils.Bottleneck,
+                                                               [2, 2, 2, 2],
+                                                               learning_rate=args.lr,
+                                                               mixture_distillation=True)
 
-    distilled_model.load_state_dict(torch.load(model_dir, map_location=torch.device(distilled_model.device)))
+    distilled_model.load_state_dict(torch.load(model_dir, map_location=distilled_model.device))
 
     distilled_model.eval_mode()
 
@@ -198,9 +199,8 @@ def predictions_corrupted_data_dirichlet(model_dir="models/distilled_model_cifar
                                                      batch_size=100,
                                                      shuffle=False,
                                                      num_workers=0)
-
             # data = []
-            predictions, targets, alpha = [], [], []
+            predictions, targets = [], []
 
             for j, batch in enumerate(dataloader):
                 inputs, labels = batch
@@ -209,8 +209,7 @@ def predictions_corrupted_data_dirichlet(model_dir="models/distilled_model_cifar
 
                 inputs, labels = inputs.to(distilled_model.device), labels.to(distilled_model.device)
 
-                a, preds = distilled_model.predict(inputs, return_params=True)
-                alpha.append(a.to(torch.device("cpu")).data.numpy())
+                preds = distilled_model.predict(inputs)
                 predictions.append(preds.to(torch.device("cpu")).data.numpy())
 
             sub_grp = corr_grp.create_group("intensity_" + str(intensity))
@@ -224,13 +223,10 @@ def predictions_corrupted_data_dirichlet(model_dir="models/distilled_model_cifar
             targets = np.concatenate(targets, axis=0)
             sub_grp.create_dataset("targets", data=targets)
 
-            preds = np.argmax(np.mean(predictions, axis=1), axis=-1)
+            preds = np.argmax(predictions, axis=-1)
 
             acc = np.mean(preds == targets)
             LOGGER.info("Accuracy on {} data set with intensity {} is {}".format(corruption, intensity, acc))
-
-            alpha = np.concatenate(alpha, axis=0)
-            sub_grp.create_dataset("alpha", data=alpha)
 
     hf.close()
 
@@ -242,9 +238,9 @@ def main():
                        log_level=args.log_level)
     LOGGER.info("Args: {}".format(args))
 
-    train_distilled_network_dirichlet()
-    #predictions_dirichlet()
-    predictions_corrupted_data_dirichlet()
+    train_distilled_network_mixture()
+    predictions_corrupted_data_mixture()
+    #predictions_mixture()
 
 
 if __name__ == "__main__":

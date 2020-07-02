@@ -47,9 +47,6 @@ def test_downloaded_resnet_network():
 
     resnet_model = cifar_resnet.ResNet(resnet_utils.Bottleneck, [2, 2, 2, 2], learning_rate=args.lr)
 
-    #acc_metric = metrics.Metric(name="Mean acc", function=metrics.accuracy)
-    #resnet_model._add_metric(acc_metric)
-
     resnet_model.train(train_loader, validation_loader=valid_loader, num_epochs=args.num_epochs, reshape_targets=False)
     # Check accuracy on test data
 

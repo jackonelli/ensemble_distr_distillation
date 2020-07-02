@@ -6,8 +6,6 @@ import torch.nn as nn
 import torch.optim as torch_optim
 import math
 import src.utils as utils
-import os
-import numpy as np
 
 
 class DistilledNet(nn.Module, ABC):
@@ -29,7 +27,7 @@ class DistilledNet(nn.Module, ABC):
         self._log.info("Moving model to device: {}".format(device))
         self.device = device
 
-    def train(self, train_loader, num_epochs, validation_loader=None, temp_anneling=False):
+    def train(self, train_loader, num_epochs, validation_loader=None):
         """ Common train method for all distilled networks
         Should NOT be overridden!
         """
@@ -37,7 +35,7 @@ class DistilledNet(nn.Module, ABC):
         clr = utils.adapted_lr(c=0.7)
         scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, [clr])
 
-        self.use_hard_labels = False  # VILL VI HA DENNA?
+        self.use_hard_labels = False
 
         self._log.info("Training distilled network.")
 
@@ -56,15 +54,14 @@ class DistilledNet(nn.Module, ABC):
             if self._learning_rate_condition(epoch_number):
                 scheduler.step()
 
-            if temp_anneling and epoch_number >= int(num_epochs / 2):
-                self.temperature_annealing()
+            if self._temp_annealing_schedule(epoch_number):
+                self._temperature_anneling()
 
         self._reset_metrics()  # For storing purposes
 
     def _train_epoch(self,
                      train_loader,
-                     validation_loader=None,
-                     scheduler=None):
+                     validation_loader=None):
         """Common train epoch method for all distilled networks
         Should NOT be overridden!
         TODO: Make sure train_loader returns None for labels,
@@ -203,7 +200,10 @@ class DistilledNet(nn.Module, ABC):
         """Evaluate condition for increasing learning rate
         Defaults to never increasing. I.e. returns False
         """
+        return False
 
+    def _temp_annealing_schedule(self, epoch=None):
+        """Evaluate condition for softmax temperature annealing"""
         return False
 
     @abstractmethod
