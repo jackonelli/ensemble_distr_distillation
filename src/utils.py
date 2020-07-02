@@ -173,6 +173,10 @@ def cyclical_lr(stepsize, min_lr=3e-4, max_lr=3e-3):
     return lr_lambda
 
 
+def is_nan_or_inf(tensor):
+    return torch.isnan(tensor) or torch.isinf(tensor)
+
+
 def adapted_lr(c=0.7):
     # the torch_optim.lr_scheduler.CycleLR does not work with Adam so I copied this one from here:
     # https://towardsdatascience.com/adaptive-and-cyclical-learning-rates-using-pytorch-2bf904d18dee

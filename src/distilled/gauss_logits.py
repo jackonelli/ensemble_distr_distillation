@@ -4,6 +4,7 @@ import torch.optim as torch_optim
 import src.loss as custom_loss
 import src.distilled.distilled_network as distilled_network
 from src import utils
+import src.utils_dir.pytorch as torch_utils
 
 
 class Model(distilled_network.DistilledNet):
@@ -34,6 +35,19 @@ class Model(distilled_network.DistilledNet):
 
         self.to(self.device)
 
+    def info(self):
+        """Get model settings"""
+        return {
+            "name":
+            "gauss_logits",
+            "layer_sizes":
+            torch_utils.human_readable_arch(self.layers),
+            "loss_function":
+            self.loss.__name__,
+            "variance_transform":
+            torch_utils.human_readable_lambda(self.variance_transform)
+        }
+
     def forward(self, x):
         """Estimate parameters of distribution
         """
@@ -57,10 +71,6 @@ class Model(distilled_network.DistilledNet):
         """Generate teacher predictions"""
 
         logits = self.teacher.get_logits(inputs).to(self.device)
-
-        if self.scale_teacher_logits:
-            scaled_logits = logits - torch.stack([logits[:, :, -1]], axis=-1)
-            logits = scaled_logits[:, :, :-1]
 
         return logits
 
@@ -112,8 +122,6 @@ class Model(distilled_network.DistilledNet):
         """
 
         return self.loss(outputs, teacher_predictions)
-
-    # TÄNKER MIG ATT VI KAN HA EN CALC_REG
 
     def mean_expected_value(self, outputs, teacher_predictions):
         exp_value = outputs[0]
