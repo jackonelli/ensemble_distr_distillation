@@ -248,6 +248,8 @@ def plot_error_curve(ax,
 def plot_sparsification_error(ax, y_true, y_pred, uncert_meas, label,
                               num_partitions):
     """Plot errors sorted according to uncertainty measure"""
+    y_true = y_true.reshape((y_true.shape[0], 1))
+    y_pred = y_pred.reshape((y_pred.shape[0], 1))
     rel_part_size, sparse_err, sparse_err_oracle = sparsification_error(
         y_true, y_pred, uncert_meas, num_partitions)
     ax.plot(rel_part_size, sparse_err, label=label)
@@ -296,6 +298,8 @@ def sparsification_error(y_true, y_pred, uncert_meas, num_partitions):
 
 
 def ause(y_true, y_pred, uncert_meas, num_partitions):
+    y_true = y_true.reshape((y_true.shape[0], 1))
+    y_pred = y_pred.reshape((y_pred.shape[0], 1))
     x, y, oracle = sparsification_error(y_true, y_pred, uncert_meas,
                                         num_partitions)
     sparse_err_diff = y - oracle
