@@ -1,4 +1,4 @@
-"""Resnet-blocks for cifar10"""
+"""Resnet-blocks for cifar10, from https://github.com/kuangliu/pytorch-cifar"""
 
 import torch.nn as nn
 import torch.nn.functional as F

@@ -1,4 +1,3 @@
-"""Data loader for CIFAR data with ensemble predictions"""
 import logging
 import torch
 import torchvision
@@ -10,7 +9,8 @@ import h5py
 
 
 class Cifar10DataCorrupted:
-    """CIFAR data with corruptions, wrapper
+    """CIFAR data with corruptions, wrapper. To create an h5py file from .npy files, use the make_h5py_data_file()
+        function below
     """
 
     def __init__(self, corruption, intensity, data_dir="data/", torch_data=True, ind=None):
@@ -93,6 +93,28 @@ class CustomSet:
         target = self.labels[index]
 
         return img, target
+
+
+def make_h5py_data_file():
+    """Save all corrupted data sets into one h5 file"""
+
+    corruption_list = ["brightness", "contrast", "defocus_blur", "elastic_transform", "fog", "frost", "gaussian_blur",
+                       "gaussian_noise", "glass_blur", "impulse_noise", "motion_blur", "pixelate", "saturate",
+                       "shot_noise", "snow", "spatter", "speckle_noise", "zoom_blur"]
+
+    data_dir = "data/CIFAR-10-C/"
+    hf = h5py.File(data_dir + "corrupted_data.h5", 'w')
+    grp = hf.create_group("labels")
+    labels = np.load(data_dir + "labels.npy")
+    grp.create_dataset("labels", data=labels)
+
+    for corruption in corruption_list:
+        print(corruption)
+        grp = hf.create_group(corruption)
+
+        data = np.load(data_dir + corruption + ".npy")
+        grp.create_dataset("data", data=data)
+    hf.close()
 
 
 def main():

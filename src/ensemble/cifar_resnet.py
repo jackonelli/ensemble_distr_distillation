@@ -1,9 +1,3 @@
-'''ResNet in PyTorch.
-For Pre-activation ResNet, see 'preact_resnet.py'.
-Reference:
-[1] Kaiming He, Xiangyu Zhang, Shaoqing Ren, Jian Sun
-    Deep Residual Learning for Image Recognition. arXiv:1512.03385
-'''
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -13,10 +7,19 @@ from src.experiments.cifar10 import resnet_utils
 
 
 class ResNet(ensemble.EnsembleMember):
-    """ResNet ensemble member"""
+    """ResNet
+    Resnet network adapted to Cifar10, adapted from https://github.com/kuangliu/pytorch-cifar
 
-    def __init__(self, block, num_blocks, learning_rate=0.001, num_classes=10):
-        super().__init__(output_size=10, loss_function=nn.CrossEntropyLoss(), device=torch.device("cpu"))
+    Args:
+        block (resnet_utils.BasicBlock/resnet_utils.Bottleneck)
+        num_blocks (vector(int))
+        device (torch.Device)
+        learning_rate (float)
+        num_classes (int)
+    """
+
+    def __init__(self, block, num_blocks, device=torch.device('cpu'), learning_rate=0.001, num_classes=10):
+        super().__init__(output_size=num_classes, loss_function=nn.CrossEntropyLoss(), device=device)
         self.learning_rate = learning_rate
 
         self.in_planes = 64

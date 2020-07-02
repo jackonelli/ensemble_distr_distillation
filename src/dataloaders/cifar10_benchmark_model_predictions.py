@@ -1,4 +1,3 @@
-"""Data loader for CIFAR data with ensemble predictions"""
 import logging
 import torch
 import h5py
@@ -6,7 +5,8 @@ import numpy as np
 
 
 class Cifar10DataPredictions:
-    """Saved predictions for (corrupted) CIFAR10 data, wrapper
+    """Saved predictions for (corrupted) CIFAR10 data, wrapper. Files created through distillation
+    experiments from src.experiments.cifar10 or obtained from Ovadia et. al. (2019)
     """
 
     def __init__(self, model, corruption, intensity, rep=None, data_dir="data/", ensemble_indices=None,
@@ -30,6 +30,7 @@ class Cifar10DataPredictions:
         else:
 
             if model == "ensemble_new":
+                # Ensemble file created from own source
 
                 if intensity == 0:
                     filepath = data_dir + "ensemble_predictions/ensemble_predictions.h5"

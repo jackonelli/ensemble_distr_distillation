@@ -91,7 +91,7 @@ class Ensemble():
     def transform_logits(self, logits, transformation=None):
         """Ensemble predictions from logits
         Returns the predictions of all individual ensemble members,
-	    by applying the logits 'transformation' to the logits.
+        by applying the logits 'transformation' to the logits.
         B = batch size, K = num output params, N = ensemble size
 
         Args:

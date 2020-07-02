@@ -71,6 +71,10 @@ def parse_args():
     parser.add_argument("--gpu",
                         action="store_true",
                         help="Use gpu, if available")
+    parser.add_argument("--rep",
+                        type=int,
+                        default=1,
+                        help="Replication number (cifar10 experiments)")
 
     return parser.parse_args()
 

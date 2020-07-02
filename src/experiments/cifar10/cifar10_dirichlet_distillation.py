@@ -11,14 +11,14 @@ from src import utils
 from src import metrics
 from src.dataloaders import cifar10_corrupted
 from src.dataloaders import cifar10_ensemble_pred
-from src.ensemble import tensorflow_ensemble
+from src.ensemble import ensemble_wrapper
 from src.distilled import cifar_resnet_dirichlet
 from src.experiments.cifar10 import resnet_utils
 
 LOGGER = logging.getLogger(__name__)
 
 
-def train_distilled_network_dirichlet(model_dir="models/distilled_model_cifar10_dirichlet", rep=1):
+def train_distilled_network_dirichlet(model_dir="models/distilled_model_cifar10_dirichlet"):
     """Distill ensemble with distribution distillation (Dirichlet) """
 
     args = utils.parse_args()
@@ -27,7 +27,7 @@ def train_distilled_network_dirichlet(model_dir="models/distilled_model_cifar10_
     utils.setup_logger(log_path=Path.cwd() / args.log_dir / log_file,
                        log_level=args.log_level)
 
-    data_ind = np.load("data/training_data_indices.npy")
+    data_ind = np.load("training_files/training_data_indices.npy")
     num_train_points = 40000
     train_ind = data_ind[:num_train_points]
     valid_ind = data_ind[num_train_points:]
@@ -53,15 +53,19 @@ def train_distilled_network_dirichlet(model_dir="models/distilled_model_cifar10_
                                               num_workers=0)
 
     ensemble_size = 10
-    ind = np.load("data/ensemble_indices.npy")[((rep - 1) * ensemble_size):(rep * ensemble_size)]
-    ensemble = tensorflow_ensemble.TensorflowEnsemble(
-        output_size=10, indices=ind)
-    # models_dir = 'models/cifar-0508-ensemble_50/r'
-    # ensemble.load_ensemble(models_dir, num_members=50)
 
+    # Note that the ensemble predictions are assumed to have been saved to file (see ensemble_predictions.py),
+    # ensemble_indices.npy contains the order of the ensemble members such that ind[:ensemble_size] are the indices
+    # of the first ensemble, ind[ensemble_size:2*ensemble_size] are the indices of the second ensemble and so on
+    ind = np.load("training_files/ensemble_indices.npy")[((args.rep - 1) * ensemble_size):(args.rep * ensemble_size)]
+    ensemble = ensemble_wrapper.EnsembleWrapper(
+        output_size=10, indices=ind)
+
+    device = utils.torch_settings(args.seed, args.gpu)
     distilled_model = cifar_resnet_dirichlet.CifarResnetDirichlet(ensemble,
                                                                   resnet_utils.Bottleneck,
                                                                   [2, 2, 2, 2],
+                                                                  device=device,
                                                                   learning_rate=args.lr)
 
     loss_metric = metrics.Metric(name="Mean loss", function=distilled_model.calculate_loss)
@@ -95,7 +99,7 @@ def predictions_dirichlet(model_dir="../models/distilled_model_cifar10_dirichlet
     train_data = cifar10_ensemble_pred.Cifar10Data()
     test_data = cifar10_ensemble_pred.Cifar10Data(train=False)
 
-    ensemble = tensorflow_ensemble.TensorflowEnsemble(output_size=10)
+    ensemble = ensemble_wrapper.EnsembleWrapper(output_size=10)
 
     distilled_model = cifar_resnet_dirichlet.CifarResnetDirichlet(ensemble,
                                                                   resnet_utils.Bottleneck,
@@ -165,7 +169,7 @@ def predictions_corrupted_data_dirichlet(model_dir="models/distilled_model_cifar
     args = utils.parse_args()
 
     # Load model
-    ensemble = tensorflow_ensemble.TensorflowEnsemble(output_size=10)
+    ensemble = ensemble_wrapper.EnsembleWrapper(output_size=10)
 
     distilled_model = cifar_resnet_dirichlet.CifarResnetDirichlet(ensemble,
                                                                   resnet_utils.Bottleneck,
