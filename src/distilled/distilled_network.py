@@ -112,6 +112,7 @@ class DistilledNet(nn.Module, ABC):
         return running_loss
 
     def calculate_metric_dataloader(self, data_loader):
+        # model.eval_mode(), important if your model has batch norm layers
         for batch in data_loader:
             # self._reset_metrics()
             inputs, labels = batch
