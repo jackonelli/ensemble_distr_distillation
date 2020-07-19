@@ -63,8 +63,8 @@ def train_distilled_network_gaussian(model_dir="models/distilled_model_cifar10")
 
     device = utils.torch_settings(args.seed, args.gpu)
     distilled_model = cifar_resnet_distilled.CifarResnetLogits(ensemble,
-                                                               resnet_utils.Bottleneck,
-                                                               [2, 2, 2, 2],
+                                                               resnet_utils.BasicBlock,
+                                                               [3, 2, 2, 2],
                                                                device=device,
                                                                learning_rate=args.lr)
 
@@ -103,8 +103,8 @@ def predictions_gaussian(model_dir="models/distilled_model_cifar10",
     ensemble = ensemble_wrapper.EnsembleWrapper(output_size=10)
 
     distilled_model = cifar_resnet_distilled.CifarResnetLogits(ensemble,
-                                                               resnet_utils.Bottleneck,
-                                                               [2, 2, 2, 2],
+                                                               resnet_utils.BasicBlock,
+                                                               [3, 2, 2, 2],
                                                                learning_rate=args.lr)
 
     distilled_model.load_state_dict(torch.load(model_dir, map_location=torch.device('cpu')))
@@ -181,8 +181,8 @@ def predictions_corrupted_data_gaussian(model_dir="models/distilled_model_cifar1
     ensemble = ensemble_wrapper.EnsembleWrapper(output_size=10)
 
     distilled_model = cifar_resnet_distilled.CifarResnetLogits(ensemble,
-                                                               resnet_utils.Bottleneck,
-                                                               [2, 2, 2, 2],
+                                                               resnet_utils.BasicBlock,
+                                                               [3, 2, 2, 2],
                                                                learning_rate=args.lr)
 
     distilled_model.load_state_dict(torch.load(model_dir, map_location=distilled_model.device))
@@ -269,7 +269,7 @@ def main():
     LOGGER.info("Args: {}".format(args))
 
     train_distilled_network_gaussian()
-    predictions_corrupted_data_gaussian()
+    #predictions_corrupted_data_gaussian()
     #predictions_gaussian()
 
 

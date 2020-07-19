@@ -63,8 +63,8 @@ def train_distilled_network_dirichlet(model_dir="models/distilled_model_cifar10_
 
     device = utils.torch_settings(args.seed, args.gpu)
     distilled_model = cifar_resnet_dirichlet.CifarResnetDirichlet(ensemble,
-                                                                  resnet_utils.Bottleneck,
-                                                                  [2, 2, 2, 2],
+                                                                  resnet_utils.BasicBlock,
+                                                                  [3, 2, 2, 2],
                                                                   device=device,
                                                                   learning_rate=args.lr)
 
@@ -102,8 +102,8 @@ def predictions_dirichlet(model_dir="../models/distilled_model_cifar10_dirichlet
     ensemble = ensemble_wrapper.EnsembleWrapper(output_size=10)
 
     distilled_model = cifar_resnet_dirichlet.CifarResnetDirichlet(ensemble,
-                                                                  resnet_utils.Bottleneck,
-                                                                  [2, 2, 2, 2],
+                                                                  resnet_utils.BasicBlock,
+                                                                  [3, 2, 2, 2],
                                                                   learning_rate=args.lr)
 
     distilled_model.load_state_dict(torch.load(model_dir, map_location=torch.device('cpu')))
@@ -172,8 +172,8 @@ def predictions_corrupted_data_dirichlet(model_dir="models/distilled_model_cifar
     ensemble = ensemble_wrapper.EnsembleWrapper(output_size=10)
 
     distilled_model = cifar_resnet_dirichlet.CifarResnetDirichlet(ensemble,
-                                                                  resnet_utils.Bottleneck,
-                                                                  [2, 2, 2, 2],
+                                                                  resnet_utils.BasicBlock,
+                                                                  [3, 2, 2, 2],
                                                                   learning_rate=args.lr)
 
     distilled_model.load_state_dict(torch.load(model_dir, map_location=torch.device(distilled_model.device)))
@@ -247,8 +247,8 @@ def main():
     LOGGER.info("Args: {}".format(args))
 
     train_distilled_network_dirichlet()
-    #predictions_dirichlet()
     predictions_corrupted_data_dirichlet()
+    #predictions_dirichlet()
 
 
 if __name__ == "__main__":

@@ -63,8 +63,8 @@ def train_distilled_network_mixture(model_dir="models/distilled_model_cifar10_mi
 
     device = utils.torch_settings(args.seed, args.gpu)
     distilled_model = cifar_resnet_distilled.CifarResnetLogits(ensemble,
-                                                               resnet_utils.Bottleneck,
-                                                               [2, 2, 2, 2],
+                                                               resnet_utils.BasicBlock,
+                                                               [3, 2, 2, 2],
                                                                device=device,
                                                                learning_rate=args.lr,
                                                                mixture_distillation=True)
@@ -104,8 +104,8 @@ def predictions_mixture(model_dir="models/distilled_model_cifar10_mixture",
     ensemble = ensemble_wrapper.EnsembleWrapper(output_size=10)
 
     distilled_model = cifar_resnet_distilled.CifarResnetLogits(ensemble,
-                                                               resnet_utils.Bottleneck,
-                                                               [2, 2, 2, 2],
+                                                               resnet_utils.BasicBlock,
+                                                               [3, 2, 2, 2],
                                                                learning_rate=args.lr,
                                                                mixture_distillation=True)
 
@@ -172,8 +172,8 @@ def predictions_corrupted_data_mixture(model_dir="models/distilled_model_cifar10
     ensemble = ensemble_wrapper.EnsembleWrapper(output_size=10)
 
     distilled_model = cifar_resnet_distilled.CifarResnetLogits(ensemble,
-                                                               resnet_utils.Bottleneck,
-                                                               [2, 2, 2, 2],
+                                                               resnet_utils.BasicBlock,
+                                                               [3, 2, 2, 2],
                                                                learning_rate=args.lr,
                                                                mixture_distillation=True)
 
@@ -245,7 +245,6 @@ def main():
     train_distilled_network_mixture()
     predictions_corrupted_data_mixture()
     #predictions_mixture()
-
 
 if __name__ == "__main__":
     main()

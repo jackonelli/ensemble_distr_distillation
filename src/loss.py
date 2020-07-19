@@ -3,6 +3,7 @@ import torch
 import numpy as np
 import torch.distributions.multivariate_normal as torch_mvn
 import torch.distributions.dirichlet as torch_dirichlet
+import math
 
 import logging
 
@@ -126,7 +127,7 @@ def norm_inv_wish_nll(parameters, target):
         cov_mat = var[:, sample, :]
         nll_gaussian += gaussian_neg_log_likelihood((mu_0, cov_mat / lambda_),
                                                     mu)
-    nll_inverse_wishart = inverse_wishart_neg_log_likelihood((psi, nu), var)
+    nll_inverse_wishart = inverse_wishart_neg_log_likelihood((psi, nu), var)  # TODO
 
     return nll_gaussian / N + nll_inverse_wishart
 
