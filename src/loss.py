@@ -22,7 +22,7 @@ def cross_entropy_soft_targets(predicted_distribution, target_distribution):
     return torch.mean(-target_distribution * torch.log(predicted_distribution))
 
 
-def gaussian_neg_log_likelihood_1d(parameters, target):
+def gaussian_nll_1d(parameters, target):
     """Negative log likelihood loss for the Gaussian distribution
     B = batch size, D = dimension of target (always 1), N = ensemble size
 
@@ -34,12 +34,20 @@ def gaussian_neg_log_likelihood_1d(parameters, target):
         target (torch.tensor((B, N, D))): sample from the normal
             distribution, if not an ensemble prediction N=1.
     """
+    B, N, _ = target.size()
     mean, var = parameters
-    target = target.reshape((target.size(0), 1))
-    exponent = -0.5 * (target - mean)**2 / var
-    log_coeff = -1 / 2 * torch.log(var) - 0.5 * 1 * np.log(2 * np.pi)
+    target = target.reshape((B, N))
 
-    return -(log_coeff + exponent).mean()
+    # Sufficient statistics:
+    # Sample average and sample cov
+    # Collapses N dimension
+    sample_avg = target.mean(dim=1, keepdim=True)
+    sample_cov = ((target - sample_avg)**2).mean(dim=1, keepdim=True)
+    quotient = ((mean - sample_avg)**2 + sample_cov) / var
+
+    # Calculates -2/N sum log N(target; mean, var) for every batch b
+    twice_nlls = np.log(2 * np.pi) + torch.log(var) + quotient
+    return twice_nlls.mean() / 2
 
 
 def gaussian_neg_log_likelihood(parameters, target):
@@ -127,7 +135,7 @@ def norm_inv_wish_nll(parameters, target):
         cov_mat = var[:, sample, :]
         nll_gaussian += gaussian_neg_log_likelihood((mu_0, cov_mat / lambda_),
                                                     mu)
-    nll_inverse_wishart = inverse_wishart_neg_log_likelihood((psi, nu), var)  # TODO
+    nll_inverse_wishart = inv_wish_nll((psi, nu), var)
 
     return nll_gaussian / N + nll_inverse_wishart
 

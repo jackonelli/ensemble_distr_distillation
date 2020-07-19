@@ -70,7 +70,7 @@ class DistilledNet(nn.Module, ABC):
 
         self._reset_metrics()
 
-        for batch in train_loader:
+        for batch_ind, batch in enumerate(train_loader):
             self.optimizer.zero_grad()
             inputs, labels = batch
 
@@ -93,8 +93,10 @@ class DistilledNet(nn.Module, ABC):
             loss.backward()
             self.optimizer.step()
             running_loss += loss.item()
+            self._log.debug("Batch: {}, running_loss: {}".format(
+                batch_ind, running_loss))
 
-            if math.isnan(running_loss):
+            if math.isnan(running_loss) or math.isinf(running_loss):
                 self._log.error("Loss is NaN")
                 break
 
@@ -144,7 +146,7 @@ class DistilledNet(nn.Module, ABC):
         return self.teacher.transform_logits(logits)
 
     def calc_metrics(
-            self, data_loader
+        self, data_loader
     ):  #TODO: How does this differ from calc_metric_dataloader except for the reset_metrics call?
         self._reset_metrics()
 

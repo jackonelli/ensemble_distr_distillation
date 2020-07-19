@@ -303,8 +303,6 @@ class EnsembleMember(nn.Module, ABC):
                         (batch_size, num_samples, self.target_size))
 
                 tmp_loss = self.calculate_loss(outputs, targets)
-                # print(outputs, targets)
-                # print(tmp_loss)
                 running_loss += tmp_loss
                 self._update_metrics(outputs, targets)
 
@@ -400,6 +398,7 @@ class EnsembleMember(nn.Module, ABC):
         That is instead handled by transform_logits
         This is for flexibility when using the ensemble as teacher.
         """
+
     @abstractmethod
     def transform_logits(self, logits):
         """Transforms the networks logits
@@ -413,6 +412,7 @@ class EnsembleMember(nn.Module, ABC):
         Args:
             logits (torch.tensor(B, K)):
         """
+
     @abstractmethod
     def calculate_loss(self, targets, outputs):
         """Calculates loss"""

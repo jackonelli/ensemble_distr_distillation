@@ -39,6 +39,11 @@ def tensor_argmax(input_tensor):
     return ind, value
 
 
+def is_nan_or_inf(tensor):
+    """NaN or Inf in tensor"""
+    return torch.isnan(tensor).sum() > 0 or torch.isinf(tensor).sum() > 0
+
+
 def cyclical_lr(stepsize, min_lr=3e-4, max_lr=3e-3):
     """ Cyclical learning rate
     the torch_optim.lr_scheduler.CycleLR does not work with Adam,
