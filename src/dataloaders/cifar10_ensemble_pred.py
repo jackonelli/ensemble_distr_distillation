@@ -15,7 +15,7 @@ class Cifar10Data:
     """
 
     def __init__(self, ind=None, train=True, augmentation=False, corrupted=False,
-                 data_dir="../../dataloaders/data/ensemble_predictions/"):
+                 data_dir="src/dataloaders/data/ensemble_predictions/"):
         self._log = logging.getLogger(self.__class__.__name__)
 
         if augmentation:
@@ -151,7 +151,6 @@ def main():
 
 def imshow(img):
     """Imshow helper
-    TODO: Move to utils
     """
     npimg = img.numpy()
     plt.imshow(np.transpose(npimg, (1, 2, 0)))
