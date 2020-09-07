@@ -117,8 +117,8 @@ def ood_data_experiment():
                        "Temp Scaling", "Dropout", "LL Dropout", "SVI", "LL SVI"]
     colors = ["#A6CEE3", "#1F78B4", "#B2DF8A", "#33A02C", "#FB9A99", "#E31A1C", "#FDBF6F", "#FF7F00", "#CAB2D6",
               "#6A3D9A"]
-    make_boxplot(acc_list, "data/fig/acc_benchmark_experiments.tikz", model_list=model_list_text, colors=colors)
-    make_boxplot(ece_list, "data/fig/ece_benchmark_experiments.tikz", label="ECE", model_list=model_list_text,
+    make_boxplot(acc_list, "data/fig/acc_reduced_benchmark_experiments.tikz", model_list=model_list_text, colors=colors)
+    make_boxplot(ece_list, "data/fig/ece_reduced_benchmark_experiments.tikz", label="ECE", model_list=model_list_text,
                  colors=colors, max_y=0.8)
 
 

@@ -27,7 +27,7 @@ def train_distilled_network_mixture(model_dir="models/distilled_model_cifar10_mi
     utils.setup_logger(log_path=Path.cwd() / args.log_dir / log_file,
                        log_level=args.log_level)
 
-    data_ind = np.load("training_files/training_data_indices.npy")
+    data_ind = np.load("src/experiments/cifar10/training_files/training_data_indices.npy")
     num_train_points = 40000
     train_ind = data_ind[:num_train_points]
     valid_ind = data_ind[num_train_points:]
@@ -57,7 +57,8 @@ def train_distilled_network_mixture(model_dir="models/distilled_model_cifar10_mi
     # Note that the ensemble predictions are assumed to have been saved to file (see ensemble_predictions.py),
     # ensemble_indices.npy contains the order of the ensemble members such that ind[:ensemble_size] are the indices
     # of the first ensemble, ind[ensemble_size:2*ensemble_size] are the indices of the second ensemble and so on
-    ind = np.load("training_files/ensemble_indices.npy")[((args.rep - 1) * ensemble_size):(args.rep * ensemble_size)]
+    ind = np.load("src/experiments/cifar10/training_files/ensemble_indices.npy")[((args.rep - 1) * ensemble_size):
+                                                                                 (args.rep * ensemble_size)]
     ensemble = ensemble_wrapper.EnsembleWrapper(
         output_size=10, indices=ind)
 

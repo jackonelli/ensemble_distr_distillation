@@ -15,7 +15,7 @@ class Cifar10Data:
     """
 
     def __init__(self, ind=None, train=True, augmentation=False, corrupted=False,
-                 data_dir="../../dataloaders/data/ensemble_predictions/"):
+                 data_dir="src/dataloaders/data/ensemble_predictions/"):
         self._log = logging.getLogger(self.__class__.__name__)
 
         if augmentation:
