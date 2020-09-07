@@ -59,6 +59,7 @@ def train_distilled_network_mixture(model_dir="models/distilled_model_cifar10_mi
     # of the first ensemble, ind[ensemble_size:2*ensemble_size] are the indices of the second ensemble and so on
     ind = np.load("src/experiments/cifar10/training_files/ensemble_indices.npy")[((args.rep - 1) * ensemble_size):
                                                                                  (args.rep * ensemble_size)]
+
     ensemble = ensemble_wrapper.EnsembleWrapper(
         output_size=10, indices=ind)
 

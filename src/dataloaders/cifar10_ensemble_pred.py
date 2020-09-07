@@ -151,7 +151,6 @@ def main():
 
 def imshow(img):
     """Imshow helper
-    TODO: Move to utils
     """
     npimg = img.numpy()
     plt.imshow(np.transpose(npimg, (1, 2, 0)))
