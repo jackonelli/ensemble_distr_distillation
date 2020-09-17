@@ -73,20 +73,20 @@ def train_distilled_network_dirichlet(model_dir="models/distilled_model_cifar10_
     distilled_model.add_metric(loss_metric)
 
     distilled_model.train(train_loader, num_epochs=args.num_epochs, validation_loader=valid_loader)
-
+    
     distilled_model.eval_mode()
-    counter = 0
-    model_acc = 0
+    predicted_distribution = []
+    all_labels = []
 
     for batch in test_loader:
         inputs, labels = batch
         inputs, labels = inputs[0].to(distilled_model.device), labels.to(distilled_model.device)
 
-        predicted_distribution = distilled_model.predict(inputs).mean(axis=1)
-        model_acc += metrics.accuracy(predicted_distribution.to(distilled_model.device), labels.long())
-        counter += 1
+        predicted_distribution.append(distilled_model.predict(inputs).to(distilled_model.device))
+        all_labels.append(labels.long())
 
-    LOGGER.info("Test accuracy is {}".format(model_acc / counter))
+    test_acc = metrics.accuracy(torch.cat(predicted_distribution), torch.cat(all_labels))
+    LOGGER.info("Test accuracy is {}".format(test_acc))
 
     torch.save(distilled_model.state_dict(), model_dir)
 
