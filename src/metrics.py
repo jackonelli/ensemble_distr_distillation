@@ -312,8 +312,6 @@ def ece(predicted_distribution, labels):
 
     num_samples = labels.shape[0]
 
-    probs_true_labels = np.zeros((predicted_distribution.shape[0], ))  # ??
-
     confidence = np.max(predicted_distribution, axis=-1)
     predicted_labels = np.argmax(predicted_distribution, axis=-1)
 

@@ -48,8 +48,7 @@ class DistilledNet(nn.Module, ABC):
         for epoch_number in range(1, num_epochs + 1):
 
             loss = self._train_epoch(train_loader,
-                                     validation_loader=validation_loader,
-                                     scheduler=scheduler)
+                                     validation_loader=validation_loader)
             self._print_epoch(epoch_number, loss)
             if self._learning_rate_condition(epoch_number):
                 scheduler.step()
@@ -114,6 +113,7 @@ class DistilledNet(nn.Module, ABC):
         return running_loss
 
     def calculate_metric_dataloader(self, data_loader):
+        # model.eval_mode(), important if your model has batch norm layers
         for batch in data_loader:
             # self._reset_metrics()
             inputs, labels = batch

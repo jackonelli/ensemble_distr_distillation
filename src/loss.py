@@ -3,6 +3,7 @@ import torch
 import numpy as np
 import torch.distributions.multivariate_normal as torch_mvn
 import torch.distributions.dirichlet as torch_dirichlet
+import math
 
 import logging
 

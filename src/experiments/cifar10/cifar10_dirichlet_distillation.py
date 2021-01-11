@@ -27,7 +27,7 @@ def train_distilled_network_dirichlet(model_dir="models/distilled_model_cifar10_
     utils.setup_logger(log_path=Path.cwd() / args.log_dir / log_file,
                        log_level=args.log_level)
 
-    data_ind = np.load("training_files/training_data_indices.npy")
+    data_ind = np.load("src/experiments/cifar10/training_files/training_data_indices.npy")
     num_train_points = 40000
     train_ind = data_ind[:num_train_points]
     valid_ind = data_ind[num_train_points:]
@@ -57,14 +57,15 @@ def train_distilled_network_dirichlet(model_dir="models/distilled_model_cifar10_
     # Note that the ensemble predictions are assumed to have been saved to file (see ensemble_predictions.py),
     # ensemble_indices.npy contains the order of the ensemble members such that ind[:ensemble_size] are the indices
     # of the first ensemble, ind[ensemble_size:2*ensemble_size] are the indices of the second ensemble and so on
-    ind = np.load("training_files/ensemble_indices.npy")[((args.rep - 1) * ensemble_size):(args.rep * ensemble_size)]
+    ind = np.load("src/experiments/cifar10/training_files/ensemble_indices.npy")[((args.rep - 1) * ensemble_size):
+                                                                                 (args.rep * ensemble_size)]
     ensemble = ensemble_wrapper.EnsembleWrapper(
         output_size=10, indices=ind)
 
     device = utils.torch_settings(args.seed, args.gpu)
     distilled_model = cifar_resnet_dirichlet.CifarResnetDirichlet(ensemble,
-                                                                  resnet_utils.Bottleneck,
-                                                                  [2, 2, 2, 2],
+                                                                  resnet_utils.BasicBlock,
+                                                                  [3, 2, 2, 2],
                                                                   device=device,
                                                                   learning_rate=args.lr)
 
@@ -72,20 +73,20 @@ def train_distilled_network_dirichlet(model_dir="models/distilled_model_cifar10_
     distilled_model.add_metric(loss_metric)
 
     distilled_model.train(train_loader, num_epochs=args.num_epochs, validation_loader=valid_loader)
-
+    
     distilled_model.eval_mode()
-    counter = 0
-    model_acc = 0
+    predicted_distribution = []
+    all_labels = []
 
     for batch in test_loader:
         inputs, labels = batch
         inputs, labels = inputs[0].to(distilled_model.device), labels.to(distilled_model.device)
 
-        predicted_distribution = distilled_model.predict(inputs).mean(axis=1)
-        model_acc += metrics.accuracy(predicted_distribution.to(distilled_model.device), labels.long())
-        counter += 1
+        predicted_distribution.append(distilled_model.predict(inputs).to(distilled_model.device))
+        all_labels.append(labels.long())
 
-    LOGGER.info("Test accuracy is {}".format(model_acc / counter))
+    test_acc = metrics.accuracy(torch.cat(predicted_distribution), torch.cat(all_labels))
+    LOGGER.info("Test accuracy is {}".format(test_acc))
 
     torch.save(distilled_model.state_dict(), model_dir)
 
@@ -102,8 +103,8 @@ def predictions_dirichlet(model_dir="../models/distilled_model_cifar10_dirichlet
     ensemble = ensemble_wrapper.EnsembleWrapper(output_size=10)
 
     distilled_model = cifar_resnet_dirichlet.CifarResnetDirichlet(ensemble,
-                                                                  resnet_utils.Bottleneck,
-                                                                  [2, 2, 2, 2],
+                                                                  resnet_utils.BasicBlock,
+                                                                  [3, 2, 2, 2],
                                                                   learning_rate=args.lr)
 
     distilled_model.load_state_dict(torch.load(model_dir, map_location=torch.device('cpu')))
@@ -172,8 +173,8 @@ def predictions_corrupted_data_dirichlet(model_dir="models/distilled_model_cifar
     ensemble = ensemble_wrapper.EnsembleWrapper(output_size=10)
 
     distilled_model = cifar_resnet_dirichlet.CifarResnetDirichlet(ensemble,
-                                                                  resnet_utils.Bottleneck,
-                                                                  [2, 2, 2, 2],
+                                                                  resnet_utils.BasicBlock,
+                                                                  [3, 2, 2, 2],
                                                                   learning_rate=args.lr)
 
     distilled_model.load_state_dict(torch.load(model_dir, map_location=torch.device(distilled_model.device)))
@@ -247,8 +248,8 @@ def main():
     LOGGER.info("Args: {}".format(args))
 
     train_distilled_network_dirichlet()
-    #predictions_dirichlet()
     predictions_corrupted_data_dirichlet()
+    #predictions_dirichlet()
 
 
 if __name__ == "__main__":
